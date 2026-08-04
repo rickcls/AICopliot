@@ -20,6 +20,8 @@ function chunk(id: string, content: string): RetrievedChunk {
     pageNumber: 3,
     sectionTitle: "Runbook",
     score: 0.8,
+    lexicalScore: 0,
+    matchType: "semantic",
   };
 }
 

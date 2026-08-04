@@ -127,6 +127,46 @@ export async function getOrCreateDefaultWorkspace(
   };
 }
 
+/**
+ * Resolves a client-supplied project ID *within* an already-authorised
+ * workspace, or throws. A projectId from the request body is never trusted on
+ * its own — the (id, workspaceId) pair is the lookup, so an ID belonging to
+ * another workspace simply does not resolve.
+ *
+ * 404 rather than 403, for the same reason as requireWorkspaceAccess: don't
+ * confirm that a project exists to someone who cannot see it.
+ */
+export async function requireProject(
+  workspaceId: string,
+  projectId: string,
+): Promise<{ id: string; name: string }> {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, workspaceId },
+    select: { id: true, name: true },
+  });
+
+  if (!project) throw new AuthError("Project not found", 404);
+  return project;
+}
+
+/**
+ * Confirms an assignee is a member of this workspace before their ID is
+ * written to a task, so a user ID from outside the workspace cannot be attached
+ * to its work.
+ */
+export async function requireWorkspaceMember(
+  workspaceId: string,
+  userId: string,
+): Promise<string> {
+  const membership = await prisma.workspaceMember.findUnique({
+    where: { workspaceId_userId: { workspaceId, userId } },
+    select: { userId: true },
+  });
+
+  if (!membership) throw new AuthError("Assignee is not a workspace member", 404);
+  return membership.userId;
+}
+
 /** Convenience for routes/pages: authenticate and resolve the workspace. */
 export async function requireWorkspace(): Promise<
   WorkspaceAccess & { user: SessionUser }

@@ -8,6 +8,7 @@ import {
   EmptyState,
   ErrorState,
   Input,
+  Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
@@ -28,6 +29,8 @@ interface EvaluationRow {
   citationCount: number;
   refused: boolean;
   autoScore: boolean | null;
+  projectId: string | null;
+  project: { name: string } | null;
   result: "pass" | "fail" | "unreviewed";
   createdAt: string;
 }
@@ -88,9 +91,11 @@ function MetricsSummary({ metrics }: { metrics: Metrics }) {
 export function EvaluationsPanel({
   initialEvaluations,
   initialMetrics,
+  projects,
 }: {
   initialEvaluations: EvaluationRow[];
   initialMetrics: Metrics;
+  projects: Array<{ id: string; name: string }>;
 }) {
   const [rows, setRows] = useState<EvaluationRow[]>(initialEvaluations);
   const [metrics, setMetrics] = useState<Metrics>(initialMetrics);
@@ -101,6 +106,7 @@ export function EvaluationsPanel({
   const [running, setRunning] = useState(false);
   const [runningAll, setRunningAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -134,6 +140,7 @@ export function EvaluationsPanel({
             .map((k) => k.trim())
             .filter(Boolean),
           shouldRefuse,
+          projectId: projectId || null,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -223,6 +230,25 @@ export function EvaluationsPanel({
 
       <Card className="p-4">
         <form onSubmit={handleRun} className="space-y-3">
+          <div>
+            <label htmlFor="eval-project" className="mb-1.5 block text-sm font-medium">
+              Project scope
+            </label>
+            <Select
+              id="eval-project"
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
+              disabled={running}
+              className="w-full"
+            >
+              <option value="">All documents</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div>
             <label htmlFor="eval-question" className="mb-1.5 block text-sm font-medium">
               Question
@@ -346,6 +372,7 @@ export function EvaluationsPanel({
               <p className="mt-1 text-xs text-slate-500">
                 {formatDate(row.createdAt)}
                 {row.modelName ? ` · ${row.modelName}` : ""}
+                {` · ${row.project?.name ?? "All documents"}`}
                 {row.latencyMs !== null
                   ? ` · ${(row.latencyMs / 1000).toFixed(1)}s`
                   : ""}

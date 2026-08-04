@@ -40,6 +40,7 @@ export async function GET() {
       where: { workspaceId: access.workspaceId },
       orderBy: { createdAt: "desc" },
       take: 200,
+      include: { project: { select: { name: true } } },
     });
 
     return NextResponse.json({
@@ -74,8 +75,20 @@ export async function POST(request: Request) {
 
     const { question, expectedAnswerNotes, expectedKeywords, shouldRefuse } =
       parsed.data;
+    const projectId = parsed.data.projectId ?? null;
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, workspaceId: access.workspaceId },
+        select: { id: true },
+      });
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
 
-    const result = await answerQuestion(access.workspaceId, question);
+    const result = await answerQuestion(access.workspaceId, question, {
+      projectId,
+    });
     const autoScore = scoreEvaluation(
       { expectedKeywords, shouldRefuse },
       {
@@ -88,6 +101,7 @@ export async function POST(request: Request) {
     const evaluation = await prisma.evaluationCase.create({
       data: {
         workspaceId: access.workspaceId,
+        projectId,
         question,
         expectedAnswerNotes,
         expectedKeywords,
@@ -128,7 +142,9 @@ async function runAll(workspaceId: string) {
 
   for (const testCase of cases) {
     try {
-      const result = await answerQuestion(workspaceId, testCase.question);
+      const result = await answerQuestion(workspaceId, testCase.question, {
+        projectId: testCase.projectId,
+      });
       const autoScore = scoreEvaluation(
         {
           expectedKeywords: testCase.expectedKeywords,
@@ -178,6 +194,7 @@ async function runAll(workspaceId: string) {
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
     take: 200,
+    include: { project: { select: { name: true } } },
   });
 
   return NextResponse.json({

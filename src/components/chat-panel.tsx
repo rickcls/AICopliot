@@ -8,6 +8,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
@@ -50,7 +51,11 @@ function CitationCard({ citation }: { citation: Citation }) {
           <span className="text-xs text-slate-500">{location}</span>
         ) : null}
         <span className="ml-auto text-xs text-slate-400">
-          {(citation.score * 100).toFixed(0)}% match
+          {citation.matchType === "lexical"
+            ? "exact text match"
+            : citation.matchType === "hybrid"
+              ? `hybrid · ${(citation.score * 100).toFixed(0)}% semantic`
+              : `${(citation.score * 100).toFixed(0)}% semantic match`}
         </span>
       </div>
       <blockquote className="mt-2 border-l-2 border-slate-300 pl-3 text-xs text-pretty text-slate-600 italic">
@@ -114,14 +119,30 @@ function FeedbackButtons({ messageId }: { messageId: string }) {
 
 export function ChatPanel({
   readyDocumentCount,
+  projects,
+  initialProjectId = "",
 }: {
   readyDocumentCount: number;
+  projects: Array<{ id: string; name: string; readyDocumentCount: number }>;
+  initialProjectId?: string;
 }) {
   const [question, setQuestion] = useState("");
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState(initialProjectId);
+
+  const selectedReadyDocumentCount = projectId
+    ? (projects.find((project) => project.id === projectId)?.readyDocumentCount ?? 0)
+    : readyDocumentCount;
+
+  function changeProject(nextProjectId: string) {
+    setProjectId(nextProjectId);
+    setConversationId(undefined);
+    setAnswers([]);
+    setError(null);
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -135,7 +156,11 @@ export function ChatPanel({
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed, conversationId }),
+        body: JSON.stringify({
+          question: trimmed,
+          conversationId,
+          projectId: projectId || null,
+        }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -157,14 +182,18 @@ export function ChatPanel({
   if (readyDocumentCount === 0 && answers.length === 0) {
     return (
       <EmptyState
-        title="No indexed documents yet"
-        description="Upload and index at least one document before asking questions — answers are generated only from your own documents."
+        title={projectId ? "This project has no indexed documents" : "No indexed documents yet"}
+        description={
+          projectId
+            ? "Upload and index a document inside this project before asking questions about it."
+            : "Create a project and index at least one document before asking questions."
+        }
         action={
           <Link
-            href="/dashboard"
+            href={projectId ? `/projects/${projectId}` : "/projects"}
             className="inline-flex h-10 items-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
           >
-            Go to documents
+            {projectId ? "Go to project" : "Go to projects"}
           </Link>
         }
       />
@@ -175,6 +204,25 @@ export function ChatPanel({
     <div className="space-y-6">
       <Card className="p-4">
         <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label htmlFor="chat-project" className="mb-1.5 block text-sm font-medium">
+              Search scope
+            </label>
+            <Select
+              id="chat-project"
+              value={projectId}
+              onChange={(event) => changeProject(event.target.value)}
+              disabled={pending}
+              className="w-full"
+            >
+              <option value="">All documents ({readyDocumentCount})</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name} ({project.readyDocumentCount})
+                </option>
+              ))}
+            </Select>
+          </div>
           <label htmlFor="question" className="sr-only">
             Your question
           </label>
@@ -193,10 +241,17 @@ export function ChatPanel({
           />
           <div className="mt-3 flex items-center justify-between gap-3">
             <span className="text-xs text-slate-500">
-              {readyDocumentCount} document{readyDocumentCount === 1 ? "" : "s"}{" "}
-              indexed
+              {selectedReadyDocumentCount} document
+              {selectedReadyDocumentCount === 1 ? "" : "s"} indexed in this scope
             </span>
-            <Button type="submit" disabled={pending || question.trim().length < 3}>
+            <Button
+              type="submit"
+              disabled={
+                pending ||
+                question.trim().length < 3 ||
+                selectedReadyDocumentCount === 0
+              }
+            >
               {pending ? (
                 <>
                   <Spinner className="border-white/40 border-t-white" />
@@ -207,6 +262,11 @@ export function ChatPanel({
               )}
             </Button>
           </div>
+          {selectedReadyDocumentCount === 0 ? (
+            <p className="mt-2 text-xs text-amber-700">
+              This project has no indexed documents yet.
+            </p>
+          ) : null}
         </form>
       </Card>
 

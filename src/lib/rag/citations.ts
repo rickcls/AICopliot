@@ -61,6 +61,7 @@ export function validateAnswer(
       sectionTitle: chunk.sectionTitle,
       excerpt: buildExcerpt(citation.quote, chunk.content),
       score: chunk.score,
+      matchType: chunk.matchType,
     });
   }
 

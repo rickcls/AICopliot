@@ -8,6 +8,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Select,
   Spinner,
 } from "@/components/ui";
 import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
@@ -21,6 +22,13 @@ interface DocumentRow {
   errorMessage: string | null;
   chunkCount: number;
   createdAt: string;
+  projectId: string | null;
+  project: { name: string } | null;
+}
+
+interface ProjectOption {
+  id: string;
+  name: string;
 }
 
 const STATUS_TONE = {
@@ -39,13 +47,30 @@ const STATUS_LABEL = {
 
 export function DocumentsPanel({
   initialDocuments,
+  projects,
+  initialProjectFilter = "all",
+  fixedProject,
 }: {
   initialDocuments: DocumentRow[];
+  projects: ProjectOption[];
+  initialProjectFilter?: string;
+  fixedProject?: ProjectOption;
 }) {
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProjectId, setUploadProjectId] = useState(
+    fixedProject
+      ? fixedProject.id
+      : initialProjectFilter !== "all" && initialProjectFilter !== "unassigned"
+      ? initialProjectFilter
+      : "",
+  );
+  const [projectFilter, setProjectFilter] = useState(
+    fixedProject?.id ?? initialProjectFilter,
+  );
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -82,6 +107,7 @@ export function DocumentsPanel({
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (uploadProjectId) formData.append("projectId", uploadProjectId);
 
       const response = await fetch("/api/documents", {
         method: "POST",
@@ -127,6 +153,44 @@ export function DocumentsPanel({
     await load();
   }
 
+  async function assignProject(documentId: string, projectId: string) {
+    setAssigningId(documentId);
+    setLoadError(null);
+    try {
+      const response = await fetch(`/api/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: projectId || null }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setLoadError(data.error ?? "Could not update the document project.");
+        return;
+      }
+      setDocuments((previous) =>
+        previous.map((document) =>
+          document.id === documentId
+            ? {
+                ...document,
+                projectId: data.document.projectId,
+                project: data.document.project,
+              }
+            : document,
+        ),
+      );
+    } catch {
+      setLoadError("Could not update the document project.");
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
+  const visibleDocuments = documents.filter((document) => {
+    if (projectFilter === "all") return true;
+    if (projectFilter === "unassigned") return document.projectId === null;
+    return document.projectId === projectFilter;
+  });
+
   async function handleDelete(id: string, filename: string) {
     if (!confirm(`Delete "${filename}"? This also removes its indexed text.`)) {
       return;
@@ -141,14 +205,41 @@ export function DocumentsPanel({
 
   return (
     <div className="space-y-4">
-      <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
+      <Card className="flex flex-wrap items-end justify-between gap-4 p-4">
         <div>
-          <p className="text-sm font-medium">Upload a document</p>
+          <p className="text-sm font-medium">
+            {fixedProject
+              ? `Upload to ${fixedProject.name}`
+              : "Upload a document"}
+          </p>
           <p className="mt-0.5 text-xs text-slate-500">
             {SUPPORTED_EXTENSIONS.join(", ")} · up to 10 MB
           </p>
         </div>
-        <div>
+        <div className="flex flex-wrap items-end gap-3">
+          {!fixedProject ? (
+            <div>
+              <label
+                htmlFor="upload-project"
+                className="mb-1 block text-xs text-slate-500"
+              >
+                Project
+              </label>
+              <Select
+                id="upload-project"
+                value={uploadProjectId}
+                onChange={(event) => setUploadProjectId(event.target.value)}
+                disabled={uploading}
+              >
+                <option value="">Unassigned</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
           <input
             ref={fileInput}
             type="file"
@@ -175,22 +266,64 @@ export function DocumentsPanel({
         </div>
       </Card>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">
+            {fixedProject ? "Documents in this project" : "Document library"}
+          </p>
+          {fixedProject ? (
+            <p className="mt-0.5 text-xs text-slate-500">
+              Only these documents are used when asking within this project.
+            </p>
+          ) : null}
+        </div>
+        {!fixedProject ? (
+          <div className="flex items-center gap-2">
+            <label htmlFor="project-filter" className="text-xs text-slate-500">
+              Filter
+            </label>
+            <Select
+              id="project-filter"
+              value={projectFilter}
+              onChange={(event) => setProjectFilter(event.target.value)}
+            >
+              <option value="all">All projects</option>
+              <option value="unassigned">Unassigned</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : null}
+      </div>
+
       {uploadError ? <ErrorState message={uploadError} /> : null}
       {loadError ? <ErrorState message={loadError} /> : null}
 
       {documents.length === 0 ? (
         <EmptyState
-          title="No documents yet"
-          description="Upload a runbook, incident report, or policy document to start asking questions about it."
+          title={fixedProject ? "This project has no documents" : "No documents yet"}
+          description={
+            fixedProject
+              ? "Upload the first document for this project. Questions asked here will use only this project's documents."
+              : "Upload a runbook, incident report, or policy document to start asking questions about it."
+          }
           action={
             <Button type="button" onClick={() => fileInput.current?.click()}>
               Upload your first document
             </Button>
           }
         />
+      ) : visibleDocuments.length === 0 ? (
+        <EmptyState
+          title="No documents in this project"
+          description="Assign an existing document or upload a new one using the selected project."
+        />
       ) : (
         <Card className="divide-y divide-slate-100">
-          {documents.map((doc) => (
+          {visibleDocuments.map((doc) => (
             <div
               key={doc.id}
               className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4"
@@ -207,6 +340,9 @@ export function DocumentsPanel({
                   {doc.status === "ready"
                     ? ` · ${doc.chunkCount} chunks indexed`
                     : ""}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Project: {doc.project?.name ?? "Unassigned"}
                 </p>
                 {doc.status === "failed" && doc.errorMessage ? (
                   <p className="mt-1 text-xs text-red-700">{doc.errorMessage}</p>
@@ -228,6 +364,25 @@ export function DocumentsPanel({
                 >
                   Retry
                 </Button>
+              ) : null}
+
+              {!fixedProject ? (
+                <Select
+                  aria-label={`Project for ${doc.originalFilename}`}
+                  value={doc.projectId ?? ""}
+                  onChange={(event) =>
+                    void assignProject(doc.id, event.target.value)
+                  }
+                  disabled={assigningId === doc.id}
+                  className="h-8 max-w-44 text-xs"
+                >
+                  <option value="">Unassigned</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </Select>
               ) : null}
 
               <Button

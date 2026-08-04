@@ -5,8 +5,9 @@ Guidance for working in this repository.
 ## What this project is
 
 **AI Ops Copilot** — a single-workspace RAG knowledge assistant for IT operations
-teams. Users upload operational documents; answers are generated **only** from
-those documents, with citations.
+teams. Users create project workspaces, upload operational documents into each
+project, and receive answers generated **only** from the selected document
+scope, with citations.
 
 **This is a RAG workflow, not an autonomous agent.** Do not add multi-agent
 orchestration, autonomous loops, external tool calling, ServiceNow (or similar)
@@ -60,8 +61,10 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    model.** Returned IDs are resolved through a server-side map and dropped if
    absent. An answer left with zero valid citations is downgraded to a refusal.
 
-4. **Refuse before spending a model call.** If no chunk clears `RAG_MIN_SCORE`,
-   `answerQuestion` returns the refusal without invoking the chat provider.
+4. **Refuse before spending a model call.** A chunk must either clear the
+   semantic `RAG_MIN_SCORE` or match the PostgreSQL full-text query. If neither
+   retrieval path supplies evidence, `answerQuestion` returns the refusal
+   without invoking the chat provider.
 
 5. **Secrets stay server-side.** Everything touching the DB or a provider
    imports `server-only`. No `NEXT_PUBLIC_` variable exists, and none should.
@@ -81,6 +84,32 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    distinguish a retrieval regression from judge variance. Cases that rules
    cannot decide return `null` and fall to human review — they are never
    guessed at.
+
+9. **Projects scope knowledge; workspaces authorize access.** A `projectId`
+   supplied by the client is never trusted by itself — `requireProject()` in
+   `src/lib/auth-guard.ts` resolves it with
+   `findFirst({ where: { id, workspaceId } })` before any write. When a project
+   is selected, both hybrid retrieval SQL paths filter `Document.projectId`
+   inside the query.
+
+   Deleting a project follows the record's own nullability, and the two rules
+   must not be confused:
+   - **`SET NULL`** for `Document`, `ChatConversation`, and `EvaluationCase`.
+     Their `projectId` is nullable, so they survive as unassigned records.
+     Removing an organizational container must not destroy uploaded knowledge
+     or answer history.
+   - **`CASCADE`** for `Task`, `Milestone`, `ProjectRisk`, and `GenerationRun`.
+     Their `projectId` is **not** nullable — a task with no project would be
+     unreachable in every view, so orphaning is not an available outcome. The
+     delete confirmation names these counts before it destroys them.
+
+10. **Project-management records are never generated silently.** `Task`,
+   `Milestone`, and `ProjectRisk` each carry `source` (`manual | ai_suggested`)
+   and `generationStatus`. Everything written today is `manual` /
+   `not_applicable`. When generation lands, a proposal must arrive as
+   `ai_suggested` + `draft` and reach `approved` only through an explicit human
+   action — and a proposal left with zero valid citations is discarded, exactly
+   as a zero-citation answer is downgraded to a refusal in invariant 3.
 
 ## ⚠️ Prisma drops the pgvector index on every migration
 
@@ -137,22 +166,22 @@ tests can inject fakes rather than mocking modules.
 ## The RAG pipeline
 
 ```
-question ─▶ rewrite (only if history) ─▶ embed ─▶ pgvector top-K
+question ─▶ rewrite (only if history) ─▶ embed ─┬─▶ pgvector top-K ─┐
+                                                 └─▶ full-text search ┤─▶ rank fusion
                                                       │
-                    ┌─────────────────────────────────┤
-                    │ nothing ≥ RAG_MIN_SCORE         │ else
-                    ▼                                 ▼
-                 REFUSE                    label S1..Sn ─▶ LLM ─▶ Zod
+                    ┌─ no semantic or lexical evidence ─┤
+                    ▼                                   ▼
+                 REFUSE                      label S1..Sn ─▶ LLM ─▶ Zod
               (no model call)                                      │
                                                                    ▼
                                                      validate citations
                                             (unknown ⇒ dropped; none ⇒ refuse)
 ```
 
-Retrieval is **dense single-stage** with cosine similarity (`<=>`,
-`vector_cosine_ops`). No hybrid search, no re-ranking, no multi-query. That is
-deliberate — it is the baseline the evaluation suite measures against. Do not
-add retrieval complexity without a before/after run of `/admin/evaluations`.
+Retrieval is **hybrid**: dense cosine similarity (`<=>`, `vector_cosine_ops`)
+fused with PostgreSQL full-text via reciprocal-rank fusion
+(`src/lib/rag/ranking.ts`). Do not combine raw cosine and `ts_rank_cd` directly
+— their scales are unrelated. Measure changes with `/admin/evaluations`.
 
 A follow-up costs **two** chat calls (rewrite + answer); a first question costs
 one. `needsRewrite()` short-circuits when there is no history.
@@ -170,6 +199,97 @@ chunk**.
 
 Cosine distance is `<=>`; similarity is `1 - (a <=> b)`. The HNSW index uses
 `vector_cosine_ops` and must match the operator used in queries.
+
+## Hybrid retrieval notes
+
+`src/lib/rag/retrieve.ts` runs workspace-scoped vector and PostgreSQL full-text
+searches in parallel. `src/lib/rag/ranking.ts` merges their ranked candidates
+with reciprocal-rank fusion; do not combine raw cosine similarity and
+`ts_rank_cd` directly because their numeric scales are unrelated.
+
+The semantic score remains `RetrievedChunk.score` so `RAG_MIN_SCORE` retains a
+stable meaning. A positive lexical score is independently acceptable grounding
+evidence because the full-text query requires every non-stopword query lexeme
+to match. Both SQL paths must keep the workspace, ready-document, and embedding
+guards inside their queries. The GIN expression index must use the same
+`english` text-search configuration as the lexical query.
+
+## Project workspace notes
+
+`Project` is the user-facing knowledge container below `Workspace`. The project
+detail route owns the focused workflow: upload documents, see only documents in
+that project, and open chat with the project preselected. `/documents` is the
+cross-project administration view for assigning or moving files.
+
+`ChatConversation.projectId` and `EvaluationCase.projectId` preserve the scope
+used for an answer. Changing project scope in the chat UI starts a fresh
+conversation so messages from different document sets are never mixed.
+
+## Project management notes
+
+`/projects/[id]` has sections — Overview, Tasks, Timeline, Documents, Risks —
+built as nested routes under a shared `layout.tsx`. Each is its own server page
+fetching only its own data. Layouts cannot pass data to children and do not
+re-render, so the project lookup goes through `getScopedProject` in
+`src/lib/pm/project.ts`, wrapped in React `cache` so the layout and the page
+share one query.
+
+**`src/components/app-sidebar.tsx` is the only navigation, and it is always
+visible.** It holds global links and, for the project you are currently in, its
+sections — derived from `usePathname`, because the layout rendering it does not
+re-render on navigation. There is deliberately no tab strip: two nav systems
+disagree about where you are, and no toggle: below `md` it narrows to a 56px
+icon rail instead of hiding. Labels are hidden with CSS (`hidden md:inline`)
+rather than conditionally rendered, so the markup is identical at every
+breakpoint and cannot cause a hydration mismatch.
+
+The app shell is full width; the old `max-w-5xl` cap is what squeezed five board
+columns into ~180px each. Prose pages (`/chat`, `/documents/[id]`) opt back out
+with their own `max-w-*`, because text gets harder to read as it widens.
+
+**Routes:** `/dashboard` is the workspace summary only, and `/documents` is
+cross-project document administration. They were one page; splitting them is why
+the sidebar entry labelled "All Documents" leads to documents and nothing else.
+`/projects/[id]/documents` remains the project-scoped library.
+
+**All date and status logic lives in `src/lib/pm/rules.ts` and is pure.**
+Overdue, blocked, due-in-7-days, active-project, and timeline bucketing each have
+exactly one definition, and the `*Where` builders take `workspaceId` first
+because no query may omit it. Do not retype these predicates inline — a card's
+count and the list beneath it must come from the same filter.
+
+Dates are compared at **UTC day** granularity. `<input type="date">` submits
+`YYYY-MM-DD`, which parses as UTC midnight; a task due today must not read as
+overdue because the viewer is west of UTC. Render date-only values with
+`formatDay` (UTC-pinned), never `formatDate` — the latter shows local time and
+would disagree with the overdue calculation west of UTC.
+
+`src/lib/pm/gantt.ts` is the other pure module: it turns dated items into bar
+offsets and widths as **percentages**, so the chart is plain CSS with no
+measurement, no layout effects, and no charting dependency. A bar covers its
+final day (hence the `+1`), a same-day item is clamped to a minimum width so it
+stays visible, and today is folded into the range so its marker is never
+off-screen. A task with a due date but no `startDate` has a deadline without a
+duration and renders as a point, not an invented span.
+
+The board's drag-and-drop uses native HTML5 drag events — one status change does
+not justify a dependency. Two rules: the drop handler reads the task id from
+`dataTransfer`, **not** from React state (state set in `dragstart` may not be
+committed when `drop` runs), and the status `<select>` in the detail panel stays
+as the keyboard-accessible equivalent, so the board is never drag-only. The move
+is optimistic and rolls back on failure.
+
+Update schemas (`updateTaskSchema` and friends) are built from a field map with
+**no `.default()`**, because `.partial()` does not strip defaults — a defaulted
+field would materialise on a PATCH and silently overwrite a value the caller
+never mentioned. For the same reason `optionalText` keeps `undefined` (leave
+alone) distinct from `null`/`""` (clear it).
+
+Collection routes are nested under the project (`POST /api/projects/[id]/tasks`)
+because creation needs project authorization; item routes are flat
+(`PATCH /api/tasks/[id]`) because the row carries its own `projectId` and the
+workspace is the security boundary. This mirrors the existing `/api/documents`
+split.
 
 ## Conventions
 

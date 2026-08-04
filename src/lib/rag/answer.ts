@@ -9,6 +9,7 @@ import {
 import { modelAnswerSchema } from "@/lib/schemas";
 import { refusal, validateAnswer, type ValidatedAnswer } from "./citations";
 import { buildContext, buildUserMessage, SYSTEM_PROMPT } from "./prompt";
+import { hasGroundingEvidence } from "./ranking";
 import { retrieveChunks, type RetrievedChunk } from "./retrieve";
 import { rewriteQuestion, type ChatTurn } from "./rewrite";
 
@@ -17,8 +18,8 @@ import { rewriteQuestion, type ChatTurn } from "./rewrite";
  *
  * Two independent guards keep answers grounded:
  *   1. A retrieval gate BEFORE the model is called — if nothing clears
- *      RAG_MIN_SCORE there is no evidence to reason over, so we refuse without
- *      spending a request. Deterministic and cheap.
+ *      RAG_MIN_SCORE (or the lexical path) there is no evidence to reason over,
+ *      so we refuse without spending a request. Deterministic and cheap.
  *   2. Citation validation AFTER the model replies (see ./citations.ts).
  */
 
@@ -38,6 +39,7 @@ export interface AnswerDeps {
   minScore?: number;
   /** Prior turns, oldest first. Empty for the first question in a thread. */
   history?: ChatTurn[];
+  projectId?: string | null;
 }
 
 /** Turns of history included in the answering prompt (assistant turns included). */
@@ -96,10 +98,16 @@ export async function answerQuestion(
   const searchQuery = await rewriteQuestion(question, history, chat);
 
   const [queryEmbedding] = await embeddings.embed([searchQuery]);
-  const retrieved = await retrieveChunks(workspaceId, queryEmbedding, topK);
+  const retrieved = await retrieveChunks(
+    workspaceId,
+    queryEmbedding,
+    searchQuery,
+    topK,
+    deps.projectId ?? null,
+  );
 
   // --- Guard 1: refuse before calling the model when evidence is too weak ---
-  const relevant = retrieved.filter((c) => c.score >= minScore);
+  const relevant = retrieved.filter((c) => hasGroundingEvidence(c, minScore));
   if (relevant.length === 0) {
     return {
       ...refusal(),

@@ -1,0 +1,75 @@
+import { NextResponse } from "next/server";
+import { handleRouteError } from "@/lib/api";
+import {
+  requireProject,
+  requireWorkspace,
+  requireWorkspaceMember,
+} from "@/lib/auth-guard";
+import { prisma } from "@/lib/db";
+import { taskSelect } from "@/lib/pm/select";
+import { createTaskSchema } from "@/lib/schemas";
+
+interface Params {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(_request: Request, { params }: Params) {
+  try {
+    const { workspaceId } = await requireWorkspace();
+    const { id } = await params;
+    const project = await requireProject(workspaceId, id);
+
+    const tasks = await prisma.task.findMany({
+      where: { workspaceId, projectId: project.id },
+      orderBy: [{ createdAt: "asc" }],
+      select: taskSelect,
+    });
+
+    return NextResponse.json({ tasks });
+  } catch (error) {
+    return handleRouteError(error, "GET /api/projects/[id]/tasks");
+  }
+}
+
+export async function POST(request: Request, { params }: Params) {
+  try {
+    const { workspaceId } = await requireWorkspace();
+    const { id } = await params;
+    const project = await requireProject(workspaceId, id);
+
+    const body = await request.json().catch(() => null);
+    const parsed = createTaskSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 },
+      );
+    }
+
+    // An assignee ID from the client is only accepted once it is confirmed to
+    // belong to this workspace's membership.
+    if (parsed.data.assigneeId) {
+      await requireWorkspaceMember(workspaceId, parsed.data.assigneeId);
+    }
+
+    const task = await prisma.task.create({
+      data: {
+        workspaceId,
+        projectId: project.id,
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        status: parsed.data.status,
+        priority: parsed.data.priority,
+        assigneeId: parsed.data.assigneeId ?? null,
+        estimatedHours: parsed.data.estimatedHours ?? null,
+        startDate: parsed.data.startDate ?? null,
+        dueDate: parsed.data.dueDate ?? null,
+      },
+      select: taskSelect,
+    });
+
+    return NextResponse.json({ task }, { status: 201 });
+  } catch (error) {
+    return handleRouteError(error, "POST /api/projects/[id]/tasks");
+  }
+}

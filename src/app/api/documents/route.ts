@@ -22,6 +22,8 @@ export async function GET() {
         errorMessage: true,
         chunkCount: true,
         createdAt: true,
+        projectId: true,
+        project: { select: { name: true } },
       },
     });
 
@@ -38,9 +40,24 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const file = formData.get("file");
+    const rawProjectId = formData.get("projectId");
+    const projectId =
+      typeof rawProjectId === "string" && rawProjectId.trim()
+        ? rawProjectId.trim()
+        : null;
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, workspaceId },
+        select: { id: true },
+      });
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
     }
 
     // Reject on the declared size before buffering the whole body.
@@ -71,6 +88,7 @@ export async function POST(request: Request) {
     const document = await prisma.document.create({
       data: {
         workspaceId,
+        projectId,
         originalFilename: validation.safeFilename,
         mimeType: file.type || "application/octet-stream",
         sizeBytes: buffer.byteLength,

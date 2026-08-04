@@ -6,9 +6,10 @@ Living plan and decision log for AI Ops Copilot.
 
 ## Goal
 
-A secure, single-workspace MVP of an internal knowledge assistant for IT
-operations teams: upload operational documents, ask questions, get answers
-grounded strictly in those documents with verifiable citations.
+A secure, single-workspace internal knowledge assistant for IT operations teams:
+create project workspaces, upload operational documents into each project, ask
+questions within a selected scope, and get answers grounded strictly in those
+documents with verifiable citations.
 
 **Explicitly out of scope**, now and later unless deliberately revisited:
 multi-agent orchestration, autonomous loops, external tool calling, ServiceNow
@@ -67,6 +68,11 @@ Retrieval quality is where the engineering is.
 | User can view the cited document / source excerpt | Done |
 | User can leave answer feedback | Done |
 | Evaluation page persists and displays cases | Done |
+| Hybrid retrieval handles semantic questions and exact identifiers | Done — vector + PostgreSQL FTS with reciprocal-rank fusion |
+| Users can create projects containing separate document libraries | Done — project workspace, targeted upload, reassignment, and safe deletion |
+| Chat and evaluations can be restricted to one project | Done — both retrieval paths filter at query time |
+| Projects track tasks, dependencies, milestones, risks, and a timeline | Done — manual CRUD, workspace- and project-scoped, no model call involved |
+| Dashboard surfaces overdue, blocked, and upcoming work | Done — counts and lists share one filter definition |
 | Type-check, lint, tests, production build pass | Done |
 | README covers setup, env, migrations, pgvector, manual test | Done |
 
@@ -86,13 +92,16 @@ upload ─▶ validate ─▶ store blob ─▶ Document(uploaded)
                                                  │ + status=ready   │
                                                  └──────────────────┘
 
-question ─▶ rewrite if follow-up ─▶ embed ─▶ pgvector search (workspace-scoped)
-           (standalone form is           │
-            what gets embedded)          ├─ nothing ≥ RAG_MIN_SCORE ─▶ REFUSE
-                                         │                        (no model call)
-                                         └─▶ label chunks S1..Sn ─▶ LLM ─▶ Zod
-                                                                            │
-                                                                            ▼
+project ─▶ documents ─▶ upload / process / manage
+    │
+question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬─▶ pgvector search ─┐
+           (standalone form is                                  └─▶ full-text search ┤─▶ rank fusion
+            what gets embedded)                                         │
+                          ┌─ no semantic or lexical evidence ─▶ REFUSE (no model call)
+                          │
+                          └─▶ label chunks S1..Sn ─▶ LLM ─▶ Zod parse
+                                                              │
+                                                              ▼
                                               validate citations against S-map
                                               (unknown label ⇒ dropped;
                                                zero valid ⇒ downgrade to refusal)
@@ -119,6 +128,18 @@ question ─▶ rewrite if follow-up ─▶ embed ─▶ pgvector search (worksp
 | 13 | Deterministic eval scoring, not LLM-as-judge | A regression suite must give the same verdict for the same output, or a retrieval regression is indistinguishable from judge variance. Cases rules cannot decide return `null` and go to human review. |
 | 14 | Rewrite failures fall back to the literal question | A bad rewrite degrades retrieval; a blocked rewrite blocks the answer entirely. Never let an optimisation become a hard dependency. |
 | 15 | pgvector index guaranteed by a post-migrate script, not by discipline | The hand-edit-every-migration approach relied on a human remembering, and the failure was silent — a dropped index degrades search to a sequential scan without any error. `prisma/ensure-vector-index.ts` is chained into `db:migrate` and exits non-zero, so the failure becomes loud. It checks `indexdef` rather than mere existence, because a wrong operator class is ignored by Postgres rather than rejected. Uses `pg` rather than `psql` (not installed everywhere) or `docker compose exec` (assumes local Docker). |
+| 16 | Reciprocal-rank fusion for hybrid retrieval | Cosine similarity and PostgreSQL text rank have unrelated scales. Rank fusion promotes chunks found by both methods while preserving `RAG_MIN_SCORE` as a semantic threshold and allowing exact lexical evidence independently. |
+| 17 | Projects are document-owning knowledge workspaces | Users need a clear container for separate systems, customers, or initiatives. Project IDs are recorded on documents, conversations, and evaluations, while retrieval enforces the selected project inside both SQL paths. |
+| 18 | Project deletion uses `SET NULL` | Removing an organizational container must not destroy uploaded documents, chat history, or evaluations. Those records become unassigned and remain recoverable. |
+| 19 | Project-management records **cascade** on project delete | `Task`, `Milestone`, `ProjectRisk`, and `GenerationRun` have a non-nullable `projectId`, so `SET NULL` is not available and an orphaned task would be unreachable in every view. The delete confirmation names the counts, and documents still survive as unassigned — see invariant 9. |
+| 20 | Project tabs are nested routes, not client-side tab state | Each tab fetches only its own data, is linkable, and gets one shared `loading.tsx`. The cost is that layouts cannot pass data down, solved by React `cache` in `src/lib/pm/project.ts`. |
+| 21 | All date/status logic is pure, in `src/lib/pm/rules.ts` | "Overdue" and "blocked" appear on a dashboard card, a project overview, and a timeline bucket. One definition, directly unit-testable, means a count and the list beneath it cannot disagree — the same reasoning as chunking and citation validation. |
+| 22 | Update schemas carry no Zod defaults | `.partial()` does **not** strip `.default()`. A defaulted field materialises on a PATCH and silently overwrites a value the caller never mentioned — caught by a test that asserted `{ status }` should not also set `priority`. `optionalText` keeps `undefined` (leave alone) distinct from `null`/`""` (clear) for the same reason. |
+| 23 | AI-facing tables shipped unused in the manual phase | `GenerationRun`, the three citation tables, and the `source` / `generationStatus` columns cost nothing empty, and mean the generation phase needs no second migration against a database that by then holds real data. |
+| 24 | Sidebar replaces the top nav; app shell is full width | The board and Gantt need horizontal room, and `max-w-5xl` was squeezing five columns into ~180px each. The sidebar also carries project sections, so the tab strip was removed — two navigation systems disagree about where you are. |
+| 25 | `Task.startDate` added | A Gantt bar needs a duration. Without a start date a task has a deadline only, and any bar length would be invented. Nullable, so a due-date-only task honestly renders as a point rather than a fabricated span. |
+| 26 | Gantt built from a pure geometry module, no charting library | `src/lib/pm/gantt.ts` returns offsets and widths as percentages, so the chart is plain CSS — no measurement, no layout effects, no bundle cost, and the arithmetic is unit-testable instead of buried in JSX. |
+| 27 | Drag-and-drop uses native HTML5 events | One status change per drop does not justify a dependency. The drop handler reads the id from `dataTransfer` rather than React state, because state set in `dragstart` is not guaranteed committed when `drop` fires — a bug found in browser testing. The status `<select>` remains as the accessible path. |
 
 ### Deviations from the original spec (approved)
 
@@ -137,7 +158,8 @@ question ─▶ rewrite if follow-up ─▶ embed ─▶ pgvector search (worksp
    confirmed against live `text-embedding-3-small` on one corpus: a genuine
    match scored 0.668 and an unrelated question refused correctly. That is one
    data point, not a calibration. Add unanswerable cases to the evaluation
-   suite and watch `refusalAccuracy` as the corpus grows.
+   suite and watch `refusalAccuracy` as the corpus grows. The lexical path is
+   an independent grounding signal, but the semantic floor still needs tuning.
 1a. **Keyword scoring is strict, and model wording varies.** A live back-to-back
    regression run moved `autoPassRate` from 0.67 to 0.33 with no code change:
    the same question answered correctly both times, but one run omitted a
@@ -205,10 +227,53 @@ entire reason item 1 was built first.
 The UI already polls for status, so no frontend work is required.
 
 **Phase 3 — retrieval quality**
-- Hybrid search (pgvector + Postgres full-text) for exact identifiers like
-  hostnames and error codes, where dense embeddings are weak.
 - Re-ranking the top ~30 candidates down to ~8.
 - Switch IVFFlat/HNSW parameters once the corpus is large enough to matter.
 
-**Phase 4 — multi-user workspaces**
-- Invite flow, role management UI, per-document access control.
+Completed in Phase 3:
+- Hybrid search using pgvector + PostgreSQL full-text search for exact
+  identifiers, merged with reciprocal-rank fusion.
+
+**Phase 4 — business knowledge organization**
+- Document collections and metadata: team, system, environment, location,
+  document type, owner, effective date, and review date.
+- Document lifecycle states, version relationships, expiry warnings, and
+  conflict detection.
+- User-triggered operational templates for incident checklists, handovers,
+  change-impact reviews, audit summaries, and onboarding guides.
+
+Completed in Phase 4:
+- Project workspaces that contain their own documents, project-targeted uploads,
+  cross-project reassignment, and project-scoped chat and evaluations.
+
+**Phase 4b — document-grounded project generation** (schema already in place)
+
+The manual project layer is complete. Generation is deliberately *not* built
+yet. When it is, the citation guarantees must extend rather than fork:
+
+1. Keep `S1..Sn` for document chunks and give structured records their own
+   disjoint opaque labels. Real database IDs still never reach the model; only
+   the source map's value type widens to a discriminated `{ kind, id }`.
+2. Keep **one** validation gate. `validateAnswer` resolves every returned label
+   through that single map and drops anything absent, so no new path can bypass
+   it. A proposal left with zero valid citations is discarded, mirroring the
+   existing zero-citation downgrade to a refusal.
+3. Structured records are fetched by workspace- and project-scoped queries, so
+   they are grounding evidence by construction and need no threshold.
+   `RAG_MIN_SCORE` keeps its exact meaning because it still applies only to
+   `RetrievedChunk.score`. The pre-model refusal gate becomes: refuse unless
+   retrieval supplied a qualifying chunk *or* the project-data query returned an
+   in-scope record — deterministic on the structured half, so the gate gets
+   stronger.
+4. Record the run in `GenerationRun`, write proposals as
+   `source: ai_suggested, generationStatus: draft`, and require an explicit human
+   action to approve. Nothing writes to a project without a click.
+5. Store the chat scope (`documents | project_data | both`) on
+   `ChatConversation` and start a fresh conversation when it changes, the same
+   rule `projectId` already follows.
+
+**Phase 5 — knowledge health and collaboration**
+- Dashboard for refusals, low-confidence topics, feedback trends, frequently
+  cited documents, unused documents, and documentation gaps.
+- Workspace invitations, role management, and document-level access control.
+- Conversation history, saved answers, internal sharing, and cited exports.
