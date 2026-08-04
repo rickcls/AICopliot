@@ -31,7 +31,10 @@ Two things worth remembering from that pass:
 
 1. **Prisma drops the pgvector HNSW index on every migration.** Caught before
    applying. It does not break correctness — it silently turns vector search
-   into a sequential scan. See the warning in `CLAUDE.md`.
+   into a sequential scan. Now **enforced rather than remembered**:
+   `prisma/ensure-vector-index.ts` runs after every migration and exits
+   non-zero if the index is missing or built with the wrong operator class.
+   See the warning in `CLAUDE.md`.
 2. **The rewrite length guard was initially too loose.** `question.length + 400`
    let a 17-character follow-up expand into a 290-character answer. Now
    `max(240, question.length * 3)`. Caught by a test, not by inspection.
@@ -115,6 +118,7 @@ question ─▶ rewrite if follow-up ─▶ embed ─▶ pgvector search (worksp
 | 12 | Rewrite follow-ups **before** embedding, not just in the answer prompt | Retrieval embeds the question. Fixing only the answering prompt would leave the vector search matching "what about for Sev-2?" — the subject lives in the previous turn. |
 | 13 | Deterministic eval scoring, not LLM-as-judge | A regression suite must give the same verdict for the same output, or a retrieval regression is indistinguishable from judge variance. Cases rules cannot decide return `null` and go to human review. |
 | 14 | Rewrite failures fall back to the literal question | A bad rewrite degrades retrieval; a blocked rewrite blocks the answer entirely. Never let an optimisation become a hard dependency. |
+| 15 | pgvector index guaranteed by a post-migrate script, not by discipline | The hand-edit-every-migration approach relied on a human remembering, and the failure was silent — a dropped index degrades search to a sequential scan without any error. `prisma/ensure-vector-index.ts` is chained into `db:migrate` and exits non-zero, so the failure becomes loud. It checks `indexdef` rather than mere existence, because a wrong operator class is ignored by Postgres rather than rejected. Uses `pg` rather than `psql` (not installed everywhere) or `docker compose exec` (assumes local Docker). |
 
 ### Deviations from the original spec (approved)
 

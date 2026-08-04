@@ -63,9 +63,19 @@ no manual extension build required. The initial migration runs
 npm run db:migrate
 ```
 
-This runs `prisma migrate deploy` followed by `prisma generate`. Prisma 7 no
-longer generates the client automatically after migrating, which is why both are
-chained.
+This runs `prisma migrate deploy`, then `prisma generate`, then a pgvector index
+check. Prisma 7 no longer generates the client automatically after migrating,
+which is why the first two are chained.
+
+The third step exists because Prisma cannot see raw-SQL indexes on
+`Unsupported()` columns and tries to drop the pgvector HNSW index on every
+migration. Losing it does not break correctness — it silently turns vector
+search into a sequential scan — so the check recreates the index if missing and
+fails loudly if it is built with the wrong operator class. Run it any time with:
+
+```bash
+npm run db:ensure-index
+```
 
 ### 4. Seed a demo account (optional)
 
@@ -203,7 +213,8 @@ npm run lint         # eslint
 npm test             # vitest — no database, network, or API key required
 npm run db:up        # start Postgres + pgvector
 npm run db:down      # stop it
-npm run db:migrate   # migrate deploy + generate
+npm run db:migrate   # migrate deploy + generate + pgvector index check
+npm run db:ensure-index  # verify/repair the pgvector index on its own
 npm run db:seed      # seed the demo account
 npm run db:studio    # Prisma Studio
 ```

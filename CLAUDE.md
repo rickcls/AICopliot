@@ -92,18 +92,31 @@ Prisma cannot see raw-SQL indexes on `Unsupported()` columns, so **every**
 DROP INDEX "DocumentChunk_embedding_hnsw_idx";
 ```
 
-**Always delete that statement before applying.** It does not break
-correctness, which is what makes it dangerous — it silently turns every vector
-search into a sequential scan. Each migration since `20260804031124` also ends
-with a `CREATE INDEX IF NOT EXISTS` guard that restores the index if an earlier
-migration removed it. Keep adding that guard.
+Delete that statement before applying. It does not break correctness, which is
+what makes it dangerous — it silently turns every vector search into a
+sequential scan, with no error and no failing test.
 
-Verify after any migration:
+**This is enforced, not remembered.** `prisma/ensure-vector-index.ts` runs after
+every migration (chained into `db:migrate` and `db:migrate:dev`) and:
+
+- recreates the extension and index if they are missing,
+- **fails with a non-zero exit** if the index is absent or built with the wrong
+  operator class — which breaks the `&&` chain rather than passing silently.
+
+So forgetting to delete the DROP is now recoverable. Still delete it: the guard
+is a safety net, not a licence to skip the step, and rebuilding an HNSW index on
+a large table is slow.
+
+Run it standalone any time:
 
 ```bash
-docker compose exec -T postgres psql -U postgres -d ai_ops_copilot \
-  -c "\di DocumentChunk_embedding_hnsw_idx"
+npm run db:ensure-index
 ```
+
+The operator class in that script must match the operator in
+`src/lib/rag/retrieve.ts` (`<=>` ⇒ `vector_cosine_ops`). If they diverge,
+Postgres ignores the index instead of erroring — which is exactly why the script
+checks `indexdef` rather than merely checking that the index exists.
 
 ## Architecture seams
 

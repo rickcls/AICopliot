@@ -12,8 +12,9 @@
     "test:watch": "vitest",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:migrate": "prisma migrate deploy && prisma generate",
-    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate": "prisma migrate deploy && prisma generate && npm run db:ensure-index",
+    "db:migrate:dev": "prisma migrate dev && npm run db:ensure-index",
+    "db:ensure-index": "tsx prisma/ensure-vector-index.ts",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio"
