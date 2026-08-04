@@ -17,3 +17,18 @@ export function formatDate(value: string | Date): string {
     timeStyle: "short",
   });
 }
+
+/**
+ * Formats a date-only value — a task due date or milestone target date.
+ *
+ * These are stored at UTC midnight (see src/lib/pm/rules.ts), so rendering them
+ * in the viewer's local zone would show the previous day for anyone west of UTC
+ * and disagree with the overdue calculation. Pinned to UTC, and with no time
+ * component, because the user never entered one.
+ */
+export function formatDay(value: string | Date): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  });
+}

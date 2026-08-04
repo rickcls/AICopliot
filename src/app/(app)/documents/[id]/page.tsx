@@ -45,9 +45,10 @@ export default async function DocumentDetailPage({
   });
 
   return (
-    <div>
+    // Extracted document text is prose; cap the width so lines stay readable.
+    <div className="mx-auto w-full max-w-4xl">
       <Link
-        href="/dashboard"
+        href="/documents"
         className="text-sm text-slate-500 hover:text-slate-900"
       >
         ← Documents

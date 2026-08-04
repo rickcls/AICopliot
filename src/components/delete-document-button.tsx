@@ -25,7 +25,7 @@ export function DeleteDocumentButton({
     }).catch(() => null);
 
     if (response?.ok) {
-      router.push("/dashboard");
+      router.push("/documents");
       router.refresh();
     } else {
       setPending(false);

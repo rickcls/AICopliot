@@ -32,6 +32,8 @@ and generation — it answers questions, it does not act.
 | Hybrid retrieval handles semantic questions and exact identifiers | Done — vector + PostgreSQL FTS with reciprocal-rank fusion |
 | Users can create projects containing separate document libraries | Done — project workspace, targeted upload, reassignment, and safe deletion |
 | Chat and evaluations can be restricted to one project | Done — both retrieval paths filter at query time |
+| Projects track tasks, dependencies, milestones, risks, and a timeline | Done — manual CRUD, workspace- and project-scoped, no model call involved |
+| Dashboard surfaces overdue, blocked, and upcoming work | Done — counts and lists share one filter definition |
 | Type-check, lint, tests, production build pass | Done |
 | README covers setup, env, migrations, pgvector, manual test | Done |
 
@@ -86,6 +88,15 @@ question ─▶ selected project ─▶ embed ─┬─▶ pgvector search (work
 | 12 | Reciprocal-rank fusion for hybrid retrieval | Cosine similarity and PostgreSQL text rank have unrelated scales. Rank fusion promotes chunks found by both methods while preserving `RAG_MIN_SCORE` as a semantic threshold and allowing exact lexical evidence independently. |
 | 13 | Projects are document-owning knowledge workspaces | Users need a clear container for separate systems, customers, or initiatives. Project IDs are recorded on documents, conversations, and evaluations, while retrieval enforces the selected project inside both SQL paths. |
 | 14 | Project deletion uses `SET NULL` | Removing an organizational container must not destroy uploaded documents, chat history, or evaluations. Those records become unassigned and remain recoverable. |
+| 15 | Project-management records **cascade** on project delete | `Task`, `Milestone`, `ProjectRisk`, and `GenerationRun` have a non-nullable `projectId`, so `SET NULL` is not available and an orphaned task would be unreachable in every view. The delete confirmation names the counts, and documents still survive as unassigned — see invariant 7. |
+| 16 | Project tabs are nested routes, not client-side tab state | Each tab fetches only its own data, is linkable, and gets one shared `loading.tsx`. The cost is that layouts cannot pass data down, solved by React `cache` in `src/lib/pm/project.ts`. |
+| 17 | All date/status logic is pure, in `src/lib/pm/rules.ts` | "Overdue" and "blocked" appear on a dashboard card, a project overview, and a timeline bucket. One definition, directly unit-testable, means a count and the list beneath it cannot disagree — the same reasoning as chunking and citation validation. |
+| 18 | Update schemas carry no Zod defaults | `.partial()` does **not** strip `.default()`. A defaulted field materialises on a PATCH and silently overwrites a value the caller never mentioned — caught by a test that asserted `{ status }` should not also set `priority`. `optionalText` keeps `undefined` (leave alone) distinct from `null`/`""` (clear) for the same reason. |
+| 19 | AI-facing tables shipped unused in the manual phase | `GenerationRun`, the three citation tables, and the `source` / `generationStatus` columns cost nothing empty, and mean the generation phase needs no second migration against a database that by then holds real data. |
+| 20 | Sidebar replaces the top nav; app shell is full width | The board and Gantt need horizontal room, and `max-w-5xl` was squeezing five columns into ~180px each. The sidebar also carries project sections, so the tab strip was removed — two navigation systems disagree about where you are. |
+| 21 | `Task.startDate` added | A Gantt bar needs a duration. Without a start date a task has a deadline only, and any bar length would be invented. Nullable, so a due-date-only task honestly renders as a point rather than a fabricated span. |
+| 22 | Gantt built from a pure geometry module, no charting library | `src/lib/pm/gantt.ts` returns offsets and widths as percentages, so the chart is plain CSS — no measurement, no layout effects, no bundle cost, and the arithmetic is unit-testable instead of buried in JSX. |
+| 23 | Drag-and-drop uses native HTML5 events | One status change per drop does not justify a dependency. The drop handler reads the id from `dataTransfer` rather than React state, because state set in `dragstart` is not guaranteed committed when `drop` fires — a bug found in browser testing. The status `<select>` remains as the accessible path. |
 
 ### Deviations from the original spec (approved)
 
@@ -156,6 +167,32 @@ Completed in Phase 3:
 Completed in Phase 4:
 - Project workspaces that contain their own documents, project-targeted uploads,
   cross-project reassignment, and project-scoped chat and evaluations.
+
+**Phase 4b — document-grounded project generation** (schema already in place)
+
+The manual project layer is complete. Generation is deliberately *not* built
+yet. When it is, the citation guarantees must extend rather than fork:
+
+1. Keep `S1..Sn` for document chunks and give structured records their own
+   disjoint opaque labels. Real database IDs still never reach the model; only
+   the source map's value type widens to a discriminated `{ kind, id }`.
+2. Keep **one** validation gate. `validateAnswer` resolves every returned label
+   through that single map and drops anything absent, so no new path can bypass
+   it. A proposal left with zero valid citations is discarded, mirroring the
+   existing zero-citation downgrade to a refusal.
+3. Structured records are fetched by workspace- and project-scoped queries, so
+   they are grounding evidence by construction and need no threshold.
+   `RAG_MIN_SCORE` keeps its exact meaning because it still applies only to
+   `RetrievedChunk.score`. The pre-model refusal gate becomes: refuse unless
+   retrieval supplied a qualifying chunk *or* the project-data query returned an
+   in-scope record — deterministic on the structured half, so the gate gets
+   stronger.
+4. Record the run in `GenerationRun`, write proposals as
+   `source: ai_suggested, generationStatus: draft`, and require an explicit human
+   action to approve. Nothing writes to a project without a click.
+5. Store the chat scope (`documents | project_data | both`) on
+   `ChatConversation` and start a fresh conversation when it changes, the same
+   rule `projectId` already follows.
 
 **Phase 5 — knowledge health and collaboration**
 - Dashboard for refusals, low-confidence topics, feedback trends, frequently

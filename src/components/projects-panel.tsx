@@ -18,6 +18,9 @@ interface ProjectRow {
   name: string;
   description: string | null;
   documentCount: number;
+  taskCount: number;
+  milestoneCount: number;
+  riskCount: number;
 }
 
 export function ProjectsPanel({
@@ -62,6 +65,9 @@ export function ProjectsPanel({
             name: data.project.name,
             description: data.project.description,
             documentCount: data.project._count.documents,
+            taskCount: data.project._count.tasks,
+            milestoneCount: data.project._count.milestones,
+            riskCount: data.project._count.risks,
           },
         ].sort((a, b) => a.name.localeCompare(b.name)),
       );
@@ -76,10 +82,33 @@ export function ProjectsPanel({
   }
 
   async function deleteProject(project: ProjectRow) {
-    const warning =
-      project.documentCount > 0
-        ? `Delete "${project.name}"? Its ${project.documentCount} document(s) will become unassigned.`
-        : `Delete "${project.name}"?`;
+    // Documents survive as unassigned records; project-management records
+    // cannot exist without a project and are destroyed. Say which is which
+    // before asking, and name the counts.
+    const keptLines = project.documentCount
+      ? [
+          `${project.documentCount} document(s) will become unassigned and remain available.`,
+        ]
+      : [];
+
+    const destroyed = [
+      [project.taskCount, "task"],
+      [project.milestoneCount, "milestone"],
+      [project.riskCount, "risk"],
+    ] as const;
+    const destroyedLabel = destroyed
+      .filter(([count]) => count > 0)
+      .map(([count, noun]) => `${count} ${noun}${count === 1 ? "" : "s"}`)
+      .join(", ");
+
+    const warning = [
+      `Delete "${project.name}"?`,
+      ...keptLines,
+      ...(destroyedLabel
+        ? [`${destroyedLabel} will be permanently deleted.`]
+        : []),
+    ].join("\n\n");
+
     if (!confirm(warning)) return;
 
     setDeletingId(project.id);
@@ -172,7 +201,9 @@ export function ProjectsPanel({
               </p>
               <p className="mt-4 text-xs text-slate-500">
                 {project.documentCount} document
-                {project.documentCount === 1 ? "" : "s"} stored in this project
+                {project.documentCount === 1 ? "" : "s"} · {project.taskCount}{" "}
+                task{project.taskCount === 1 ? "" : "s"} ·{" "}
+                {project.riskCount} risk{project.riskCount === 1 ? "" : "s"}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
                 <Link

@@ -10,7 +10,16 @@ export async function GET() {
     const projects = await prisma.project.findMany({
       where: { workspaceId },
       orderBy: { name: "asc" },
-      include: { _count: { select: { documents: true } } },
+      include: {
+        _count: {
+          select: {
+            documents: true,
+            tasks: true,
+            milestones: true,
+            risks: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({ projects });
@@ -48,7 +57,16 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         description: parsed.data.description || null,
       },
-      include: { _count: { select: { documents: true } } },
+      include: {
+        _count: {
+          select: {
+            documents: true,
+            tasks: true,
+            milestones: true,
+            risks: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({ project }, { status: 201 });

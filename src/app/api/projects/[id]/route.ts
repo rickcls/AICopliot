@@ -54,7 +54,16 @@ export async function PATCH(request: Request, { params }: Params) {
           ? { description: parsed.data.description || null }
           : {}),
       },
-      include: { _count: { select: { documents: true } } },
+      include: {
+        _count: {
+          select: {
+            documents: true,
+            tasks: true,
+            milestones: true,
+            risks: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({ project: updated });
@@ -75,8 +84,9 @@ export async function DELETE(_request: Request, { params }: Params) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Project relations use SET NULL so deleting a project never deletes its
-    // documents, conversations, or evaluation history.
+    // Documents, conversations, and evaluations use SET NULL and survive as
+    // unassigned records. Tasks, milestones, and risks have a non-nullable
+    // projectId and cascade — the UI names those counts before confirming.
     await prisma.project.delete({ where: { id: project.id } });
     return NextResponse.json({ ok: true });
   } catch (error) {

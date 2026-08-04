@@ -14,6 +14,12 @@ answer.
 ## Features
 
 - Project workspaces with separate document libraries and project-scoped chat
+- **Project management inside each workspace** — a drag-and-drop Kanban board,
+  task dependencies, milestones, and risks
+- **Gantt timeline** showing tasks and milestones against a date axis, with a
+  today marker and overdue highlighting
+- **Workspace dashboard** showing active projects, overdue tasks, blocked tasks,
+  and upcoming milestones
 - Upload PDF, DOCX, Markdown, TXT, or CSV, validated by extension, MIME type, **and** magic bytes
 - Text extraction that preserves page numbers (PDF) and headings (DOCX/Markdown)
 - Chunking that carries document, page, section, and position metadata into every citation
@@ -74,9 +80,14 @@ chained.
 npm run db:seed
 ```
 
-Creates `demo@example.com` / `demo-password-123`. You can also register a new
+Creates `demo@example.com` / `demo-password-123`, plus a sample project with
+tasks, dependencies, milestones, and risks so the board, timeline, and dashboard
+have something to show before you upload anything. You can also register a new
 account from the sign-in page — a workspace is provisioned automatically on
 first use.
+
+Re-running is safe: the user is upserted and the demo project is skipped once
+the workspace already has one.
 
 ### 5. Start the app
 
@@ -168,6 +179,112 @@ With the app running and a real `OPENROUTER_API_KEY` set:
    it pass or fail. Project, latency, model name, and retrieved chunk IDs are
    stored with each case.
 
+## Testing project management manually
+
+No API key or model call is involved — this works on a fresh database.
+
+1. **Open a project** and use the **Tasks** section. Create a task with a
+   priority, assignee, start and due date, and an estimate. **Drag it between
+   columns** — it should move immediately and stay put. Then open its detail
+   panel and change the status from the dropdown instead.
+
+2. **Add a dependency** from the detail panel. Confirm the three rejections:
+   the task itself is not offered in the list; adding the same dependency twice
+   returns *"That dependency already exists"*; a task from another project is
+   never offered and is rejected server-side if forced.
+
+3. **Set a due date in the past** and check the **Timeline** — it appears under
+   *Overdue*, in red, and its Gantt bar turns red. A task due **today** must
+   appear under *Next 7 days*, not *Overdue*.
+
+4. **Give one task a start date and leave another with only a due date.** The
+   first draws a bar, the second a small marker. Try setting a start date after
+   the due date — it is rejected on both the form and the API.
+
+5. **Add a milestone** from the Timeline, with and without a target date. The
+   undated one is listed under the chart rather than disappearing.
+
+6. **Record a risk** on the **Risks** section with impact, likelihood, and a
+   mitigation, then change its status to Mitigated.
+
+7. **Check `/dashboard`** — the summary counts should match what you just
+   entered. **`/documents`** holds the cross-project document library and is
+   unaffected by any of it.
+
+8. **Delete the project** from `/projects`. The confirmation names how many
+   documents become unassigned and how many tasks, milestones, and risks are
+   permanently deleted. Confirm, then check that the documents still exist on
+   `/documents` as unassigned.
+
+---
+
+## Project management
+
+Each project is both a knowledge container and a place to track the work its
+documents describe. Open a project and use the tabs:
+
+Navigation lives in the left sidebar: global links at the top, and the sections
+of whichever project you are in below it.
+
+| Section | What it does |
+|---|---|
+| **Overview** | Open, overdue, blocked, and risk counts; overdue tasks, upcoming milestones, and document readiness at a glance |
+| **Tasks** | Kanban board — Backlog, To do, In progress, Blocked, Done. **Drag a card between columns** to change its status; click a card for the detail panel |
+| **Timeline** | A **Gantt chart** of tasks and milestones, then what is overdue, due in the next 7 days, and later — plus milestone management |
+| **Documents** | The project's document library (unchanged) |
+| **Risks** | Impact, likelihood, mitigation, and status for each recorded risk |
+
+Task cards show a priority stripe, assignee, due date (red when overdue),
+estimate, and dependency count. Everything else — description, dates,
+dependencies, sources, edit, and delete — lives in the detail panel, so cards
+stay readable. Moving a card is optimistic and rolls back if the server rejects
+it. Dragging is never the only way: the detail panel has a status dropdown.
+
+Dependencies are added from the detail panel. A task cannot depend on itself,
+cannot depend on a task in another project, and cannot have the same dependency
+twice — the API rejects all three, and a database `CHECK` constraint plus a
+unique index back the first two up.
+
+### Reading the Gantt
+
+Give a task both a **start** and a **due** date and it draws a bar; a due date
+alone has no duration, so it shows as a small marker instead of an invented
+span. Milestones are diamonds. Bar colour follows status — blue in progress,
+green done, red overdue or blocked — and a red line marks today. Anything with
+no date is listed under the chart rather than silently dropped.
+
+**Everything in this phase is entered by hand.** Records carry a Manual badge
+today; the `AI suggested` badge, the draft/approved review states, and the
+citation lists under a card exist for a later phase where tasks and risks can be
+proposed from a document. Nothing is generated yet, and no LLM call is made
+anywhere in this feature.
+
+### Where things live
+
+The sidebar is always visible — it narrows to an icon rail on small screens
+rather than hiding behind a menu button.
+
+| Route | Sidebar entry | What it is |
+|---|---|---|
+| `/dashboard` | Dashboard | Workspace summary: active projects, overdue tasks, blocked tasks, upcoming milestones, and the items behind those counts |
+| `/projects` | Projects | Create and open projects |
+| `/documents` | All Documents | Cross-project document library — upload, reassign, delete |
+| `/chat` | Ask | Grounded question answering |
+| `/admin/evaluations` | Evaluations | Admin only |
+
+Dashboard and All Documents used to be one page; they are separate so the entry
+labelled "All Documents" leads to documents and nothing else.
+
+### What deleting a project does
+
+Deleting a project keeps knowledge and destroys only the plan, and the
+confirmation names both:
+
+- **Kept, unassigned:** documents, chat conversations, evaluation cases. Their
+  `projectId` is nullable, so they survive.
+- **Permanently deleted:** tasks, milestones, and risks. Their `projectId` is
+  not nullable — a task with no project would be unreachable in every view.
+
 ### Tuning the refusal threshold
 
 `RAG_MIN_SCORE` defaults to `0.25`, which is a starting guess. Ask several
@@ -223,20 +340,22 @@ npm run db:studio    # Prisma Studio
 ```
 prisma/
   schema.prisma            data model (Unsupported("vector(1536)") for embeddings)
-  migrations/              pgvector/HNSW, full-text GIN, and project layer
+  migrations/              pgvector/HNSW, full-text GIN, project layer, project management
 src/
   app/
-    (app)/                 projects, project documents, chat, all documents, admin
+    (app)/                 projects (tabbed workspace), chat, all documents, admin
     api/                   route handlers — all Zod-validated and workspace-scoped
   lib/
-    auth.ts auth-guard.ts  Auth.js config; requireWorkspace / requireAdmin
+    auth.ts auth-guard.ts  Auth.js config; requireWorkspace / requireProject / requireAdmin
     db.ts                  Prisma client (PrismaPg adapter) + vector serialisation
     env.ts                 lazily validated server env
     providers/             EmbeddingProvider / ChatProvider + OpenRouter impl
     storage/               StorageProvider + local-disk impl
     ingest/                validate-upload, extract, chunk, pipeline
     rag/                   hybrid retrieve/ranking, prompt, citations, answer
-tests/                     vitest — chunking, citations, retrieval, access, refusals, uploads
+    pm/                    rules (pure dates/status), scoped summaries, selections
+tests/                     vitest — chunking, citations, retrieval, access, refusals,
+                           uploads, project-management rules and isolation
 ```
 
 See [CLAUDE.md](CLAUDE.md) for invariants and conventions, and
