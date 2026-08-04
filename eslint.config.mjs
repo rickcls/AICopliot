@@ -12,7 +12,19 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Prisma 7 emits the client into the source tree; it is generated code.
+    "src/generated/**",
   ]),
+  {
+    rules: {
+      // Allow deliberately unused parameters when they exist to carry a type,
+      // using the conventional leading underscore.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -109,6 +109,24 @@ export function DocumentsPanel({
     }
   }
 
+  /**
+   * Re-runs ingestion for a document that failed. runIngestion clears any
+   * partial chunks before retrying, so this is safe to click repeatedly.
+   */
+  async function handleRetry(id: string) {
+    setLoadError(null);
+    setDocuments((prev) =>
+      prev.map((d) =>
+        d.id === id ? { ...d, status: "processing", errorMessage: null } : d,
+      ),
+    );
+
+    await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(
+      () => undefined,
+    );
+    await load();
+  }
+
   async function handleDelete(id: string, filename: string) {
     if (!confirm(`Delete "${filename}"? This also removes its indexed text.`)) {
       return;
@@ -201,6 +219,16 @@ export function DocumentsPanel({
                 ) : null}
                 {STATUS_LABEL[doc.status]}
               </Badge>
+
+              {doc.status === "failed" ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleRetry(doc.id)}
+                >
+                  Retry
+                </Button>
+              ) : null}
 
               <Button
                 variant="ghost"

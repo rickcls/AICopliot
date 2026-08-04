@@ -55,6 +55,15 @@ export const feedbackSchema = z.object({
 export const createEvaluationSchema = z.object({
   question: z.string().trim().min(3).max(2000),
   expectedAnswerNotes: z.string().max(4000).optional(),
+  /** Golden-set expectation: the answer must mention all of these. */
+  expectedKeywords: z.array(z.string().trim().min(1).max(120)).max(20).default([]),
+  /** Golden-set expectation: this question is not answerable from the corpus. */
+  shouldRefuse: z.boolean().default(false),
+});
+
+/** Re-runs stored cases against the live pipeline as a regression check. */
+export const runEvaluationsSchema = z.object({
+  action: z.literal("run-all"),
 });
 
 export const reviewEvaluationSchema = z.object({

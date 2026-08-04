@@ -70,6 +70,41 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    magic bytes must all agree. Storage keys are built from IDs
    (`{workspaceId}/{documentId}.{ext}`), never from the user's filename.
 
+7. **Follow-ups are rewritten before they are embedded.** Retrieval searches
+   the *standalone* form of a question (`src/lib/rag/rewrite.ts`). Passing
+   history only to the answering model would leave retrieval matching against
+   "what about for Sev-2?", which embeds almost no signal. `AnswerResult.searchQuery`
+   records what was actually embedded.
+
+8. **Evaluation scoring is deterministic, never model-graded.** A regression
+   suite must return the same verdict for the same output, or you cannot
+   distinguish a retrieval regression from judge variance. Cases that rules
+   cannot decide return `null` and fall to human review — they are never
+   guessed at.
+
+## ⚠️ Prisma drops the pgvector index on every migration
+
+Prisma cannot see raw-SQL indexes on `Unsupported()` columns, so **every**
+`prisma migrate dev` emits:
+
+```sql
+-- DropIndex
+DROP INDEX "DocumentChunk_embedding_hnsw_idx";
+```
+
+**Always delete that statement before applying.** It does not break
+correctness, which is what makes it dangerous — it silently turns every vector
+search into a sequential scan. Each migration since `20260804031124` also ends
+with a `CREATE INDEX IF NOT EXISTS` guard that restores the index if an earlier
+migration removed it. Keep adding that guard.
+
+Verify after any migration:
+
+```bash
+docker compose exec -T postgres psql -U postgres -d ai_ops_copilot \
+  -c "\di DocumentChunk_embedding_hnsw_idx"
+```
+
 ## Architecture seams
 
 Three abstractions exist so pieces can be swapped without touching call sites:
@@ -85,6 +120,29 @@ Three abstractions exist so pieces can be swapped without touching call sites:
 
 Prefer passing providers in as arguments (see `AnswerDeps`, `IngestionDeps`) so
 tests can inject fakes rather than mocking modules.
+
+## The RAG pipeline
+
+```
+question ─▶ rewrite (only if history) ─▶ embed ─▶ pgvector top-K
+                                                      │
+                    ┌─────────────────────────────────┤
+                    │ nothing ≥ RAG_MIN_SCORE         │ else
+                    ▼                                 ▼
+                 REFUSE                    label S1..Sn ─▶ LLM ─▶ Zod
+              (no model call)                                      │
+                                                                   ▼
+                                                     validate citations
+                                            (unknown ⇒ dropped; none ⇒ refuse)
+```
+
+Retrieval is **dense single-stage** with cosine similarity (`<=>`,
+`vector_cosine_ops`). No hybrid search, no re-ranking, no multi-query. That is
+deliberate — it is the baseline the evaluation suite measures against. Do not
+add retrieval complexity without a before/after run of `/admin/evaluations`.
+
+A follow-up costs **two** chat calls (rewrite + answer); a first question costs
+one. `needsRewrite()` short-circuits when there is no history.
 
 ## pgvector notes
 
@@ -110,3 +168,13 @@ Cosine distance is `<=>`; similarity is `1 - (a <=> b)`. The HNSW index uses
 - Server components fetch initial data and pass it to client components as
   props — do not fetch on mount in an effect (React 19 lint forbids the
   resulting `setState`-in-effect).
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

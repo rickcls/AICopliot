@@ -5,6 +5,9 @@ import { prisma } from "@/lib/db";
 import { answerQuestion } from "@/lib/rag/answer";
 import { askQuestionSchema } from "@/lib/schemas";
 
+/** Upper bound on turns loaded for context; the RAG layer trims further. */
+const MAX_HISTORY_MESSAGES = 12;
+
 export async function POST(request: Request) {
   try {
     const { workspaceId, user } = await requireWorkspace();
@@ -45,11 +48,25 @@ export async function POST(request: Request) {
       conversationId = created.id;
     }
 
+    // Load prior turns before writing the new one, so the history passed to the
+    // model excludes the question being asked right now.
+    const priorTurns = await prisma.chatMessage.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: "asc" },
+      take: MAX_HISTORY_MESSAGES,
+      select: { role: true, content: true },
+    });
+
     await prisma.chatMessage.create({
       data: { conversationId, role: "user", content: question },
     });
 
-    const result = await answerQuestion(workspaceId, question);
+    const result = await answerQuestion(workspaceId, question, {
+      history: priorTurns.map((turn) => ({
+        role: turn.role,
+        content: turn.content,
+      })),
+    });
 
     // Persist enough to audit the answer later: chunks used, model, latency.
     const assistantMessage = await prisma.chatMessage.create({

@@ -236,13 +236,24 @@ model EvaluationCase {
   workspaceId         String
   question            String
   expectedAnswerNotes String?
+  // Golden-set expectations, used for deterministic auto-scoring. Keeping these
+  // machine-checkable is what lets the whole suite be re-run as a regression.
+  expectedKeywords    String[]         @default([])
+  shouldRefuse        Boolean          @default(false)
   actualAnswer        String?
   retrievedChunkIds   Json?
   confidence          AnswerConfidence?
   latencyMs           Int?
   modelName           String?
+  citationCount       Int              @default(0)
+  /// Whether the last run refused. Recorded rather than inferred from the
+  /// answer text or citation count, both of which are fragile proxies.
+  refused             Boolean          @default(false)
+  /// Set by scoreEvaluation(); null when the case needs human judgement.
+  autoScore           Boolean?
   result              EvaluationResult @default(unreviewed)
   createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 

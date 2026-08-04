@@ -127,6 +127,68 @@ describe("retrieval gate — refusing before the model is called", () => {
   });
 });
 
+describe("conversation memory", () => {
+  it("embeds the REWRITTEN question, not the literal follow-up", async () => {
+    retrieveChunks.mockResolvedValue([chunk("c1", 0.9)]);
+    const embedSpy = vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3]));
+
+    const chat = {
+      modelName: "fake-chat",
+      complete: vi
+        .fn()
+        // First call is the rewrite; second is the answer.
+        .mockResolvedValueOnce("How do I promote the standby for a Sev-2 incident?")
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            answer: "Same procedure applies.",
+            confidence: "medium",
+            insufficientContext: false,
+            citations: [{ sourceId: "S1", quote: "" }],
+          }),
+        ),
+    };
+
+    const result = await answerQuestion("ws-1", "what about for Sev-2?", {
+      embeddings: { modelName: "e", dimensions: 3, embed: embedSpy },
+      chat,
+      minScore: 0.25,
+      history: [
+        { role: "user", content: "How do I promote the standby?" },
+        { role: "assistant", content: "Run `repmgr standby promote`." },
+      ],
+    });
+
+    // This is the whole point: retrieval must search the standalone form.
+    expect(embedSpy).toHaveBeenCalledWith([
+      "How do I promote the standby for a Sev-2 incident?",
+    ]);
+    expect(result.searchQuery).toBe(
+      "How do I promote the standby for a Sev-2 incident?",
+    );
+    expect(result.refused).toBe(false);
+  });
+
+  it("skips the rewrite call entirely on the first question", async () => {
+    retrieveChunks.mockResolvedValue([chunk("c1", 0.9)]);
+    const chat = chatReturning({
+      answer: "Answer.",
+      confidence: "high",
+      insufficientContext: false,
+      citations: [{ sourceId: "S1", quote: "" }],
+    });
+
+    const result = await answerQuestion("ws-1", "How do I promote the standby?", {
+      embeddings,
+      chat,
+      minScore: 0.25,
+    });
+
+    // One call total: the answer. No rewrite round trip.
+    expect(chat.complete).toHaveBeenCalledTimes(1);
+    expect(result.searchQuery).toBe("How do I promote the standby?");
+  });
+});
+
 describe("model-reported insufficient context", () => {
   it("renders the refusal when the model reports it cannot answer", async () => {
     retrieveChunks.mockResolvedValue([chunk("c1", 0.9)]);

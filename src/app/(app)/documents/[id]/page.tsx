@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteDocumentButton } from "@/components/delete-document-button";
+import { RetryIngestionButton } from "@/components/retry-ingestion-button";
 import { Badge, Card } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
@@ -64,6 +65,9 @@ export default async function DocumentDetailPage({
         </div>
         <div className="flex items-center gap-3">
           <Badge tone={STATUS_TONE[document.status]}>{document.status}</Badge>
+          {document.status === "failed" ? (
+            <RetryIngestionButton id={document.id} />
+          ) : null}
           <DeleteDocumentButton
             id={document.id}
             filename={document.originalFilename}

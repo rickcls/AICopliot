@@ -10,6 +10,7 @@ import { modelAnswerSchema } from "@/lib/schemas";
 import { refusal, validateAnswer, type ValidatedAnswer } from "./citations";
 import { buildContext, buildUserMessage, SYSTEM_PROMPT } from "./prompt";
 import { retrieveChunks, type RetrievedChunk } from "./retrieve";
+import { rewriteQuestion, type ChatTurn } from "./rewrite";
 
 /**
  * Question answering.
@@ -26,6 +27,8 @@ export interface AnswerResult extends ValidatedAnswer {
   retrievedChunks: RetrievedChunk[];
   modelName: string;
   latencyMs: number;
+  /** The standalone question actually embedded; differs on follow-ups. */
+  searchQuery: string;
 }
 
 export interface AnswerDeps {
@@ -33,6 +36,18 @@ export interface AnswerDeps {
   chat?: ChatProvider;
   topK?: number;
   minScore?: number;
+  /** Prior turns, oldest first. Empty for the first question in a thread. */
+  history?: ChatTurn[];
+}
+
+/** Turns of history included in the answering prompt (assistant turns included). */
+const HISTORY_TURNS_IN_PROMPT = 6;
+
+function buildHistoryMessages(history: ChatTurn[]) {
+  return history.slice(-HISTORY_TURNS_IN_PROMPT).map((turn) => ({
+    role: turn.role,
+    content: turn.content.slice(0, 1000),
+  }));
 }
 
 /** Models sometimes wrap JSON in prose or a fenced block; recover the object. */
@@ -73,7 +88,14 @@ export async function answerQuestion(
   const topK = deps.topK ?? env.RAG_TOP_K;
   const minScore = deps.minScore ?? env.RAG_MIN_SCORE;
 
-  const [queryEmbedding] = await embeddings.embed([question]);
+  const history = deps.history ?? [];
+
+  // Resolve pronouns and implied subjects against the conversation BEFORE
+  // embedding — retrieval quality depends on the standalone form, not the
+  // literal follow-up.
+  const searchQuery = await rewriteQuestion(question, history, chat);
+
+  const [queryEmbedding] = await embeddings.embed([searchQuery]);
   const retrieved = await retrieveChunks(workspaceId, queryEmbedding, topK);
 
   // --- Guard 1: refuse before calling the model when evidence is too weak ---
@@ -85,13 +107,17 @@ export async function answerQuestion(
       retrievedChunks: [],
       modelName: chat.modelName,
       latencyMs: Date.now() - startedAt,
+      searchQuery,
     };
   }
 
   const { contextBlock, sourceMap } = buildContext(relevant);
   const messages = [
     { role: "system" as const, content: SYSTEM_PROMPT },
-    { role: "user" as const, content: buildUserMessage(question, contextBlock) },
+    // History gives the model the thread's wording; the sources remain the only
+    // permitted basis for factual claims.
+    ...buildHistoryMessages(history),
+    { role: "user" as const, content: buildUserMessage(searchQuery, contextBlock) },
   ];
 
   let parsed = parseModelAnswer(
@@ -123,6 +149,7 @@ export async function answerQuestion(
       retrievedChunks: relevant,
       modelName: chat.modelName,
       latencyMs: Date.now() - startedAt,
+      searchQuery,
     };
   }
 
@@ -135,5 +162,6 @@ export async function answerQuestion(
     retrievedChunks: relevant,
     modelName: chat.modelName,
     latencyMs: Date.now() - startedAt,
+    searchQuery,
   };
 }

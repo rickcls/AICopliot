@@ -1,6 +1,7 @@
 import { EvaluationsPanel } from "@/components/evaluations-panel";
 import { requireAdmin, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { computeMetrics } from "@/lib/evaluation/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -12,16 +13,29 @@ export default async function EvaluationsPage() {
   const evaluations = await prisma.evaluationCase.findMany({
     where: { workspaceId: access.workspaceId },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    take: 200,
   });
+
+  const metrics = computeMetrics(
+    evaluations.map((row) => ({
+      shouldRefuse: row.shouldRefuse,
+      refused: row.refused,
+      autoScore: row.autoScore,
+      result: row.result,
+      citationCount: row.citationCount,
+      latencyMs: row.latencyMs,
+    })),
+  );
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Evaluations</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Run a question through the live retrieval pipeline, record what came
-          back, and mark whether the answer was acceptable.
+          A regression suite for retrieval quality. Cases with expected keywords
+          or a &ldquo;should refuse&rdquo; expectation are scored automatically;
+          the rest fall to human review. Re-run them after changing a model,
+          threshold, or chunk size and compare the metrics.
         </p>
       </div>
       <EvaluationsPanel
@@ -29,6 +43,8 @@ export default async function EvaluationsPage() {
           id: row.id,
           question: row.question,
           expectedAnswerNotes: row.expectedAnswerNotes,
+          expectedKeywords: row.expectedKeywords,
+          shouldRefuse: row.shouldRefuse,
           actualAnswer: row.actualAnswer,
           retrievedChunkIds: Array.isArray(row.retrievedChunkIds)
             ? (row.retrievedChunkIds as string[])
@@ -36,9 +52,13 @@ export default async function EvaluationsPage() {
           confidence: row.confidence,
           latencyMs: row.latencyMs,
           modelName: row.modelName,
+          citationCount: row.citationCount,
+          refused: row.refused,
+          autoScore: row.autoScore,
           result: row.result,
           createdAt: row.createdAt.toISOString(),
         }))}
+        initialMetrics={metrics}
       />
     </div>
   );
