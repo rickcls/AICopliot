@@ -1,0 +1,139 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { DeleteDocumentButton } from "@/components/delete-document-button";
+import { Badge, Card } from "@/components/ui";
+import { requireWorkspace } from "@/lib/auth-guard";
+import { prisma } from "@/lib/db";
+import { formatBytes, formatDate } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
+
+const STATUS_TONE = {
+  uploaded: "info",
+  processing: "warning",
+  ready: "success",
+  failed: "danger",
+} as const;
+
+export default async function DocumentDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { workspaceId } = await requireWorkspace();
+  const { id } = await params;
+
+  // Scoped by workspaceId: an ID from another workspace 404s rather than leaking.
+  const document = await prisma.document.findFirst({
+    where: { id, workspaceId },
+  });
+
+  if (!document) notFound();
+
+  const chunkSample = await prisma.documentChunk.findMany({
+    where: { documentId: document.id, workspaceId },
+    orderBy: { chunkIndex: "asc" },
+    take: 5,
+    select: {
+      id: true,
+      chunkIndex: true,
+      pageNumber: true,
+      sectionTitle: true,
+      content: true,
+    },
+  });
+
+  return (
+    <div>
+      <Link
+        href="/dashboard"
+        className="text-sm text-slate-500 hover:text-slate-900"
+      >
+        ← Documents
+      </Link>
+
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight break-words">
+            {document.originalFilename}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {formatBytes(document.sizeBytes)} · uploaded{" "}
+            {formatDate(document.createdAt)}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge tone={STATUS_TONE[document.status]}>{document.status}</Badge>
+          <DeleteDocumentButton
+            id={document.id}
+            filename={document.originalFilename}
+          />
+        </div>
+      </div>
+
+      {document.status === "failed" && document.errorMessage ? (
+        <div
+          role="alert"
+          className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+        >
+          <p className="text-sm font-medium text-red-800">Processing failed</p>
+          <p className="mt-1 text-sm text-red-700">{document.errorMessage}</p>
+        </div>
+      ) : null}
+
+      <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {[
+          { label: "Status", value: document.status },
+          { label: "Chunks indexed", value: String(document.chunkCount) },
+          { label: "Content type", value: document.mimeType || "unknown" },
+          { label: "Last updated", value: formatDate(document.updatedAt) },
+        ].map((item) => (
+          <div key={item.label}>
+            <dt className="text-xs text-slate-500">{item.label}</dt>
+            <dd className="mt-0.5 truncate text-sm font-medium" title={item.value}>
+              {item.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {chunkSample.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold">
+            Indexed chunks{" "}
+            <span className="font-normal text-slate-500">
+              (first {chunkSample.length} of {document.chunkCount})
+            </span>
+          </h2>
+          <div className="mt-3 space-y-2">
+            {chunkSample.map((chunk) => (
+              <Card key={chunk.id} className="p-4">
+                <p className="text-xs text-slate-500">
+                  Chunk {chunk.chunkIndex}
+                  {chunk.pageNumber !== null ? ` · page ${chunk.pageNumber}` : ""}
+                  {chunk.sectionTitle ? ` · ${chunk.sectionTitle}` : ""}
+                </p>
+                <p className="mt-2 text-sm text-pretty text-slate-700">
+                  {chunk.content.slice(0, 400)}
+                  {chunk.content.length > 400 ? "…" : ""}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {document.extractedText ? (
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold">Extracted text preview</h2>
+          <Card className="mt-3 max-h-96 overflow-auto p-4">
+            <pre className="font-sans text-xs whitespace-pre-wrap text-slate-700">
+              {document.extractedText.slice(0, 5000)}
+              {document.extractedText.length > 5000 ? "\n\n…" : ""}
+            </pre>
+          </Card>
+        </section>
+      ) : null}
+    </div>
+  );
+}

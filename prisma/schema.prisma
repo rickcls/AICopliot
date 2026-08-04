@@ -1,0 +1,250 @@
+// AI Ops Copilot — data model.
+//
+// Isolation rule: every application table below carries `workspaceId`, and every
+// query must filter on it. Single-record reads use findFirst({ where: { id, workspaceId } })
+// rather than findUnique({ where: { id } }) so a leaked ID from another workspace
+// cannot resolve. See src/lib/auth-guard.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7: the connection URL lives in prisma.config.ts, not here.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js v5 tables. Identity lives here and nowhere else; application tables
+// reference User.id only and never duplicate credentials.
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  // Credentials provider has no password store of its own, so the bcrypt hash
+  // lives on the Auth.js user row. Never selected into any client payload.
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+
+  accounts         Account[]
+  ownedWorkspaces  Workspace[]
+  memberships      WorkspaceMember[]
+  conversations    ChatConversation[]
+  feedback         AnswerFeedback[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// ---------------------------------------------------------------------------
+// Workspaces
+// ---------------------------------------------------------------------------
+
+enum WorkspaceRole {
+  admin
+  member
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members     WorkspaceMember[]
+  documents   Document[]
+  chunks      DocumentChunk[]
+  conversations ChatConversation[]
+  evaluations EvaluationCase[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(member)
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Documents & chunks
+// ---------------------------------------------------------------------------
+
+enum DocumentStatus {
+  uploaded
+  processing
+  ready
+  failed
+}
+
+model Document {
+  id               String         @id @default(cuid())
+  workspaceId      String
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  storageKey       String
+  status           DocumentStatus @default(uploaded)
+  errorMessage     String?
+  // Cached plain text for the document detail preview; avoids re-parsing the
+  // original file just to show an excerpt.
+  extractedText    String?
+  chunkCount       Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chunks    DocumentChunk[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+}
+
+model DocumentChunk {
+  id           String   @id @default(cuid())
+  documentId   String
+  workspaceId  String
+  content      String
+  chunkIndex   Int
+  pageNumber   Int?
+  sectionTitle String?
+  // pgvector. Prisma intentionally omits Unsupported() fields from the generated
+  // client, so reads/writes of this column go through $queryRaw/$executeRaw in
+  // src/lib/rag/retrieve.ts and src/lib/ingest/pipeline.ts.
+  // The dimension must equal EMBEDDING_DIMENSIONS.
+  embedding    Unsupported("vector(1536)")?
+  createdAt    DateTime @default(now())
+
+  document  Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([workspaceId])
+  @@index([documentId])
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
+enum MessageRole {
+  user
+  assistant
+}
+
+enum AnswerConfidence {
+  high
+  medium
+  low
+}
+
+model ChatConversation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  title       String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@index([workspaceId, userId])
+}
+
+model ChatMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  citations      Json?
+  confidence     AnswerConfidence?
+  latencyMs      Int?
+  // Observability (approved addition to the original spec): lets us inspect
+  // which chunks fed an answer and which model produced it.
+  modelName          String?
+  retrievedChunkIds  Json?
+  createdAt      DateTime          @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  feedback     AnswerFeedback[]
+
+  @@index([conversationId, createdAt])
+}
+
+enum FeedbackRating {
+  up
+  down
+}
+
+model AnswerFeedback {
+  id            String         @id @default(cuid())
+  chatMessageId String
+  userId        String
+  rating        FeedbackRating
+  comment       String?
+  createdAt     DateTime       @default(now())
+
+  chatMessage ChatMessage @relation(fields: [chatMessageId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatMessageId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Evaluations
+// ---------------------------------------------------------------------------
+
+enum EvaluationResult {
+  pass
+  fail
+  unreviewed
+}
+
+model EvaluationCase {
+  id                  String           @id @default(cuid())
+  workspaceId         String
+  question            String
+  expectedAnswerNotes String?
+  actualAnswer        String?
+  retrievedChunkIds   Json?
+  confidence          AnswerConfidence?
+  latencyMs           Int?
+  modelName           String?
+  result              EvaluationResult @default(unreviewed)
+  createdAt           DateTime         @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}
