@@ -9,11 +9,19 @@ export default async function EvaluationsPage() {
   const access = await requireWorkspace();
   requireAdmin(access);
 
-  const evaluations = await prisma.evaluationCase.findMany({
-    where: { workspaceId: access.workspaceId },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const [evaluations, projects] = await Promise.all([
+    prisma.evaluationCase.findMany({
+      where: { workspaceId: access.workspaceId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { project: { select: { name: true } } },
+    }),
+    prisma.project.findMany({
+      where: { workspaceId: access.workspaceId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
 
   return (
     <div>
@@ -25,6 +33,7 @@ export default async function EvaluationsPage() {
         </p>
       </div>
       <EvaluationsPanel
+        projects={projects}
         initialEvaluations={evaluations.map((row) => ({
           id: row.id,
           question: row.question,
@@ -36,6 +45,8 @@ export default async function EvaluationsPage() {
           confidence: row.confidence,
           latencyMs: row.latencyMs,
           modelName: row.modelName,
+          projectId: row.projectId,
+          project: row.project,
           result: row.result,
           createdAt: row.createdAt.toISOString(),
         }))}

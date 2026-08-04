@@ -4,12 +4,28 @@ import { requireWorkspace } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatPage() {
+export default async function ChatPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ project?: string }>;
+}) {
   const { workspaceId } = await requireWorkspace();
+  const requestedProjectId = (await searchParams).project;
 
-  const readyCount = await prisma.document.count({
-    where: { workspaceId, status: "ready" },
-  });
+  const [readyCount, projects] = await Promise.all([
+    prisma.document.count({ where: { workspaceId, status: "ready" } }),
+    prisma.project.findMany({
+      where: { workspaceId },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: { documents: { where: { status: "ready" } } },
+        },
+      },
+    }),
+  ]);
 
   return (
     <div>
@@ -20,7 +36,19 @@ export default async function ChatPage() {
           don&apos;t cover it, the assistant will say so.
         </p>
       </div>
-      <ChatPanel readyDocumentCount={readyCount} />
+      <ChatPanel
+        readyDocumentCount={readyCount}
+        initialProjectId={
+          requestedProjectId && projects.some((project) => project.id === requestedProjectId)
+            ? requestedProjectId
+            : ""
+        }
+        projects={projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          readyDocumentCount: project._count.documents,
+        }))}
+      />
     </div>
   );
 }

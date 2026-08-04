@@ -14,6 +14,7 @@ export async function GET() {
       where: { workspaceId: access.workspaceId },
       orderBy: { createdAt: "desc" },
       take: 100,
+      include: { project: { select: { name: true } } },
     });
 
     return NextResponse.json({ evaluations });
@@ -38,11 +39,25 @@ export async function POST(request: Request) {
     }
 
     const { question, expectedAnswerNotes } = parsed.data;
-    const result = await answerQuestion(access.workspaceId, question);
+    const projectId = parsed.data.projectId ?? null;
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, workspaceId: access.workspaceId },
+        select: { id: true },
+      });
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+
+    const result = await answerQuestion(access.workspaceId, question, {
+      projectId,
+    });
 
     const evaluation = await prisma.evaluationCase.create({
       data: {
         workspaceId: access.workspaceId,
+        projectId,
         question,
         expectedAnswerNotes,
         actualAnswer: result.answer,

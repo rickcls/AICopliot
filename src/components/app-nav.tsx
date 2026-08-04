@@ -6,7 +6,8 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { href: "/dashboard", label: "Documents" },
+  { href: "/projects", label: "Projects" },
+  { href: "/dashboard", label: "All Documents" },
   { href: "/chat", label: "Ask" },
 ];
 
@@ -27,7 +28,7 @@ export function AppNav({
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-        <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
+        <Link href="/projects" className="text-sm font-semibold tracking-tight">
           AI Ops Copilot
         </Link>
 

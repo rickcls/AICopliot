@@ -36,6 +36,7 @@ export const citationSchema = z.object({
   sectionTitle: z.string().nullable(),
   excerpt: z.string(),
   score: z.number(),
+  matchType: z.enum(["semantic", "lexical", "hybrid"]).optional(),
 });
 export type Citation = z.infer<typeof citationSchema>;
 
@@ -44,6 +45,21 @@ export type Citation = z.infer<typeof citationSchema>;
 export const askQuestionSchema = z.object({
   question: z.string().trim().min(3, "Question is too short").max(2000),
   conversationId: z.string().optional(),
+  projectId: z.string().min(1).nullable().optional(),
+});
+
+export const createProjectSchema = z.object({
+  name: z.string().trim().min(1, "Project name is required").max(120),
+  description: z.string().trim().max(1000).optional(),
+});
+
+export const updateProjectSchema = createProjectSchema.partial().refine(
+  (value) => value.name !== undefined || value.description !== undefined,
+  "Provide a name or description",
+);
+
+export const assignDocumentProjectSchema = z.object({
+  projectId: z.string().min(1).nullable(),
 });
 
 export const feedbackSchema = z.object({
@@ -55,6 +71,7 @@ export const feedbackSchema = z.object({
 export const createEvaluationSchema = z.object({
   question: z.string().trim().min(3).max(2000),
   expectedAnswerNotes: z.string().max(4000).optional(),
+  projectId: z.string().min(1).nullable().optional(),
 });
 
 export const reviewEvaluationSchema = z.object({

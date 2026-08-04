@@ -8,6 +8,7 @@ import {
   EmptyState,
   ErrorState,
   Input,
+  Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
@@ -22,6 +23,8 @@ interface EvaluationRow {
   confidence: "high" | "medium" | "low" | null;
   latencyMs: number | null;
   modelName: string | null;
+  projectId: string | null;
+  project: { name: string } | null;
   result: "pass" | "fail" | "unreviewed";
   createdAt: string;
 }
@@ -34,14 +37,17 @@ const RESULT_TONE = {
 
 export function EvaluationsPanel({
   initialEvaluations,
+  projects,
 }: {
   initialEvaluations: EvaluationRow[];
+  projects: Array<{ id: string; name: string }>;
 }) {
   const [rows, setRows] = useState<EvaluationRow[]>(initialEvaluations);
   const [question, setQuestion] = useState("");
   const [notes, setNotes] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +75,7 @@ export function EvaluationsPanel({
         body: JSON.stringify({
           question: question.trim(),
           expectedAnswerNotes: notes.trim() || undefined,
+          projectId: projectId || null,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -106,6 +113,25 @@ export function EvaluationsPanel({
     <div className="space-y-6">
       <Card className="p-4">
         <form onSubmit={handleRun} className="space-y-3">
+          <div>
+            <label htmlFor="eval-project" className="mb-1.5 block text-sm font-medium">
+              Project scope
+            </label>
+            <Select
+              id="eval-project"
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
+              disabled={running}
+              className="w-full"
+            >
+              <option value="">All documents</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div>
             <label htmlFor="eval-question" className="mb-1.5 block text-sm font-medium">
               Question
@@ -166,6 +192,7 @@ export function EvaluationsPanel({
               <p className="mt-1 text-xs text-slate-500">
                 {formatDate(row.createdAt)}
                 {row.modelName ? ` · ${row.modelName}` : ""}
+                {` · ${row.project?.name ?? "All documents"}`}
                 {row.latencyMs !== null
                   ? ` · ${(row.latencyMs / 1000).toFixed(1)}s`
                   : ""}

@@ -26,6 +26,7 @@ export default async function DocumentDetailPage({
   // Scoped by workspaceId: an ID from another workspace 404s rather than leaking.
   const document = await prisma.document.findFirst({
     where: { id, workspaceId },
+    include: { project: { select: { name: true } } },
   });
 
   if (!document) notFound();
@@ -84,6 +85,7 @@ export default async function DocumentDetailPage({
       <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           { label: "Status", value: document.status },
+          { label: "Project", value: document.project?.name ?? "Unassigned" },
           { label: "Chunks indexed", value: String(document.chunkCount) },
           { label: "Content type", value: document.mimeType || "unknown" },
           { label: "Last updated", value: formatDate(document.updatedAt) },

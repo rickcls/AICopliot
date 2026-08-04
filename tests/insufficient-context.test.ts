@@ -40,6 +40,8 @@ function chunk(id: string, score: number): RetrievedChunk {
     pageNumber: null,
     sectionTitle: null,
     score,
+    lexicalScore: 0,
+    matchType: "semantic",
   };
 }
 
@@ -61,6 +63,24 @@ beforeEach(() => {
 });
 
 describe("retrieval gate — refusing before the model is called", () => {
+  it("passes the selected project into retrieval", async () => {
+    retrieveChunks.mockResolvedValue([]);
+
+    await answerQuestion("ws-1", "project question", {
+      embeddings,
+      chat: chatReturning({}),
+      projectId: "project-1",
+    });
+
+    expect(retrieveChunks).toHaveBeenCalledWith(
+      "ws-1",
+      [0.1, 0.2, 0.3],
+      "project question",
+      8,
+      "project-1",
+    );
+  });
+
   it("refuses without invoking the chat provider when all scores are below the threshold", async () => {
     retrieveChunks.mockResolvedValue([chunk("c1", 0.10), chunk("c2", 0.05)]);
     const chat = chatReturning({ answer: "should never be produced" });
@@ -124,6 +144,31 @@ describe("retrieval gate — refusing before the model is called", () => {
     expect(result.answer).toBe("Restart the service.");
     // Only the chunk that cleared the threshold is sent to the model.
     expect(result.retrievedChunkIds).toEqual(["c1"]);
+  });
+
+  it("calls the model for an exact lexical match below the semantic threshold", async () => {
+    const lexicalChunk = {
+      ...chunk("error-code", 0.1),
+      lexicalScore: 0.4,
+      matchType: "lexical" as const,
+    };
+    retrieveChunks.mockResolvedValue([lexicalChunk]);
+    const chat = chatReturning({
+      answer: "Error OPS-104 requires escalation.",
+      confidence: "high",
+      insufficientContext: false,
+      citations: [{ sourceId: "S1", quote: "Content of error-code." }],
+    });
+
+    const result = await answerQuestion("ws-1", "What is OPS-104?", {
+      embeddings,
+      chat,
+      minScore: 0.25,
+    });
+
+    expect(chat.complete).toHaveBeenCalledTimes(1);
+    expect(result.refused).toBe(false);
+    expect(result.retrievedChunkIds).toEqual(["error-code"]);
   });
 });
 

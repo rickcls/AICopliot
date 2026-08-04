@@ -74,12 +74,30 @@ model Workspace {
 
   owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   members     WorkspaceMember[]
+  projects    Project[]
   documents   Document[]
   chunks      DocumentChunk[]
   conversations ChatConversation[]
   evaluations EvaluationCase[]
 
   @@index([ownerId])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  documents     Document[]
+  conversations ChatConversation[]
+  evaluations   EvaluationCase[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, createdAt])
 }
 
 model WorkspaceMember {
@@ -110,6 +128,7 @@ enum DocumentStatus {
 model Document {
   id               String         @id @default(cuid())
   workspaceId      String
+  projectId        String?
   originalFilename String
   mimeType         String
   sizeBytes        Int
@@ -124,10 +143,12 @@ model Document {
   updatedAt        DateTime       @updatedAt
 
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   chunks    DocumentChunk[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, projectId])
 }
 
 model DocumentChunk {
@@ -171,11 +192,13 @@ enum AnswerConfidence {
 model ChatConversation {
   id          String   @id @default(cuid())
   workspaceId String
+  projectId   String?
   userId      String
   title       String
   createdAt   DateTime @default(now())
 
   workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  ChatMessage[]
 
@@ -234,6 +257,7 @@ enum EvaluationResult {
 model EvaluationCase {
   id                  String           @id @default(cuid())
   workspaceId         String
+  projectId           String?
   question            String
   expectedAnswerNotes String?
   actualAnswer        String?
@@ -245,6 +269,8 @@ model EvaluationCase {
   createdAt           DateTime         @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, projectId])
 }

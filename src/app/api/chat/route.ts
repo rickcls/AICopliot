@@ -19,12 +19,28 @@ export async function POST(request: Request) {
     }
 
     const { question } = parsed.data;
+    const projectId = parsed.data.projectId ?? null;
+
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, workspaceId },
+        select: { id: true },
+      });
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
 
     // Resolve the conversation, scoped to this workspace AND this user.
     let conversationId = parsed.data.conversationId;
     if (conversationId) {
       const existing = await prisma.chatConversation.findFirst({
-        where: { id: conversationId, workspaceId, userId: user.id },
+        where: {
+          id: conversationId,
+          workspaceId,
+          userId: user.id,
+          projectId,
+        },
         select: { id: true },
       });
       if (!existing) {
@@ -37,6 +53,7 @@ export async function POST(request: Request) {
       const created = await prisma.chatConversation.create({
         data: {
           workspaceId,
+          projectId,
           userId: user.id,
           title: question.slice(0, 80),
         },
@@ -49,7 +66,7 @@ export async function POST(request: Request) {
       data: { conversationId, role: "user", content: question },
     });
 
-    const result = await answerQuestion(workspaceId, question);
+    const result = await answerQuestion(workspaceId, question, { projectId });
 
     // Persist enough to audit the answer later: chunks used, model, latency.
     const assistantMessage = await prisma.chatMessage.create({

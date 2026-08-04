@@ -9,6 +9,7 @@ import {
 import { modelAnswerSchema } from "@/lib/schemas";
 import { refusal, validateAnswer, type ValidatedAnswer } from "./citations";
 import { buildContext, buildUserMessage, SYSTEM_PROMPT } from "./prompt";
+import { hasGroundingEvidence } from "./ranking";
 import { retrieveChunks, type RetrievedChunk } from "./retrieve";
 
 /**
@@ -33,6 +34,7 @@ export interface AnswerDeps {
   chat?: ChatProvider;
   topK?: number;
   minScore?: number;
+  projectId?: string | null;
 }
 
 /** Models sometimes wrap JSON in prose or a fenced block; recover the object. */
@@ -74,10 +76,16 @@ export async function answerQuestion(
   const minScore = deps.minScore ?? env.RAG_MIN_SCORE;
 
   const [queryEmbedding] = await embeddings.embed([question]);
-  const retrieved = await retrieveChunks(workspaceId, queryEmbedding, topK);
+  const retrieved = await retrieveChunks(
+    workspaceId,
+    queryEmbedding,
+    question,
+    topK,
+    deps.projectId ?? null,
+  );
 
   // --- Guard 1: refuse before calling the model when evidence is too weak ---
-  const relevant = retrieved.filter((c) => c.score >= minScore);
+  const relevant = retrieved.filter((c) => hasGroundingEvidence(c, minScore));
   if (relevant.length === 0) {
     return {
       ...refusal(),

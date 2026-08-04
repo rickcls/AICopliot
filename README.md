@@ -1,9 +1,9 @@
 # AI Ops Copilot
 
-An internal knowledge assistant for IT operations teams. Upload your runbooks,
-incident reports, and policy documents, then ask questions in plain English and
-get answers assembled **only** from those documents — with citations you can
-open and verify.
+An internal knowledge assistant for IT operations teams. Create project
+workspaces, upload each project&apos;s runbooks, incident reports, and policies,
+then ask questions in plain English and get answers assembled **only** from the
+selected documents — with citations you can open and verify.
 
 When the documents don't cover something, it says so instead of inventing an
 answer.
@@ -13,10 +13,11 @@ answer.
 
 ## Features
 
+- Project workspaces with separate document libraries and project-scoped chat
 - Upload PDF, DOCX, Markdown, TXT, or CSV, validated by extension, MIME type, **and** magic bytes
 - Text extraction that preserves page numbers (PDF) and headings (DOCX/Markdown)
 - Chunking that carries document, page, section, and position metadata into every citation
-- Vector search over PostgreSQL + pgvector, scoped to your workspace on every query
+- Hybrid pgvector + full-text search, scoped to the workspace and selected project on every query
 - Answers returned as structured JSON: answer, confidence, and citations
 - Citations validated server-side — the model cannot cite a source it was never given
 - Thumbs up/down feedback on every answer
@@ -103,8 +104,8 @@ All are server-side only. None are exposed to the browser.
 | `EMBEDDING_DIMENSIONS` | `1536` | **Must match the `vector(N)` column** |
 | `STORAGE_DIR` | `./storage` | Where uploaded files are written |
 | `MAX_UPLOAD_BYTES` | `10485760` | 10 MB upload cap |
-| `RAG_TOP_K` | `8` | Chunks retrieved per question |
-| `RAG_MIN_SCORE` | `0.25` | Below this similarity, refuse without calling the model |
+| `RAG_TOP_K` | `8` | Hybrid-ranked chunks retrieved per question |
+| `RAG_MIN_SCORE` | `0.25` | Minimum semantic similarity; exact full-text matches are also valid evidence |
 
 `.env.example` contains placeholder names only — never commit real keys.
 
@@ -122,7 +123,9 @@ With the app running and a real `OPENROUTER_API_KEY` set:
 
 1. **Sign in** at `/login` (register, or use the seeded demo account).
 
-2. **Upload a document** at `/dashboard`. Try this as `runbook.md`:
+2. **Create a project** at `/projects`. Creating it opens the project workspace.
+
+3. **Upload a document inside the project.** Try this as `runbook.md`:
 
    ```markdown
    # Sev-1 Database Outage Runbook
@@ -138,38 +141,41 @@ With the app running and a real `OPENROUTER_API_KEY` set:
    loss is 30 seconds of write-ahead log.
    ```
 
-3. **Watch the status** go `uploaded → processing → ready`. The dashboard polls
+4. **Watch the status** go `uploaded → processing → ready`. The project polls
    automatically. A document is only marked ready once its chunks and embeddings
    are committed — if anything fails you get a `failed` badge with the reason.
 
-4. **Ask an answerable question** at `/chat`:
+5. **Click “Ask this project”** and ask an answerable question:
    > How do I promote the standby database during an outage?
 
    Expect a grounded answer, a confidence badge, and at least one citation
    showing the filename, section, and a source excerpt.
 
-5. **Ask an unanswerable question**:
+6. **Ask an unanswerable question**:
    > What is the vacation policy for marketing interns in Lisbon?
 
    Expect *"I couldn't find this in the uploaded documents."* — **not** a
    fabricated answer. If you instead get a made-up answer, raise `RAG_MIN_SCORE`
    (see tuning note below).
 
-6. **Click a citation** to open `/documents/[id]` and check the extracted text
+7. **Click a citation** to open `/documents/[id]` and check the extracted text
    and indexed chunks against the original.
 
-7. **Leave feedback** with the thumbs buttons.
+8. **Leave feedback** with the thumbs buttons.
 
-8. **Record an evaluation** at `/admin/evaluations`: enter a question and what a
-   correct answer should mention, run it, then mark it pass or fail. Latency,
-   model name, and retrieved chunk IDs are stored with each case.
+9. **Record an evaluation** at `/admin/evaluations`: select its project scope,
+   enter a question and what a correct answer should mention, run it, then mark
+   it pass or fail. Project, latency, model name, and retrieved chunk IDs are
+   stored with each case.
 
 ### Tuning the refusal threshold
 
 `RAG_MIN_SCORE` defaults to `0.25`, which is a starting guess. Ask several
 questions you know your documents cannot answer and raise the value until they
 reliably refuse. Too low and unrelated chunks get through; too high and valid
-questions get refused.
+semantic questions get refused. Exact full-text matches are evaluated
+independently, so identifiers such as hostnames and error codes do not depend
+on dense-vector similarity alone.
 
 ---
 
@@ -177,9 +183,11 @@ questions get refused.
 
 Two independent guards, so neither depends on the model behaving well:
 
-1. **Retrieval gate (before the model is called).** If no chunk clears
-   `RAG_MIN_SCORE`, the refusal is returned immediately without spending a model
-   request. Deterministic and free.
+1. **Retrieval gate (before the model is called).** Vector and PostgreSQL
+   full-text candidate rankings are fused. If no chunk clears
+   `RAG_MIN_SCORE` and no chunk matches the full-text query, the refusal is
+   returned immediately without spending a model request. Deterministic and
+   free.
 
 2. **Citation whitelist (after the model replies).** Retrieved chunks are
    labelled `S1…Sn` in the prompt — real database IDs are never sent to the
@@ -215,10 +223,10 @@ npm run db:studio    # Prisma Studio
 ```
 prisma/
   schema.prisma            data model (Unsupported("vector(1536)") for embeddings)
-  migrations/              init migration, hand-edited for CREATE EXTENSION + HNSW index
+  migrations/              pgvector/HNSW, full-text GIN, and project layer
 src/
   app/
-    (app)/                 auth-guarded pages: dashboard, chat, documents, admin
+    (app)/                 projects, project documents, chat, all documents, admin
     api/                   route handlers — all Zod-validated and workspace-scoped
   lib/
     auth.ts auth-guard.ts  Auth.js config; requireWorkspace / requireAdmin
@@ -227,8 +235,8 @@ src/
     providers/             EmbeddingProvider / ChatProvider + OpenRouter impl
     storage/               StorageProvider + local-disk impl
     ingest/                validate-upload, extract, chunk, pipeline
-    rag/                   retrieve, prompt, citations, answer
-tests/                     vitest — chunking, citations, workspace access, refusals, uploads
+    rag/                   hybrid retrieve/ranking, prompt, citations, answer
+tests/                     vitest — chunking, citations, retrieval, access, refusals, uploads
 ```
 
 See [CLAUDE.md](CLAUDE.md) for invariants and conventions, and
