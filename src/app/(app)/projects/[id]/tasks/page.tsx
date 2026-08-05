@@ -3,7 +3,12 @@ import { TaskBoard } from "@/components/task-board";
 import type { TaskRow } from "@/components/task-types";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
-import { getAssignableMembers, getScopedProject } from "@/lib/pm/project";
+import {
+  getAssignableMembers,
+  getProjectMilestoneOptions,
+  getScopedProject,
+} from "@/lib/pm/project";
+import { officialRecordWhere } from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
 
 export const dynamic = "force-dynamic";
@@ -19,13 +24,14 @@ export default async function ProjectTasksPage({
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
 
-  const [tasks, members] = await Promise.all([
+  const [tasks, members, milestones] = await Promise.all([
     prisma.task.findMany({
-      where: { workspaceId, projectId: project.id },
+      where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: { createdAt: "asc" },
       select: taskSelect,
     }),
     getAssignableMembers(workspaceId),
+    getProjectMilestoneOptions(workspaceId, project.id),
   ]);
 
   // Dates are serialised here rather than in the client component, which cannot
@@ -34,6 +40,7 @@ export default async function ProjectTasksPage({
     ...task,
     startDate: task.startDate ? task.startDate.toISOString() : null,
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+    completedAt: task.completedAt ? task.completedAt.toISOString() : null,
   }));
 
   return (
@@ -41,6 +48,7 @@ export default async function ProjectTasksPage({
       projectId={project.id}
       initialTasks={initialTasks}
       members={members}
+      milestones={milestones}
     />
   );
 }

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { findOfficialProjectMilestone } from "@/lib/pm/project";
+import { officialRecordWhere } from "@/lib/pm/rules";
 import { riskSelect } from "@/lib/pm/select";
 import { updateRiskSchema } from "@/lib/schemas";
 
@@ -24,19 +26,35 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     const existing = await prisma.projectRisk.findFirst({
-      where: { id, workspaceId },
-      select: { id: true },
+      where: officialRecordWhere({ id, workspaceId }),
+      select: { id: true, projectId: true },
     });
     if (!existing) {
       return NextResponse.json({ error: "Risk not found" }, { status: 404 });
     }
 
     const data = parsed.data;
+    if (data.milestoneId) {
+      const milestone = await findOfficialProjectMilestone(
+        workspaceId,
+        existing.projectId,
+        data.milestoneId,
+      );
+      if (!milestone) {
+        return NextResponse.json(
+          { error: "Milestone not found in this project" },
+          { status: 404 },
+        );
+      }
+    }
     const risk = await prisma.projectRisk.update({
       where: { id: existing.id },
       data: {
         ...(data.description !== undefined
           ? { description: data.description }
+          : {}),
+        ...(data.milestoneId !== undefined
+          ? { milestoneId: data.milestoneId }
           : {}),
         ...(data.impact !== undefined ? { impact: data.impact } : {}),
         ...(data.likelihood !== undefined
@@ -62,7 +80,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     const { id } = await params;
 
     const existing = await prisma.projectRisk.findFirst({
-      where: { id, workspaceId },
+      where: officialRecordWhere({ id, workspaceId }),
       select: { id: true },
     });
     if (!existing) {

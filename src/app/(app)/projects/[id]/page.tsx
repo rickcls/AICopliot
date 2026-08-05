@@ -5,7 +5,7 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getScopedProject } from "@/lib/pm/project";
 import { getProjectSummary } from "@/lib/pm/summary";
-import { overdueTaskWhere } from "@/lib/pm/rules";
+import { officialRecordWhere, overdueTaskWhere } from "@/lib/pm/rules";
 import { formatDay } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -68,13 +68,21 @@ export default async function ProjectOverviewPage({
       select: { id: true, title: true, dueDate: true },
     }),
     prisma.milestone.findMany({
-      where: { workspaceId, projectId: project.id, status: { not: "completed" } },
+      where: officialRecordWhere({
+        workspaceId,
+        projectId: project.id,
+        status: { not: "completed" as const },
+      }),
       orderBy: [{ targetDate: "asc" }, { createdAt: "asc" }],
       take: 5,
       select: { id: true, title: true, targetDate: true, status: true },
     }),
     prisma.task.findMany({
-      where: { workspaceId, projectId: project.id, status: "blocked" },
+      where: officialRecordWhere({
+        workspaceId,
+        projectId: project.id,
+        status: "blocked" as const,
+      }),
       orderBy: { createdAt: "asc" },
       take: 5,
       select: { id: true, title: true },
@@ -85,11 +93,23 @@ export default async function ProjectOverviewPage({
     summary.openTasks === 0 &&
     summary.doneTasks === 0 &&
     summary.openMilestones === 0 &&
-    summary.openRisks === 0;
+    summary.openRisks === 0 &&
+    summary.totalRequirements === 0;
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Stat
+          label="Approved requirements"
+          value={summary.approvedRequirements}
+          href={`/projects/${project.id}/requirements`}
+        />
+        <Stat
+          label="Uncovered requirements"
+          value={summary.uncoveredRequirements}
+          tone="danger"
+          href={`/projects/${project.id}/requirements`}
+        />
         <Stat
           label="Open tasks"
           value={summary.openTasks}
@@ -116,14 +136,14 @@ export default async function ProjectOverviewPage({
 
       {nothingYet ? (
         <EmptyState
-          title="This project has no plan yet"
-          description="Add tasks, milestones, and risks to track the work these documents describe. Nothing here is generated — every record is one you enter."
+          title="This project has no scope yet"
+          description="Start with the requirements — extract drafts from a document or record them by hand — then create the tasks, milestones, and risks that deliver them."
           action={
             <Link
-              href={`/projects/${project.id}/tasks`}
+              href={`/projects/${project.id}/requirements`}
               className="inline-flex h-10 items-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
             >
-              Add the first task
+              Open Requirements
             </Link>
           }
         />

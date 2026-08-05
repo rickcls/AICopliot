@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireProject, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { completedAtOnCreate, officialRecordWhere } from "@/lib/pm/rules";
 import { milestoneSelect } from "@/lib/pm/select";
 import { createMilestoneSchema } from "@/lib/schemas";
 
@@ -16,7 +17,7 @@ export async function GET(_request: Request, { params }: Params) {
     const project = await requireProject(workspaceId, id);
 
     const milestones = await prisma.milestone.findMany({
-      where: { workspaceId, projectId: project.id },
+      where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: [{ targetDate: "asc" }, { createdAt: "asc" }],
       select: milestoneSelect,
     });
@@ -50,6 +51,7 @@ export async function POST(request: Request, { params }: Params) {
         description: parsed.data.description ?? null,
         targetDate: parsed.data.targetDate ?? null,
         status: parsed.data.status,
+        completedAt: completedAtOnCreate(parsed.data.status, "completed"),
       },
       select: milestoneSelect,
     });

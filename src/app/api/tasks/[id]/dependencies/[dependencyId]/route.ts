@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { officialRecordWhere } from "@/lib/pm/rules";
 
 interface Params {
   params: Promise<{ id: string; dependencyId: string }>;
@@ -15,7 +16,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     // Constrained on all three: the dependency row, its owning task, and the
     // workspace. A dependency ID borrowed from another task does not resolve.
     const dependency = await prisma.taskDependency.findFirst({
-      where: { id: dependencyId, taskId: id, workspaceId },
+      where: officialRecordWhere({ id: dependencyId, taskId: id, workspaceId }),
       select: { id: true },
     });
     if (!dependency) {

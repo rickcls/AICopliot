@@ -13,6 +13,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import type { Citation } from "@/lib/schemas";
+import { formatDate } from "@/lib/utils";
 
 interface Answer {
   messageId: string;
@@ -31,6 +32,47 @@ const CONFIDENCE_TONE = {
 } as const;
 
 function CitationCard({ citation }: { citation: Citation }) {
+  if (citation.kind !== "document") {
+    const status =
+      typeof citation.snapshot.status === "string"
+        ? citation.snapshot.status.replaceAll("_", " ")
+        : null;
+    const sourceDate =
+      typeof citation.snapshot.dueDate === "string"
+        ? citation.snapshot.dueDate
+        : typeof citation.snapshot.targetDate === "string"
+          ? citation.snapshot.targetDate
+          : null;
+    const label =
+      citation.kind === "project_snapshot"
+        ? "Project snapshot"
+        : citation.kind.charAt(0).toUpperCase() + citation.kind.slice(1);
+
+    return (
+      <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Badge tone="info">{label}</Badge>
+          <Link
+            href={citation.href}
+            className="text-xs font-medium text-slate-900 hover:underline"
+          >
+            {citation.title}
+          </Link>
+          {status ? <span className="text-xs text-slate-500">{status}</span> : null}
+          {sourceDate ? (
+            <span className="text-xs text-slate-500">{sourceDate}</span>
+          ) : null}
+          <span className="ml-auto text-xs text-slate-400">
+            observed {formatDate(citation.observedAt)}
+          </span>
+        </div>
+        <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-pretty text-slate-600 italic">
+          {citation.excerpt}
+        </blockquote>
+      </div>
+    );
+  }
+
   const location = [
     citation.pageNumber !== null ? `page ${citation.pageNumber}` : null,
     citation.sectionTitle,
@@ -123,7 +165,12 @@ export function ChatPanel({
   initialProjectId = "",
 }: {
   readyDocumentCount: number;
-  projects: Array<{ id: string; name: string; readyDocumentCount: number }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    readyDocumentCount: number;
+    liveRecordCount: number;
+  }>;
   initialProjectId?: string;
 }) {
   const [question, setQuestion] = useState("");
@@ -133,9 +180,21 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState(initialProjectId);
 
+  const selectedProject = projects.find((project) => project.id === projectId);
   const selectedReadyDocumentCount = projectId
-    ? (projects.find((project) => project.id === projectId)?.readyDocumentCount ?? 0)
+    ? (selectedProject?.readyDocumentCount ?? 0)
     : readyDocumentCount;
+  const selectedLiveRecordCount = projectId
+    ? (selectedProject?.liveRecordCount ?? 0)
+    : 0;
+  const selectedEvidenceCount =
+    selectedReadyDocumentCount + selectedLiveRecordCount;
+  const anyEvidenceAvailable =
+    readyDocumentCount > 0 ||
+    projects.some(
+      (project) =>
+        project.readyDocumentCount > 0 || project.liveRecordCount > 0,
+    );
 
   function changeProject(nextProjectId: string) {
     setProjectId(nextProjectId);
@@ -179,14 +238,12 @@ export function ChatPanel({
     }
   }
 
-  if (readyDocumentCount === 0 && answers.length === 0) {
+  if (!anyEvidenceAvailable && answers.length === 0) {
     return (
       <EmptyState
-        title={projectId ? "This project has no indexed documents" : "No indexed documents yet"}
+        title="No supporting project evidence yet"
         description={
-          projectId
-            ? "Upload and index a document inside this project before asking questions about it."
-            : "Create a project and index at least one document before asking questions."
+          "Index a document or add approved project records before asking questions."
         }
         action={
           <Link
@@ -218,7 +275,8 @@ export function ChatPanel({
               <option value="">All documents ({readyDocumentCount})</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
-                  {project.name} ({project.readyDocumentCount})
+                  {project.name} ({project.readyDocumentCount} docs ·{" "}
+                  {project.liveRecordCount} records)
                 </option>
               ))}
             </Select>
@@ -241,15 +299,26 @@ export function ChatPanel({
           />
           <div className="mt-3 flex items-center justify-between gap-3">
             <span className="text-xs text-slate-500">
-              {selectedReadyDocumentCount} document
-              {selectedReadyDocumentCount === 1 ? "" : "s"} indexed in this scope
+              {projectId ? (
+                <>
+                  {selectedReadyDocumentCount} indexed document
+                  {selectedReadyDocumentCount === 1 ? "" : "s"} ·{" "}
+                  {selectedLiveRecordCount} current record
+                  {selectedLiveRecordCount === 1 ? "" : "s"}
+                </>
+              ) : (
+                <>
+                  {selectedReadyDocumentCount} document
+                  {selectedReadyDocumentCount === 1 ? "" : "s"} indexed in this scope
+                </>
+              )}
             </span>
             <Button
               type="submit"
               disabled={
                 pending ||
                 question.trim().length < 3 ||
-                selectedReadyDocumentCount === 0
+                selectedEvidenceCount === 0
               }
             >
               {pending ? (
@@ -262,9 +331,14 @@ export function ChatPanel({
               )}
             </Button>
           </div>
-          {selectedReadyDocumentCount === 0 ? (
+          {selectedEvidenceCount === 0 ? (
             <p className="mt-2 text-xs text-amber-700">
-              This project has no indexed documents yet.
+              This scope has no indexed documents or approved project records yet.
+            </p>
+          ) : projectId ? (
+            <p className="mt-2 text-xs text-slate-500">
+              Project answers combine document requirements with current approved
+              project records and cite both source types.
             </p>
           ) : null}
         </form>
@@ -295,8 +369,9 @@ export function ChatPanel({
 
           {item.refused ? (
             <p className="mt-3 text-xs text-slate-500">
-              Nothing in your indexed documents matched this closely enough to
-              answer from. Try rephrasing, or upload a document that covers it.
+              {projectId
+                ? "Neither this project's documents nor its current records support an answer. Try rephrasing or update the project data."
+                : "Nothing in your indexed documents matched this closely enough to answer from. Try rephrasing, or upload a document that covers it."}
             </p>
           ) : null}
 
@@ -307,7 +382,14 @@ export function ChatPanel({
               </h3>
               <div className="mt-2 space-y-2">
                 {item.citations.map((citation) => (
-                  <CitationCard key={citation.chunkId} citation={citation} />
+                  <CitationCard
+                    key={
+                      citation.kind === "document"
+                        ? `document-${citation.chunkId}`
+                        : `${citation.kind}-${citation.href}-${citation.title}-${citation.observedAt}`
+                    }
+                    citation={citation}
+                  />
                 ))}
               </div>
             </div>

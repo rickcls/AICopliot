@@ -14,7 +14,13 @@ export default async function ProjectsPage() {
       name: true,
       description: true,
       _count: {
-        select: { documents: true, tasks: true, milestones: true, risks: true },
+        select: {
+          documents: true,
+          tasks: true,
+          milestones: true,
+          risks: true,
+          requirements: true,
+        },
       },
     },
   });
@@ -37,6 +43,7 @@ export default async function ProjectsPage() {
           taskCount: project._count.tasks,
           milestoneCount: project._count.milestones,
           riskCount: project._count.risks,
+          requirementCount: project._count.requirements,
         }))}
       />
     </div>

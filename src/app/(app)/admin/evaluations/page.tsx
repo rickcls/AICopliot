@@ -51,6 +51,7 @@ export default async function EvaluationsPage() {
         initialEvaluations={evaluations.map((row) => ({
           id: row.id,
           question: row.question,
+          groundingScope: row.groundingScope,
           expectedAnswerNotes: row.expectedAnswerNotes,
           expectedKeywords: row.expectedKeywords,
           shouldRefuse: row.shouldRefuse,

@@ -3,12 +3,15 @@ import {
   activeProjectWhere,
   blockedTaskWhere,
   bucketTimeline,
+  completedAtOnCreate,
+  completedAtOnStatusChange,
   daysBetween,
   isDueWithinDays,
   isMilestoneOpen,
   isOverdue,
   isTaskOpen,
   overdueTaskWhere,
+  officialRecordWhere,
   startOfUtcDay,
   upcomingMilestoneWhere,
   DUE_SOON_DAYS,
@@ -187,6 +190,18 @@ describe("scoped query filters", () => {
     expect(activeProjectWhere("ws-1")).toMatchObject({ workspaceId: "ws-1" });
   });
 
+  it("includes only manual records or approved AI suggestions", () => {
+    const expected = [
+      { source: "manual", generationStatus: "not_applicable" },
+      { source: "ai_suggested", generationStatus: "approved" },
+    ];
+
+    expect(officialRecordWhere({ workspaceId: "ws-1" }).OR).toEqual(expected);
+    expect(overdueTaskWhere("ws-1", NOW).OR).toEqual(expected);
+    expect(blockedTaskWhere("ws-1").OR).toEqual(expected);
+    expect(upcomingMilestoneWhere("ws-1", NOW).OR).toEqual(expected);
+  });
+
   it("adds projectId only when a project scope is supplied", () => {
     expect(overdueTaskWhere("ws-1", NOW)).not.toHaveProperty("projectId");
     expect(overdueTaskWhere("ws-1", NOW, "p-1")).toMatchObject({
@@ -212,17 +227,20 @@ describe("scoped query filters", () => {
   });
 
   it("a project counts as active only while it has unfinished work", () => {
-    expect(activeProjectWhere("ws-1")).toMatchObject({
-      workspaceId: "ws-1",
-      OR: [
-        { tasks: { some: { status: { in: [...OPEN_TASK_STATUSES] } } } },
-        {
-          milestones: {
-            some: { status: { in: [...OPEN_MILESTONE_STATUSES] } },
-          },
-        },
-      ],
-    });
+    const where = activeProjectWhere("ws-1");
+    expect(where.workspaceId).toBe("ws-1");
+    expect(where.OR[0].tasks?.some.status.in).toEqual([...OPEN_TASK_STATUSES]);
+    expect(where.OR[0].tasks?.some.OR).toEqual([
+      { source: "manual", generationStatus: "not_applicable" },
+      { source: "ai_suggested", generationStatus: "approved" },
+    ]);
+    expect(where.OR[1].milestones?.some.status.in).toEqual([
+      ...OPEN_MILESTONE_STATUSES,
+    ]);
+    expect(where.OR[1].milestones?.some.OR).toEqual([
+      { source: "manual", generationStatus: "not_applicable" },
+      { source: "ai_suggested", generationStatus: "approved" },
+    ]);
     expect(OPEN_TASK_STATUSES).not.toContain("done");
     expect(OPEN_MILESTONE_STATUSES).not.toContain("completed");
   });
@@ -233,5 +251,38 @@ describe("scoped query filters", () => {
     const { OR } = activeProjectWhere("ws-1");
     expect(OR).toHaveLength(2);
     expect(JSON.stringify(OR)).toContain('"some"');
+  });
+});
+
+describe("completion timestamps", () => {
+  const FINISHED = new Date("2026-08-05T03:04:05.000Z");
+
+  it("timestamps newly-created terminal records only", () => {
+    expect(completedAtOnCreate("done", "done", FINISHED)).toBe(FINISHED);
+    expect(completedAtOnCreate("todo", "done", FINISHED)).toBeNull();
+    expect(
+      completedAtOnCreate("completed", "completed", FINISHED),
+    ).toBe(FINISHED);
+  });
+
+  it("sets the timestamp when work enters its terminal status", () => {
+    expect(
+      completedAtOnStatusChange("in_progress", "done", "done", FINISHED),
+    ).toBe(FINISHED);
+  });
+
+  it("clears the timestamp when completed work reopens", () => {
+    expect(
+      completedAtOnStatusChange("done", "blocked", "done", FINISHED),
+    ).toBeNull();
+  });
+
+  it("preserves the timestamp for unrelated and idempotent updates", () => {
+    expect(
+      completedAtOnStatusChange("done", undefined, "done", FINISHED),
+    ).toBeUndefined();
+    expect(
+      completedAtOnStatusChange("done", "done", "done", FINISHED),
+    ).toBeUndefined();
   });
 });

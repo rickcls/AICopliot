@@ -10,6 +10,7 @@ export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export interface TaskCitationRow {
   id: string;
+  purpose: "proposal" | "milestone_link";
   excerpt: string | null;
   chunk: {
     id: string;
@@ -22,7 +23,19 @@ export interface TaskCitationRow {
 export interface TaskDependencyRow {
   id: string;
   dependsOnTaskId: string;
+  source: "manual" | "ai_suggested";
+  generationStatus: "not_applicable" | "draft" | "approved" | "rejected";
   dependsOnTask: { title: string; status: TaskStatus };
+  citations: Array<{
+    id: string;
+    excerpt: string | null;
+    chunk: {
+      id: string;
+      pageNumber: number | null;
+      sectionTitle: string | null;
+      document: { id: string; originalFilename: string };
+    };
+  }>;
 }
 
 export interface TaskRow {
@@ -34,9 +47,12 @@ export interface TaskRow {
   assigneeId: string | null;
   assignee: { id: string; name: string | null; email: string } | null;
   estimatedHours: number | null;
+  milestoneId: string | null;
+  milestone: { id: string; title: string } | null;
   /** ISO strings — Dates are serialised before crossing to the client. */
   startDate: string | null;
   dueDate: string | null;
+  completedAt: string | null;
   source: "manual" | "ai_suggested";
   generationStatus: "not_applicable" | "draft" | "approved" | "rejected";
   dependencies: TaskDependencyRow[];
@@ -46,6 +62,11 @@ export interface TaskRow {
 export interface MemberOption {
   id: string;
   name: string;
+}
+
+export interface MilestoneOption {
+  id: string;
+  title: string;
 }
 
 export const BOARD_COLUMNS: Array<{ status: TaskStatus; label: string }> = [

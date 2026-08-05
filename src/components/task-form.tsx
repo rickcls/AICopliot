@@ -6,6 +6,7 @@ import {
   TASK_PRIORITIES,
   toDateInput,
   type MemberOption,
+  type MilestoneOption,
   type TaskPriority,
   type TaskRow,
   type TaskStatus,
@@ -17,6 +18,7 @@ export interface TaskDraft {
   status: TaskStatus;
   priority: TaskPriority;
   assigneeId: string;
+  milestoneId: string;
   estimatedHours: string;
   startDate: string;
   dueDate: string;
@@ -29,6 +31,7 @@ export function emptyDraft(status: TaskStatus = "backlog"): TaskDraft {
     status,
     priority: "medium",
     assigneeId: "",
+    milestoneId: "",
     estimatedHours: "",
     startDate: "",
     dueDate: "",
@@ -42,6 +45,7 @@ export function draftFrom(task: TaskRow): TaskDraft {
     status: task.status,
     priority: task.priority,
     assigneeId: task.assigneeId ?? "",
+    milestoneId: task.milestoneId ?? "",
     estimatedHours:
       task.estimatedHours === null ? "" : String(task.estimatedHours),
     startDate: toDateInput(task.startDate),
@@ -56,6 +60,7 @@ function toPayload(draft: TaskDraft) {
     status: draft.status,
     priority: draft.priority,
     assigneeId: draft.assigneeId || null,
+    milestoneId: draft.milestoneId || null,
     estimatedHours: draft.estimatedHours === "" ? null : draft.estimatedHours,
     startDate: draft.startDate || null,
     dueDate: draft.dueDate || null,
@@ -67,6 +72,7 @@ const fieldLabel = "mb-1 block text-xs font-medium text-slate-600";
 export function TaskForm({
   draft,
   members,
+  milestones,
   saving,
   editing,
   onChange,
@@ -75,6 +81,7 @@ export function TaskForm({
 }: {
   draft: TaskDraft;
   members: MemberOption[];
+  milestones: MilestoneOption[];
   saving: boolean;
   editing: boolean;
   onChange: (draft: TaskDraft) => void;
@@ -133,7 +140,7 @@ export function TaskForm({
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
           <div>
             <label htmlFor="task-status" className={fieldLabel}>
               Status
@@ -196,6 +203,28 @@ export function TaskForm({
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="task-milestone" className={fieldLabel}>
+              Milestone
+            </label>
+            <Select
+              id="task-milestone"
+              className="w-full"
+              value={draft.milestoneId}
+              onChange={(event) =>
+                onChange({ ...draft, milestoneId: event.target.value })
+              }
+              disabled={saving}
+            >
+              <option value="">None</option>
+              {milestones.map((milestone) => (
+                <option key={milestone.id} value={milestone.id}>
+                  {milestone.title}
                 </option>
               ))}
             </Select>

@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace, requireWorkspaceMember } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { findOfficialProjectMilestone } from "@/lib/pm/project";
+import {
+  completedAtOnStatusChange,
+  officialRecordWhere,
+} from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
 import { updateTaskSchema } from "@/lib/schemas";
 
@@ -26,8 +31,14 @@ export async function PATCH(request: Request, { params }: Params) {
     // findFirst on (id, workspaceId): a task ID from another workspace does not
     // resolve, so the update below can only ever touch our own row.
     const existing = await prisma.task.findFirst({
-      where: { id, workspaceId },
-      select: { id: true, startDate: true, dueDate: true },
+      where: officialRecordWhere({ id, workspaceId }),
+      select: {
+        id: true,
+        projectId: true,
+        status: true,
+        startDate: true,
+        dueDate: true,
+      },
     });
     if (!existing) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -35,6 +46,19 @@ export async function PATCH(request: Request, { params }: Params) {
 
     if (parsed.data.assigneeId) {
       await requireWorkspaceMember(workspaceId, parsed.data.assigneeId);
+    }
+    if (parsed.data.milestoneId) {
+      const milestone = await findOfficialProjectMilestone(
+        workspaceId,
+        existing.projectId,
+        parsed.data.milestoneId,
+      );
+      if (!milestone) {
+        return NextResponse.json(
+          { error: "Milestone not found in this project" },
+          { status: 404 },
+        );
+      }
     }
 
     const data = parsed.data;
@@ -52,6 +76,12 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
+    const completedAt = completedAtOnStatusChange(
+      existing.status,
+      data.status,
+      "done",
+    );
+
     const task = await prisma.task.update({
       where: { id: existing.id },
       data: {
@@ -64,11 +94,15 @@ export async function PATCH(request: Request, { params }: Params) {
         ...(data.assigneeId !== undefined
           ? { assigneeId: data.assigneeId }
           : {}),
+        ...(data.milestoneId !== undefined
+          ? { milestoneId: data.milestoneId }
+          : {}),
         ...(data.estimatedHours !== undefined
           ? { estimatedHours: data.estimatedHours }
           : {}),
         ...(data.startDate !== undefined ? { startDate: data.startDate } : {}),
         ...(data.dueDate !== undefined ? { dueDate: data.dueDate } : {}),
+        ...(completedAt !== undefined ? { completedAt } : {}),
       },
       select: taskSelect,
     });
@@ -85,7 +119,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     const { id } = await params;
 
     const existing = await prisma.task.findFirst({
-      where: { id, workspaceId },
+      where: officialRecordWhere({ id, workspaceId }),
       select: { id: true },
     });
     if (!existing) {

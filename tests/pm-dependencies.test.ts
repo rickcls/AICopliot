@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { validateDependency } from "@/lib/pm/rules";
+import {
+  validateDependency,
+  wouldCreateDependencyCycle,
+} from "@/lib/pm/rules";
 
 /**
  * Task dependency rules.
@@ -69,5 +72,52 @@ describe("validateDependency", () => {
     const result = validateDependency({ ...base, sameProject: false });
 
     expect(result).toMatchObject({ ok: false, status: 404 });
+  });
+});
+
+describe("wouldCreateDependencyCycle", () => {
+  const edges = [
+    { taskId: "task-a", dependsOnTaskId: "task-b" },
+    { taskId: "task-b", dependsOnTaskId: "task-c" },
+  ];
+
+  it("detects a direct reverse edge", () => {
+    expect(
+      wouldCreateDependencyCycle(edges, {
+        taskId: "task-b",
+        dependsOnTaskId: "task-a",
+      }),
+    ).toBe(true);
+  });
+
+  it("detects a transitive cycle", () => {
+    expect(
+      wouldCreateDependencyCycle(edges, {
+        taskId: "task-c",
+        dependsOnTaskId: "task-a",
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts a new acyclic branch", () => {
+    expect(
+      wouldCreateDependencyCycle(edges, {
+        taskId: "task-d",
+        dependsOnTaskId: "task-a",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not loop forever if legacy input already contains a cycle", () => {
+    const legacyCycle = [
+      ...edges,
+      { taskId: "task-c", dependsOnTaskId: "task-b" },
+    ];
+    expect(
+      wouldCreateDependencyCycle(legacyCycle, {
+        taskId: "task-d",
+        dependsOnTaskId: "task-a",
+      }),
+    ).toBe(false);
   });
 });

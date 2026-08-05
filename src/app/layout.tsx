@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Ops Copilot",
+  title: "ScopePilot — AI Project Delivery Copilot",
   description:
-    "Ask questions against your operational documents and get answers grounded in cited sources.",
+    "Turn project documents into cited delivery plans and grounded project answers.",
 };
 
 export default function RootLayout({

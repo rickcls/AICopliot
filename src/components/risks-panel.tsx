@@ -11,12 +11,14 @@ import {
   Spinner,
   Textarea,
 } from "@/components/ui";
+import type { MilestoneOption } from "@/components/task-types";
 
 export type RiskLevel = "low" | "medium" | "high";
 export type RiskStatus = "open" | "monitoring" | "mitigated" | "accepted";
 
 export interface RiskCitationRow {
   id: string;
+  purpose: "proposal" | "milestone_link";
   excerpt: string | null;
   chunk: {
     id: string;
@@ -28,6 +30,8 @@ export interface RiskCitationRow {
 
 export interface RiskRow {
   id: string;
+  milestoneId: string | null;
+  milestone: MilestoneOption | null;
   description: string;
   impact: RiskLevel;
   likelihood: RiskLevel;
@@ -55,6 +59,7 @@ const STATUS_TONE = {
 
 interface Draft {
   description: string;
+  milestoneId: string;
   impact: RiskLevel;
   likelihood: RiskLevel;
   mitigation: string;
@@ -63,6 +68,7 @@ interface Draft {
 
 const EMPTY: Draft = {
   description: "",
+  milestoneId: "",
   impact: "medium",
   likelihood: "medium",
   mitigation: "",
@@ -72,9 +78,11 @@ const EMPTY: Draft = {
 export function RisksPanel({
   projectId,
   initialRisks,
+  milestones,
 }: {
   projectId: string;
   initialRisks: RiskRow[];
+  milestones: MilestoneOption[];
 }) {
   const [risks, setRisks] = useState(initialRisks);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -106,6 +114,7 @@ export function RisksPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             description: draft.description.trim(),
+            milestoneId: draft.milestoneId || null,
             impact: draft.impact,
             likelihood: draft.likelihood,
             mitigation: draft.mitigation.trim() || null,
@@ -224,7 +233,32 @@ export function RisksPanel({
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label
+                  htmlFor="risk-milestone"
+                  className="mb-1 block text-xs text-slate-500"
+                >
+                  Milestone
+                </label>
+                <Select
+                  id="risk-milestone"
+                  className="w-full"
+                  value={draft.milestoneId}
+                  onChange={(event) =>
+                    setDraft({ ...draft, milestoneId: event.target.value })
+                  }
+                  disabled={saving}
+                >
+                  <option value="">None</option>
+                  {milestones.map((milestone) => (
+                    <option key={milestone.id} value={milestone.id}>
+                      {milestone.title}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
               <div>
                 <label
                   htmlFor="risk-impact"
@@ -398,6 +432,13 @@ export function RisksPanel({
                 </p>
               ) : null}
 
+              {risk.milestone ? (
+                <p className="mt-2 text-xs text-slate-600">
+                  <span className="font-medium">Milestone: </span>
+                  {risk.milestone.title}
+                </p>
+              ) : null}
+
               {risk.citations.length > 0 ? (
                 <div className="mt-2">
                   <p className="text-xs font-medium text-slate-600">Sources</p>
@@ -412,7 +453,15 @@ export function RisksPanel({
                           {citation.chunk.pageNumber
                             ? ` p.${citation.chunk.pageNumber}`
                             : ""}
+                          {citation.chunk.sectionTitle
+                            ? ` · ${citation.chunk.sectionTitle}`
+                            : ""}
                         </a>
+                        {citation.purpose === "milestone_link" ? (
+                          <Badge tone="info" className="ml-1.5">
+                            Milestone link
+                          </Badge>
+                        ) : null}
                         {citation.excerpt ? (
                           <p className="mt-0.5 text-slate-500 italic">
                             “{citation.excerpt}”
@@ -448,6 +497,7 @@ export function RisksPanel({
                     setEditingId(risk.id);
                     setDraft({
                       description: risk.description,
+                      milestoneId: risk.milestoneId ?? "",
                       impact: risk.impact,
                       likelihood: risk.likelihood,
                       mitigation: risk.mitigation ?? "",

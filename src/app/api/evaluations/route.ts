@@ -76,6 +76,7 @@ export async function POST(request: Request) {
     const { question, expectedAnswerNotes, expectedKeywords, shouldRefuse } =
       parsed.data;
     const projectId = parsed.data.projectId ?? null;
+    const groundingScope = projectId ? "project_combined" : "documents";
     if (projectId) {
       const project = await prisma.project.findFirst({
         where: { id: projectId, workspaceId: access.workspaceId },
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
 
     const result = await answerQuestion(access.workspaceId, question, {
       projectId,
+      groundingScope,
     });
     const autoScore = scoreEvaluation(
       { expectedKeywords, shouldRefuse },
@@ -102,6 +104,7 @@ export async function POST(request: Request) {
       data: {
         workspaceId: access.workspaceId,
         projectId,
+        groundingScope,
         question,
         expectedAnswerNotes,
         expectedKeywords,
@@ -144,6 +147,7 @@ async function runAll(workspaceId: string) {
     try {
       const result = await answerQuestion(workspaceId, testCase.question, {
         projectId: testCase.projectId,
+        groundingScope: testCase.projectId ? "project_combined" : "documents",
       });
       const autoScore = scoreEvaluation(
         {
@@ -161,6 +165,9 @@ async function runAll(workspaceId: string) {
         where: { id: testCase.id },
         data: {
           actualAnswer: result.answer,
+          groundingScope: testCase.projectId
+            ? "project_combined"
+            : "documents",
           retrievedChunkIds: result.retrievedChunkIds,
           confidence: result.confidence,
           latencyMs: result.latencyMs,

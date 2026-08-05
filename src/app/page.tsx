@@ -27,7 +27,7 @@ export default async function LandingPage() {
     <main className="flex-1">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
         <span className="text-sm font-semibold tracking-tight">
-          AI Ops Copilot
+          ScopePilot
         </span>
         <nav className="flex items-center gap-3 text-sm">
           {user ? (
@@ -50,15 +50,15 @@ export default async function LandingPage() {
 
       <section className="mx-auto max-w-3xl px-6 pt-12 pb-16 text-center sm:pt-20">
         <p className="text-sm font-medium text-slate-500">
-          Internal knowledge assistant for IT operations
+          AI Project Delivery Copilot
         </p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Answers from your runbooks, not from guesswork
+          From project documents to traceable delivery
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-slate-600">
-          Upload your operational documents, ask a question in plain English,
-          and get an answer assembled only from what those documents actually
-          say — with citations you can open and verify.
+          Upload requirements and meeting notes, generate a cited draft plan for
+          human approval, and track delivery against documents and live project
+          records.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link

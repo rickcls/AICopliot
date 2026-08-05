@@ -87,28 +87,60 @@ export function TaskDependencies({
           {task.dependencies.map((dependency) => (
             <li
               key={dependency.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs"
+              className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs"
             >
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className={
-                    dependency.dependsOnTask.status === "done"
-                      ? "size-1.5 shrink-0 rounded-full bg-emerald-500"
-                      : "size-1.5 shrink-0 rounded-full bg-amber-500"
-                  }
-                />
-                <span className="truncate">{dependency.dependsOnTask.title}</span>
-              </span>
-              <button
-                type="button"
-                className="shrink-0 text-slate-500 hover:text-red-700 disabled:opacity-50"
-                disabled={busy}
-                onClick={() => void removeDependency(dependency.id)}
-                aria-label={`Remove dependency on ${dependency.dependsOnTask.title}`}
-              >
-                Remove
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className={
+                      dependency.dependsOnTask.status === "done"
+                        ? "size-1.5 shrink-0 rounded-full bg-emerald-500"
+                        : "size-1.5 shrink-0 rounded-full bg-amber-500"
+                    }
+                  />
+                  <span className="truncate">
+                    {dependency.dependsOnTask.title}
+                  </span>
+                  {dependency.source === "ai_suggested" ? (
+                    <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                      AI suggested
+                    </span>
+                  ) : null}
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 text-slate-500 hover:text-red-700 disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void removeDependency(dependency.id)}
+                  aria-label={`Remove dependency on ${dependency.dependsOnTask.title}`}
+                >
+                  Remove
+                </button>
+              </div>
+              {dependency.citations.length > 0 ? (
+                <ul className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+                  {dependency.citations.map((citation) => (
+                    <li key={citation.id} className="text-slate-600">
+                      <a
+                        href={`/documents/${citation.chunk.document.id}`}
+                        className="font-medium text-slate-700 underline hover:text-slate-900"
+                      >
+                        {citation.chunk.document.originalFilename}
+                        {citation.chunk.pageNumber !== null
+                          ? ` · page ${citation.chunk.pageNumber}`
+                          : ""}
+                        {citation.chunk.sectionTitle
+                          ? ` · ${citation.chunk.sectionTitle}`
+                          : ""}
+                      </a>
+                      {citation.excerpt ? (
+                        <p className="mt-0.5 leading-5">“{citation.excerpt}”</p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </li>
           ))}
         </ul>

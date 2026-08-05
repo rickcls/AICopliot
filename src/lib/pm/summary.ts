@@ -2,12 +2,17 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import {
   activeProjectWhere,
+  baselinedRequirementWhere,
   blockedTaskWhere,
   overdueTaskWhere,
+  uncoveredRequirementWhere,
+  unvalidatedRequirementWhere,
   upcomingMilestoneWhere,
   startOfUtcDay,
   DUE_SOON_DAYS,
+  OPEN_REQUIREMENT_STATUSES,
   OPEN_TASK_STATUSES,
+  officialRecordWhere,
 } from "./rules";
 
 /**
@@ -99,6 +104,11 @@ export interface ProjectSummary {
   openMilestones: number;
   readyDocuments: number;
   totalDocuments: number;
+  totalRequirements: number;
+  openRequirements: number;
+  approvedRequirements: number;
+  uncoveredRequirements: number;
+  unvalidatedRequirements: number;
 }
 
 export async function getProjectSummary(
@@ -119,29 +129,71 @@ export async function getProjectSummary(
     openMilestones,
     readyDocuments,
     totalDocuments,
+    totalRequirements,
+    openRequirements,
+    approvedRequirements,
+    uncoveredRequirements,
+    unvalidatedRequirements,
   ] = await Promise.all([
     prisma.task.count({
-      where: { workspaceId, projectId, status: { not: "done" } },
+      where: officialRecordWhere({
+        workspaceId,
+        projectId,
+        status: { not: "done" as const },
+      }),
     }),
-    prisma.task.count({ where: { workspaceId, projectId, status: "done" } }),
+    prisma.task.count({
+      where: officialRecordWhere({
+        workspaceId,
+        projectId,
+        status: "done" as const,
+      }),
+    }),
     prisma.task.count({ where: overdueTaskWhere(workspaceId, now, projectId) }),
     prisma.task.count({ where: blockedTaskWhere(workspaceId, projectId) }),
     prisma.task.count({
-      where: {
+      where: officialRecordWhere({
         workspaceId,
         projectId,
         status: { in: [...OPEN_TASK_STATUSES] },
         dueDate: { gte: startOfUtcDay(now), lte: dueSoonCutoff },
-      },
+      }),
     }),
     prisma.projectRisk.count({
-      where: { workspaceId, projectId, status: { in: ["open", "monitoring"] } },
+      where: officialRecordWhere({
+        workspaceId,
+        projectId,
+        status: { in: ["open" as const, "monitoring" as const] },
+      }),
     }),
     prisma.milestone.count({
-      where: { workspaceId, projectId, status: { not: "completed" } },
+      where: officialRecordWhere({
+        workspaceId,
+        projectId,
+        status: { not: "completed" as const },
+      }),
     }),
     prisma.document.count({ where: { workspaceId, projectId, status: "ready" } }),
     prisma.document.count({ where: { workspaceId, projectId } }),
+    // The register deliberately counts drafts too: an unconfirmed requirement is
+    // still something the team is carrying, unlike a draft task proposal.
+    prisma.requirement.count({ where: { workspaceId, projectId } }),
+    prisma.requirement.count({
+      where: officialRecordWhere({
+        workspaceId,
+        projectId,
+        status: { in: [...OPEN_REQUIREMENT_STATUSES] },
+      }),
+    }),
+    prisma.requirement.count({
+      where: baselinedRequirementWhere(workspaceId, projectId),
+    }),
+    prisma.requirement.count({
+      where: uncoveredRequirementWhere(workspaceId, projectId),
+    }),
+    prisma.requirement.count({
+      where: unvalidatedRequirementWhere(workspaceId, projectId),
+    }),
   ]);
 
   return {
@@ -154,5 +206,10 @@ export async function getProjectSummary(
     openMilestones,
     readyDocuments,
     totalDocuments,
+    totalRequirements,
+    openRequirements,
+    approvedRequirements,
+    uncoveredRequirements,
+    unvalidatedRequirements,
   };
 }

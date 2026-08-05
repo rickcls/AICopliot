@@ -4,10 +4,11 @@ Guidance for working in this repository.
 
 ## What this project is
 
-**AI Ops Copilot** — a single-workspace RAG knowledge assistant for IT operations
-teams. Users create project workspaces, upload operational documents into each
-project, and receive answers generated **only** from the selected document
-scope, with citations.
+**ScopePilot — AI Requirements-to-Delivery Copilot** — a single-workspace
+discovery and delivery assistant. Users create project workspaces, upload project
+documents, extract cited draft *requirements* and cited draft *plans* for human
+approval, trace agreed requirements to the work that delivers them, and ask
+questions grounded in documents and approved live project records.
 
 **This is a RAG workflow, not an autonomous agent.** Do not add multi-agent
 orchestration, autonomous loops, external tool calling, ServiceNow (or similar)
@@ -98,18 +99,56 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
      Their `projectId` is nullable, so they survive as unassigned records.
      Removing an organizational container must not destroy uploaded knowledge
      or answer history.
-   - **`CASCADE`** for `Task`, `Milestone`, `ProjectRisk`, and `GenerationRun`.
-     Their `projectId` is **not** nullable — a task with no project would be
-     unreachable in every view, so orphaning is not an available outcome. The
-     delete confirmation names these counts before it destroys them.
+   - **`CASCADE`** for `Requirement`, `Task`, `Milestone`, `ProjectRisk`, and
+     `GenerationRun`. Their `projectId` is **not** nullable — a task with no
+     project would be unreachable in every view, so orphaning is not an available
+     outcome. The delete confirmation names these counts before it destroys them.
 
-10. **Project-management records are never generated silently.** `Task`,
-   `Milestone`, and `ProjectRisk` each carry `source` (`manual | ai_suggested`)
-   and `generationStatus`. Everything written today is `manual` /
-   `not_applicable`. When generation lands, a proposal must arrive as
-   `ai_suggested` + `draft` and reach `approved` only through an explicit human
-   action — and a proposal left with zero valid citations is discarded, exactly
-   as a zero-citation answer is downgraded to a refusal in invariant 3.
+10. **Only official records enter operational reads.** `Task`, `Milestone`,
+   `ProjectRisk`, and `TaskDependency` use the same source/review invariant:
+   manual records are `manual + not_applicable + no generationRunId`; generated
+   records are `ai_suggested` with a run and `draft | approved | rejected`.
+   “Official” means manual/not-applicable or AI/approved. Always compose PM
+   queries with `officialRecordWhere()` from `src/lib/pm/rules.ts`; drafts and
+   rejections belong only in Review history.
+
+11. **Generated plans are proposals, never silent writes.** Plan generation
+   first creates an auditable `processing` run, uses opaque evidence labels,
+   validates every item/citation/reference/date/edge, and atomically persists
+   only surviving drafts. Editing, approval, and rejection happen through the
+   Review API, record the human reviewer/time, and enforce milestone and
+   dependency approval prerequisites in one transaction.
+
+12. **Completion timestamps are transitions, not edit timestamps.** Entering
+   task `done` or milestone `completed` sets `completedAt`; reopening clears it;
+   unrelated edits preserve it. Weekly reports depend on this distinction.
+
+13. **Project chat has two evidence families.** Global chat is document-only.
+   Project chat always uses `project_combined`: document retrieval and official
+   project-data selection run in parallel, live records are frozen with
+   `observedAt`, and exact aggregate counts remain available even if the detail
+   list is capped. History supplies wording only and is never evidence.
+
+14. **A requirement carries two independent status axes.** `source` +
+   `generationStatus` answer *did a human accept this record?* — identical to the
+   delivery records, so `officialRecordWhere()` and the CHECK constraint apply
+   unchanged. `status` (`draft | needs_clarification | validated | approved |
+   rejected`) answers *is this agreed scope?* **Baselined scope requires both**:
+   `baselinedRequirementWhere()` in `src/lib/pm/rules.ts` is the only definition,
+   and coverage counts, chat grounding, and link targets all use it. A manual
+   requirement is official the moment it is saved but still starts at `draft` —
+   writing something down is not agreeing it. For AI rows the two axes are tied
+   together by the pure `requirementGenerationStatusFor()`, never by hand.
+
+   **The register deliberately lists drafts, which is an extension of invariant
+   10 rather than a breach of it.** A draft task has no operational meaning, so
+   it belongs only in Review history. A draft requirement — "we think they asked
+   for this, unconfirmed" — *is* the working state a consultant acts on, and
+   `needs_clarification` is the queue of things to take back to the client.
+   Hence the register page and `GET /api/projects/[id]/requirements` are the only
+   reads that omit the official predicate, and `PATCH /api/requirements/[id]` is
+   the only item route that resolves rows without it. Every operational read
+   still uses `baselinedRequirementWhere()`.
 
 ## ⚠️ Prisma drops the pgvector index on every migration
 
@@ -163,19 +202,35 @@ Three abstractions exist so pieces can be swapped without touching call sites:
 Prefer passing providers in as arguments (see `AnswerDeps`, `IngestionDeps`) so
 tests can inject fakes rather than mocking modules.
 
-## The RAG pipeline
+## The grounding and generation pipelines
 
 ```
-question ─▶ rewrite (only if history) ─▶ embed ─┬─▶ pgvector top-K ─┐
-                                                 └─▶ full-text search ┤─▶ rank fusion
-                                                      │
-                    ┌─ no semantic or lexical evidence ─┤
-                    ▼                                   ▼
-                 REFUSE                      label S1..Sn ─▶ LLM ─▶ Zod
-              (no model call)                                      │
-                                                                   ▼
-                                                     validate citations
-                                            (unknown ⇒ dropped; none ⇒ refuse)
+selected documents ─▶ bounded context (≤48 chunks) ─▶ label S1..Sn
+       └──────────────────────────────────────────────▶ LLM JSON
+                                                        │
+                                          ┌─────────────┴─────────────┐
+                                          ▼                           ▼
+                              validate citations + graph    validate citations
+                                          │                           │
+                                          ▼                           ▼
+                        draft plan ─▶ Review page ─▶ official   draft requirements
+                                                                      │
+                                                                      ▼
+                                                      register review ─▶ baselined
+                                                                      │
+                                                        RequirementLink ─▶ coverage
+
+question ─▶ rewrite ─┬─▶ hybrid document retrieval ───────────────┐
+                     └─▶ deterministic official project snapshot ┤
+                                                                  ▼
+                                                  opaque source labels ─▶ LLM
+                                                                  │
+                                                                  ▼
+                                                validate citation families
+                                                (none ⇒ grounded refusal)
+
+official records ─▶ deterministic UTC weekly snapshot + health ─▶ LLM narrative
+                                                              └─▶ saved report run
 ```
 
 Retrieval is **hybrid**: dense cosine similarity (`<=>`, `vector_cosine_ops`)
@@ -221,16 +276,85 @@ detail route owns the focused workflow: upload documents, see only documents in
 that project, and open chat with the project preselected. `/documents` is the
 cross-project administration view for assigning or moving files.
 
-`ChatConversation.projectId` and `EvaluationCase.projectId` preserve the scope
-used for an answer. Changing project scope in the chat UI starts a fresh
-conversation so messages from different document sets are never mixed.
+`ChatConversation.projectId`, `groundingScope`, and the equivalent evaluation
+fields preserve the scope used for an answer. Changing project/scope in the chat
+UI starts a fresh conversation so messages from different evidence sets are
+never mixed. `ChatMessage.groundingSourceIds` and saved public citations retain
+the frozen live snapshots used at answer time.
+
+## Requirements register notes
+
+The register is the discovery half of the product: what the client asked for,
+before and independently of the work created to deliver it. Read invariant 14
+first — the two-axis model is the thing everything else here depends on.
+
+**Extraction mirrors plan generation rather than forking it.**
+`src/lib/generation/requirements-{prompt,validate,service}.ts` reuse
+`resolveDocumentCitations`, `buildLabelledContext`, the `processing → draft →
+failed` audit lifecycle, the single JSON repair attempt, and the
+provider-resolved-after-the-run-row rule. The only genuinely new piece is
+`REQUIREMENTS_QUERIES`, which is why `selectDocumentContext(…, queries)` takes
+its probes as an argument and `selectPlanContext` is now a thin wrapper.
+
+**The prompt's most important rule is rule 4: do not infer unstated specifics.**
+"Must be secure" yields a `low`-confidence requirement at that level of detail,
+never an invented MFA control or retention period. Naming a specific the client
+never stated converts an open question into a false agreement — which is exactly
+the failure the register exists to prevent. Unresolved detail goes in
+`assumptions`; an unstated verification stays `null` rather than being invented.
+
+**`sequence` is an integer, `REQ-007` is a rendering.** `formatRequirementCode()`
+in `rules.ts` is the only place the display format lives. Sequences are handed out
+inside the same transaction as the insert, and `@@unique([projectId, sequence])`
+is what stops two concurrent batches colliding — the manual create route retries
+once on `P2002`.
+
+**`RequirementLink` has three nullable foreign keys, not an opaque `targetId`.**
+A bare id has no referential integrity, so deleting a task would leave a link that
+coverage queries still count. `RequirementLink_exactly_one_target` is a
+hand-written CHECK because Prisma cannot express it. Only *official* records may
+be linked, so a coverage count can never be satisfied by a draft proposal. Phase 1
+uses only the task edge; the milestone and risk edges exist so the traceability
+matrix needs no migration.
+
+Approved requirements are a chat evidence family labelled `Q1..Qn` (`R` was
+already risk). The project snapshot carries exact requirement counts including
+uncovered and uncovered-must, so *"which Must-have requirements have no task?"*
+is answerable without the detail list being complete.
+
+**`requirements-panel.tsx` is a scan-first list, not a card feed.** The first
+version rendered every field of every record — five badges, four stacked
+labelled sections, and a full-size `<select>` per row — at roughly 270px each,
+so a 19-requirement extraction was 5,000px of unscannable scrolling and the
+description wrapped into a ~30% column while half the row sat empty. Rules that
+keep it readable:
+
+- **One line per requirement, expanded on demand.** Collapsed rows carry only
+  code, title, priority, and status; everything else lives in the expansion.
+- **Badges mark exceptions, not fields.** `warningsFor()` surfaces `no task`,
+  `no criteria`, and `low confidence`. Badging every field means nothing stands
+  out — `confidence: high` on all 19 rows was pure noise. MoSCoW uses weight
+  rather than colour, so only `must` is loud.
+- **The expanded body is a two-column `<dl>`**, which gives the prose one wide
+  measure instead of four narrow ones.
+- **Bulk review is first-class.** Reviewing an extraction is the page's purpose,
+  so selection plus a batch status bar exists rather than 19 dropdowns. It
+  includes *Back to draft*: without an undo, one mis-aimed batch approval could
+  only be reversed a row at a time. Each item is still a separate PATCH, so the
+  optimistic-concurrency check applies per row and one stale row fails alone.
+- **The row wraps its metadata below `sm`.** At 375px the fixed-width badges
+  left ~60px for the title, truncating every row to "Evalua…".
+- Extraction collapses once the register has content — it is a setup step, not
+  something you look at while reviewing.
 
 ## Project management notes
 
-`/projects/[id]` has sections — Overview, Tasks, Timeline, Documents, Risks —
-built as nested routes under a shared `layout.tsx`. Each is its own server page
-fetching only its own data. Layouts cannot pass data to children and do not
-re-render, so the project lookup goes through `getScopedProject` in
+`/projects/[id]` has sections — Overview, Requirements, Tasks, Timeline,
+Documents, Risks, Review, and Reports — built as nested routes under a shared
+`layout.tsx`. Requirements comes before Tasks because discovery precedes
+delivery. Each
+is its own server page fetching only its own data. Layouts cannot pass data to
+children and do not re-render, so the project lookup goes through `getScopedProject` in
 `src/lib/pm/project.ts`, wrapped in React `cache` so the layout and the page
 share one query.
 
@@ -279,6 +403,17 @@ committed when `drop` runs), and the status `<select>` in the detail panel stays
 as the keyboard-accessible equivalent, so the board is never drag-only. The move
 is optimistic and rolls back on failure.
 
+The Tasks page also has a Board/List switch. Both views render from the same
+client-side `tasks` state in `src/components/task-board.tsx`, so creating,
+editing, deleting, or changing a status stays in sync without a second fetch.
+The List view is a compact table with Jira-style quick filters for All, Backlog,
+To do, In progress, Blocked, and Done; filter counts are derived from the current
+task state and must update with it. The whole list row is mouse- and
+keyboard-activated and opens the same `TaskDetail` slide-over used by board
+cards, including its Edit action. The table keeps task, status, priority,
+assignee, and due date visible at the normal project viewport, shows estimate
+on wider screens, and scrolls horizontally when the viewport is narrower.
+
 Update schemas (`updateTaskSchema` and friends) are built from a field map with
 **no `.default()`**, because `.partial()` does not strip defaults — a defaulted
 field would materialise on a PATCH and silently overwrite a value the caller
@@ -290,6 +425,26 @@ because creation needs project authorization; item routes are flat
 (`PATCH /api/tasks/[id]`) because the row carries its own `projectId` and the
 workspace is the security boundary. This mirrors the existing `/api/documents`
 split.
+
+Plan generation lives at `/api/projects/[id]/generation-runs`; its Review action
+is nested under both project and run so every lookup can constrain workspace,
+project, run, source, and draft state. Weekly reports use
+`/api/projects/[id]/status-reports` for project history/creation and the flat
+`/api/status-reports/[id]` read only after a workspace-scoped lookup.
+Requirements extraction is `/api/projects/[id]/requirement-runs` and has no
+separate review route, because review is a status PATCH on the record itself.
+
+## ⚠️ A new `GenerationRunType` value needs its own migration file
+
+Postgres refuses to *use* an enum value in the transaction that added it, and
+Prisma runs each migration file in one transaction. `20260806000000_requirements_run_type`
+therefore contains only the `ALTER TYPE … ADD VALUE`, and everything referencing
+`'requirements'` — including the partial unique index that enforces one active
+extraction run per project — lives in `20260806000100_requirements_register`.
+
+The earlier `ALTER TYPE "GenerationRunStatus" ADD VALUE 'processing'` got away
+with a single file only because nothing in that migration referenced the new
+value. Do not read it as precedent.
 
 ## Conventions
 

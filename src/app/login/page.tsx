@@ -14,7 +14,7 @@ export default async function LoginPage() {
           href="/"
           className="mb-8 block text-center text-sm font-semibold tracking-tight"
         >
-          AI Ops Copilot
+          ScopePilot
         </Link>
         <LoginForm />
       </div>

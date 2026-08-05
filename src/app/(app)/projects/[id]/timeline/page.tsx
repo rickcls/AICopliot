@@ -15,6 +15,7 @@ import {
   isMilestoneOpen,
   isOverdue,
   isTaskOpen,
+  officialRecordWhere,
   DUE_SOON_DAYS,
   type TimelineItem,
 } from "@/lib/pm/rules";
@@ -99,7 +100,7 @@ export default async function ProjectTimelinePage({
 
   const [tasks, milestones] = await Promise.all([
     prisma.task.findMany({
-      where: { workspaceId, projectId: project.id },
+      where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: [{ startDate: "asc" }, { dueDate: "asc" }, { createdAt: "asc" }],
       select: {
         id: true,
@@ -110,7 +111,7 @@ export default async function ProjectTimelinePage({
       },
     }),
     prisma.milestone.findMany({
-      where: { workspaceId, projectId: project.id },
+      where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: [{ targetDate: "asc" }, { createdAt: "asc" }],
       select: milestoneSelect,
     }),
@@ -172,6 +173,9 @@ export default async function ProjectTimelinePage({
     ...milestone,
     targetDate: milestone.targetDate
       ? milestone.targetDate.toISOString()
+      : null,
+    completedAt: milestone.completedAt
+      ? milestone.completedAt.toISOString()
       : null,
   }));
 

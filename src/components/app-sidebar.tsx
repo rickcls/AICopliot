@@ -5,13 +5,16 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   ClipboardList,
+  FileBarChart,
   FileText,
   FolderKanban,
   GanttChartSquare,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   MessageSquare,
   ShieldAlert,
+  Sparkles,
   SquareKanban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,12 +43,17 @@ const GLOBAL_LINKS = [
   { href: "/chat", label: "Ask", icon: MessageSquare },
 ] as const;
 
+// Requirements precedes Tasks because discovery precedes delivery: the register
+// is where a project's scope is established before work is created from it.
 const PROJECT_SECTIONS = [
   { path: "", label: "Overview", icon: LayoutDashboard },
+  { path: "/requirements", label: "Requirements", icon: ListChecks },
   { path: "/tasks", label: "Tasks", icon: SquareKanban },
   { path: "/timeline", label: "Timeline", icon: GanttChartSquare },
   { path: "/documents", label: "Documents", icon: FileText },
   { path: "/risks", label: "Risks", icon: ShieldAlert },
+  { path: "/review", label: "Review", icon: Sparkles },
+  { path: "/reports", label: "Reports", icon: FileBarChart },
 ] as const;
 
 /** Hidden on the rail, shown once there is room for text. */
@@ -104,12 +112,12 @@ export function AppSidebar({
   return (
     <aside className="sticky top-0 z-30 flex h-dvh w-14 shrink-0 flex-col border-r border-slate-200 bg-white md:w-64">
       <div className="flex h-14 shrink-0 items-center justify-center px-2 md:justify-start md:px-4">
-        <Link href="/dashboard" title="AI Ops Copilot">
+        <Link href="/dashboard" title="ScopePilot — AI Project Delivery Copilot">
           <span className="text-sm font-semibold tracking-tight md:hidden">
-            AI
+            SP
           </span>
           <span className="hidden text-sm font-semibold tracking-tight md:inline">
-            AI Ops Copilot
+            ScopePilot
           </span>
         </Link>
       </div>

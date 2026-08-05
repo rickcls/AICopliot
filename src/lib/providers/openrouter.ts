@@ -30,7 +30,7 @@ async function postJson<T>(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         // Optional OpenRouter attribution headers.
-        "X-Title": "AI Ops Copilot",
+        "X-Title": "ScopePilot",
       },
       body: JSON.stringify(body),
     });

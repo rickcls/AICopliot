@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma/client";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
@@ -7,6 +8,10 @@ import { askQuestionSchema } from "@/lib/schemas";
 
 /** Upper bound on turns loaded for context; the RAG layer trims further. */
 const MAX_HISTORY_MESSAGES = 12;
+
+function jsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
 
 export async function POST(request: Request) {
   try {
@@ -23,6 +28,7 @@ export async function POST(request: Request) {
 
     const { question } = parsed.data;
     const projectId = parsed.data.projectId ?? null;
+    const groundingScope = projectId ? "project_combined" : "documents";
 
     if (projectId) {
       const project = await prisma.project.findFirst({
@@ -43,6 +49,7 @@ export async function POST(request: Request) {
           workspaceId,
           userId: user.id,
           projectId,
+          groundingScope,
         },
         select: { id: true },
       });
@@ -59,6 +66,7 @@ export async function POST(request: Request) {
           projectId,
           userId: user.id,
           title: question.slice(0, 80),
+          groundingScope,
         },
         select: { id: true },
       });
@@ -69,7 +77,7 @@ export async function POST(request: Request) {
     // model excludes the question being asked right now.
     const priorTurns = await prisma.chatMessage.findMany({
       where: { conversationId },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
       take: MAX_HISTORY_MESSAGES,
       select: { role: true, content: true },
     });
@@ -80,7 +88,8 @@ export async function POST(request: Request) {
 
     const result = await answerQuestion(workspaceId, question, {
       projectId,
-      history: priorTurns.map((turn) => ({
+      groundingScope,
+      history: priorTurns.toReversed().map((turn) => ({
         role: turn.role,
         content: turn.content,
       })),
@@ -92,11 +101,12 @@ export async function POST(request: Request) {
         conversationId,
         role: "assistant",
         content: result.answer,
-        citations: result.citations,
+        citations: jsonValue(result.citations),
         confidence: result.confidence,
         latencyMs: result.latencyMs,
         modelName: result.modelName,
-        retrievedChunkIds: result.retrievedChunkIds,
+        retrievedChunkIds: jsonValue(result.retrievedChunkIds),
+        groundingSourceIds: jsonValue(result.groundingSourceIds),
       },
       select: { id: true },
     });
@@ -117,6 +127,7 @@ export async function POST(request: Request) {
       refused: result.refused,
       latencyMs: result.latencyMs,
       modelName: result.modelName,
+      groundingScope,
     });
   } catch (error) {
     return handleRouteError(error, "POST /api/chat");

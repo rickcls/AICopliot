@@ -18,6 +18,7 @@ import { formatDate } from "@/lib/utils";
 interface EvaluationRow {
   id: string;
   question: string;
+  groundingScope: "documents" | "project_combined";
   expectedAnswerNotes: string | null;
   expectedKeywords: string[];
   shouldRefuse: boolean;
@@ -241,10 +242,10 @@ export function EvaluationsPanel({
               disabled={running}
               className="w-full"
             >
-              <option value="">All documents</option>
+              <option value="">All documents (document grounding)</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
-                  {project.name}
+                  {project.name} (documents + current records)
                 </option>
               ))}
             </Select>
@@ -290,7 +291,7 @@ export function EvaluationsPanel({
                   disabled={running}
                   className="size-4"
                 />
-                Should refuse (not in the documents)
+                Should refuse (not in the selected evidence)
               </label>
               <p className="mt-1.5 text-xs text-slate-500">
                 Passes only if the assistant declines to answer.
@@ -347,7 +348,7 @@ export function EvaluationsPanel({
       {rows.length === 0 ? (
         <EmptyState
           title="No evaluation cases yet"
-          description="Add a question with expected keywords, or mark it as one the documents cannot answer. Cases are auto-scored and can be re-run as a regression suite."
+          description="Add a question with expected keywords, or mark it as one the selected evidence cannot answer. Cases are auto-scored and can be re-run as a regression suite."
         />
       ) : (
         <div className="space-y-3">
@@ -373,6 +374,9 @@ export function EvaluationsPanel({
                 {formatDate(row.createdAt)}
                 {row.modelName ? ` · ${row.modelName}` : ""}
                 {` · ${row.project?.name ?? "All documents"}`}
+                {row.groundingScope === "project_combined"
+                  ? " · documents + current records"
+                  : " · document grounding"}
                 {row.latencyMs !== null
                   ? ` · ${(row.latencyMs / 1000).toFixed(1)}s`
                   : ""}

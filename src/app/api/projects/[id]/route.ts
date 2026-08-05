@@ -61,6 +61,7 @@ export async function PATCH(request: Request, { params }: Params) {
             tasks: true,
             milestones: true,
             risks: true,
+            requirements: true,
           },
         },
       },
@@ -85,8 +86,8 @@ export async function DELETE(_request: Request, { params }: Params) {
     }
 
     // Documents, conversations, and evaluations use SET NULL and survive as
-    // unassigned records. Tasks, milestones, and risks have a non-nullable
-    // projectId and cascade — the UI names those counts before confirming.
+    // unassigned records. Requirements, tasks, milestones, and risks have a
+    // non-nullable projectId and cascade — the UI names those counts first.
     await prisma.project.delete({ where: { id: project.id } });
     return NextResponse.json({ ok: true });
   } catch (error) {

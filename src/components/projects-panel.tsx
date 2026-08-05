@@ -21,6 +21,7 @@ interface ProjectRow {
   taskCount: number;
   milestoneCount: number;
   riskCount: number;
+  requirementCount: number;
 }
 
 export function ProjectsPanel({
@@ -68,6 +69,7 @@ export function ProjectsPanel({
             taskCount: data.project._count.tasks,
             milestoneCount: data.project._count.milestones,
             riskCount: data.project._count.risks,
+          requirementCount: data.project._count.requirements,
           },
         ].sort((a, b) => a.name.localeCompare(b.name)),
       );
@@ -92,6 +94,7 @@ export function ProjectsPanel({
       : [];
 
     const destroyed = [
+      [project.requirementCount, "requirement"],
       [project.taskCount, "task"],
       [project.milestoneCount, "milestone"],
       [project.riskCount, "risk"],

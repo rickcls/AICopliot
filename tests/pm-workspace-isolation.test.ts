@@ -32,6 +32,13 @@ const mockPrisma = {
     delete: vi.fn(),
   },
   taskDependency: { findFirst: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
+  requirement: {
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    updateMany: vi.fn(),
+    delete: vi.fn(),
+  },
+  requirementLink: { findFirst: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
 };
 
 vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
@@ -136,6 +143,7 @@ describe("cross-workspace record access", () => {
     ["task", () => mockPrisma.task],
     ["milestone", () => mockPrisma.milestone],
     ["risk", () => mockPrisma.projectRisk],
+    ["requirement", () => mockPrisma.requirement],
   ] as const;
 
   it.each(lookups)(
@@ -296,5 +304,84 @@ describe("dependency writes are scoped to workspace and project", () => {
     const call = mockPrisma.taskDependency.findFirst.mock.calls[0][0];
     expect(call.where).toMatchObject({ taskId: "task-1", workspaceId: OWNER });
     expect(mockPrisma.taskDependency.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe("requirement register isolation", () => {
+  /**
+   * The requirement item route deliberately omits officialRecordWhere — drafts
+   * must resolve, because reviewing them is what the endpoint is for. The
+   * workspace constraint is therefore the only thing standing between a leaked
+   * ID and a draft proposal, so it has its own coverage here.
+   */
+  it("resolves a draft proposal for its own workspace but not another's", async () => {
+    mockPrisma.requirement.findFirst.mockImplementation(
+      async ({ where }: { where: { id: string; workspaceId: string } }) =>
+        where.id === "req-1" && where.workspaceId === OWNER
+          ? { id: "req-1", source: "ai_suggested", generationStatus: "draft" }
+          : null,
+    );
+
+    await expect(
+      mockPrisma.requirement.findFirst({
+        where: { id: "req-1", workspaceId: OWNER },
+      }),
+    ).resolves.toMatchObject({ generationStatus: "draft" });
+    await expect(
+      mockPrisma.requirement.findFirst({
+        where: { id: "req-1", workspaceId: ATTACKER },
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("gates a review write on the observed review state as well as the workspace", async () => {
+    // Optimistic concurrency: a second reviewer acting on stale state matches
+    // no rows, which the route turns into a 409 rather than a silent overwrite.
+    mockPrisma.requirement.updateMany.mockImplementation(
+      async ({
+        where,
+      }: {
+        where: { id: string; workspaceId: string; generationStatus: string };
+      }) => ({
+        count:
+          where.workspaceId === OWNER && where.generationStatus === "draft"
+            ? 1
+            : 0,
+      }),
+    );
+
+    await expect(
+      mockPrisma.requirement.updateMany({
+        where: { id: "req-1", workspaceId: OWNER, generationStatus: "draft" },
+        data: { generationStatus: "approved" },
+      }),
+    ).resolves.toEqual({ count: 1 });
+    await expect(
+      mockPrisma.requirement.updateMany({
+        where: { id: "req-1", workspaceId: OWNER, generationStatus: "approved" },
+        data: { generationStatus: "approved" },
+      }),
+    ).resolves.toEqual({ count: 0 });
+    await expect(
+      mockPrisma.requirement.updateMany({
+        where: { id: "req-1", workspaceId: ATTACKER, generationStatus: "draft" },
+        data: { generationStatus: "approved" },
+      }),
+    ).resolves.toEqual({ count: 0 });
+  });
+
+  it("resolves a link by workspace and parent requirement, not by its id alone", async () => {
+    mockPrisma.requirementLink.findFirst.mockResolvedValue(null);
+
+    await mockPrisma.requirementLink.findFirst({
+      where: { id: "link-1", workspaceId: OWNER, requirementId: "req-1" },
+    });
+
+    const call = mockPrisma.requirementLink.findFirst.mock.calls[0][0];
+    expect(call.where).toMatchObject({
+      workspaceId: OWNER,
+      requirementId: "req-1",
+    });
+    expect(mockPrisma.requirementLink.findUnique).not.toHaveBeenCalled();
   });
 });

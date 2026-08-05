@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
-import { validateDependency } from "@/lib/pm/rules";
+import {
+  officialRecordWhere,
+  validateDependency,
+  wouldCreateDependencyCycle,
+} from "@/lib/pm/rules";
 import { createTaskDependencySchema } from "@/lib/schemas";
 
 interface Params {
@@ -24,11 +28,14 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const task = await prisma.task.findFirst({
-      where: { id, workspaceId },
+      where: officialRecordWhere({ id, workspaceId }),
       select: {
         id: true,
         projectId: true,
-        dependencies: { select: { dependsOnTaskId: true } },
+        dependencies: {
+          where: officialRecordWhere({}),
+          select: { dependsOnTaskId: true },
+        },
       },
     });
     if (!task) {
@@ -38,7 +45,10 @@ export async function POST(request: Request, { params }: Params) {
     // The dependency target is resolved under the same workspace constraint, so
     // a task ID from elsewhere cannot be linked into this project's graph.
     const target = await prisma.task.findFirst({
-      where: { id: parsed.data.dependsOnTaskId, workspaceId },
+      where: officialRecordWhere({
+        id: parsed.data.dependsOnTaskId,
+        workspaceId,
+      }),
       select: { id: true, projectId: true },
     });
 
@@ -52,6 +62,25 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: check.error }, { status: check.status });
     }
 
+    const projectEdges = await prisma.taskDependency.findMany({
+      where: officialRecordWhere({
+        workspaceId,
+        task: { projectId: task.projectId },
+      }),
+      select: { taskId: true, dependsOnTaskId: true },
+    });
+    if (
+      wouldCreateDependencyCycle(projectEdges, {
+        taskId: task.id,
+        dependsOnTaskId: parsed.data.dependsOnTaskId,
+      })
+    ) {
+      return NextResponse.json(
+        { error: "That dependency would create a cycle" },
+        { status: 409 },
+      );
+    }
+
     const dependency = await prisma.taskDependency.create({
       data: {
         workspaceId,
@@ -61,7 +90,25 @@ export async function POST(request: Request, { params }: Params) {
       select: {
         id: true,
         dependsOnTaskId: true,
+        source: true,
+        generationStatus: true,
         dependsOnTask: { select: { title: true, status: true } },
+        citations: {
+          select: {
+            id: true,
+            excerpt: true,
+            chunk: {
+              select: {
+                id: true,
+                pageNumber: true,
+                sectionTitle: true,
+                document: {
+                  select: { id: true, originalFilename: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 

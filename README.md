@@ -1,12 +1,14 @@
-# AI Ops Copilot
+# ScopePilot — AI Requirements-to-Delivery Copilot
 
-An internal knowledge assistant for IT operations teams. Create project
-workspaces, upload each project&apos;s runbooks, incident reports, and policies,
-then ask questions in plain English and get answers assembled **only** from the
-selected documents — with citations you can open and verify.
+Turn client briefs, meeting notes, SOPs, and delivery records into cited,
+reviewable **requirements** and cited, reviewable **plans**. Agreed requirements
+are traced to the tasks that deliver them, so scope with no delivery behind it is
+a number on a dashboard rather than something someone has to remember. Approved
+work is tracked with tasks, milestones, dependencies, risks, timelines, and
+weekly status reports.
 
-When the documents don't cover something, it says so instead of inventing an
-answer.
+When the available evidence does not cover something, ScopePilot says so instead
+of inventing an answer.
 
 > This is a retrieval-augmented generation (RAG) workflow, not an autonomous
 > agent. It answers questions; it does not take actions on external systems.
@@ -14,10 +16,21 @@ answer.
 ## Features
 
 - Project workspaces with separate document libraries and project-scoped chat
+- **Cited requirements extraction** from selected project documents — MoSCoW
+  priority, acceptance criteria, assumptions, and honest confidence, every one
+  reviewed by a person before it counts as agreed scope
+- **Requirement traceability** linking agreed scope to the tasks delivering it,
+  with uncovered and unvalidated requirements surfaced as counts
+- **Cited plan generation** from up to 20 selected project documents, with a
+  dedicated Review workflow before any suggestion becomes operational work
 - **Project management inside each workspace** — a drag-and-drop Kanban board,
-  task dependencies, milestones, and risks
+  list view, task dependencies, milestones, and risks
 - **Gantt timeline** showing tasks and milestones against a date axis, with a
   today marker and overdue highlighting
+- **Combined project Q&A** grounded in both document evidence and frozen
+  snapshots of approved tasks, milestones, risks, dependencies, and exact counts
+- **Saved weekly reports** with deterministic completed/blocker/overdue/upcoming
+  sections, server-derived health, a cited executive narrative, and immutable history
 - **Workspace dashboard** showing active projects, overdue tasks, blocked tasks,
   and upcoming milestones
 - Upload PDF, DOCX, Markdown, TXT, or CSV, validated by extension, MIME type, **and** magic bytes
@@ -138,7 +151,7 @@ dimension requires a **new migration and re-embedding every existing chunk**.
 
 ---
 
-## Testing the RAG flow manually
+## Testing the core copilot loop manually
 
 With the app running and a real `OPENROUTER_API_KEY` set:
 
@@ -146,52 +159,88 @@ With the app running and a real `OPENROUTER_API_KEY` set:
 
 2. **Create a project** at `/projects`. Creating it opens the project workspace.
 
-3. **Upload a document inside the project.** Try this as `runbook.md`:
-
-   ```markdown
-   # Sev-1 Database Outage Runbook
-
-   ## Escalation Path
-   For a Sev-1 database outage, page the on-call DBA immediately via PagerDuty.
-   If there is no acknowledgement within 10 minutes, escalate to the Director of
-   Infrastructure.
-
-   ## Recovery Steps
-   Confirm the primary is down with `pg_isready -h primary.db`. If unreachable,
-   promote the standby using `repmgr standby promote`. Maximum acceptable data
-   loss is 30 seconds of write-ahead log.
-   ```
+3. **Upload requirements and meeting notes inside the project.** For example,
+   make the requirements state that UAT needs an approved test environment and
+   make the meeting notes record that environment provisioning is still open.
 
 4. **Watch the status** go `uploaded → processing → ready`. The project polls
    automatically. A document is only marked ready once its chunks and embeddings
    are committed — if anything fails you get a `failed` badge with the reason.
 
-5. **Click “Ask this project”** and ask an answerable question:
-   > How do I promote the standby database during an outage?
+5. Open **Review** and generate a plan. Check the scope, deliverables,
+   acceptance criteria, proposed milestones, tasks, risks, dependencies, and
+   their document/page/section excerpts. Edit one proposal, reject another, and
+   approve the rest.
 
-   Expect a grounded answer, a confidence badge, and at least one citation
-   showing the filename, section, and a source excerpt.
+6. Open **Tasks**, **Timeline**, and **Risks**. Only approved suggestions should
+   appear; rejected and still-draft suggestions remain visible only in Review
+   history.
 
-6. **Ask an unanswerable question**:
-   > What is the vacation policy for marketing interns in Lisbon?
+7. Click **AI Chat** and ask:
+   > What is required for UAT, and what currently blocks it?
 
-   Expect *"I couldn't find this in the uploaded documents."* — **not** a
-   fabricated answer. If you instead get a made-up answer, raise `RAG_MIN_SCORE`
-   (see tuning note below).
+   A mixed answer separates **Document requirements** from **Current project
+   state** and cites both document chunks and saved live-record snapshots.
 
-7. **Click a citation** to open `/documents/[id]` and check the extracted text
-   and indexed chunks against the original.
+8. Ask an unsupported question. Expect a clear refusal, not a fabricated
+   answer. Click document citations to compare excerpts with the source and use
+   the thumbs buttons to leave feedback.
 
-8. **Leave feedback** with the thumbs buttons.
+9. Open **Reports** and generate the weekly report. Verify its UTC period,
+   health, exact deterministic sections, narrative citations, history entry,
+   model/latency metadata, and **Copy as Markdown** action.
 
-9. **Record an evaluation** at `/admin/evaluations`: select its project scope,
+10. **Record an evaluation** at `/admin/evaluations`: select its project scope,
    enter a question and what a correct answer should mention, run it, then mark
    it pass or fail. Project, latency, model name, and retrieved chunk IDs are
    stored with each case.
 
-## Testing project management manually
+## Testing the requirement register
 
-No API key or model call is involved — this works on a fresh database.
+This is the discovery half of the product: what the client asked for, before and
+separately from the work created to deliver it. Steps 1 and 6 need no API key.
+
+1. **Record one by hand.** Open a project, go to **Requirements**, and create
+   one. It appears as `REQ-001`, badged **Manual** and **draft** — saving a
+   requirement is not the same as agreeing it, so nothing starts approved.
+
+2. **Extract drafts from a document.** Upload a brief or requirements document,
+   wait for it to reach *ready*, select it, and choose **Extract draft
+   requirements**. Each proposal must carry at least one source link that opens
+   the document it came from. Anything the model could not cite is discarded
+   before it reaches the database, so an empty result means no evidence — not a
+   silent failure.
+
+3. **Check the grounding claim, not just the output.** Find a vague line in the
+   source ("the system must be secure", "data is kept for a while"). The matching
+   requirement should stay at that level of detail with **confidence: low** — it
+   must *not* have invented multi-factor authentication, an encryption standard,
+   or a retention period. That invention is the failure mode the register exists
+   to prevent, and it is worth checking on every prompt change.
+
+4. **Review them.** Use the status dropdown on each row. Approve some, reject
+   others, and move one to *Needs clarification* — it stays visible in the
+   register under its own filter, because an unresolved requirement is something
+   you act on rather than something to hide in run history.
+
+5. **Find the gap.** Approve five requirements, then link three of them to tasks
+   with **Link task**. The **Gaps** filter and the **Uncovered requirements**
+   stat on the project Overview must both read 2. They come from the same
+   builder in `src/lib/pm/rules.ts`, so a disagreement is a bug.
+
+6. **Ask about coverage.** In project chat, ask *"which approved requirements
+   have no delivery task?"* The answer should cite the project snapshot plus the
+   individual requirements, and its numbers should match the Gaps filter. Draft
+   requirements must not appear — only approved ones are agreed scope.
+
+7. **Delete the project** and confirm the warning names the requirement count
+   alongside tasks, milestones, and risks. Requirements cascade; documents
+   survive as unassigned.
+
+## Testing manual project management
+
+Creating and editing manual records does not call a model and still works on a
+fresh database. AI suggestions enter these views only after Review approval.
 
 1. **Open a project** and use the **Tasks** section. Create a task with a
    priority, assignee, start and due date, and an estimate. **Drag it between
@@ -222,27 +271,31 @@ No API key or model call is involved — this works on a fresh database.
    unaffected by any of it.
 
 8. **Delete the project** from `/projects`. The confirmation names how many
-   documents become unassigned and how many tasks, milestones, and risks are
-   permanently deleted. Confirm, then check that the documents still exist on
-   `/documents` as unassigned.
+   documents become unassigned and how many requirements, tasks, milestones, and
+   risks are permanently deleted. Confirm, then check that the documents still
+   exist on `/documents` as unassigned.
 
 ---
 
 ## Project management
 
-Each project is both a knowledge container and a place to track the work its
-documents describe. Open a project and use the tabs:
+Each project is a knowledge container, a record of what was agreed, and a place
+to track the work delivering it. Open a project and use its sidebar sections —
+Requirements comes before Tasks because discovery precedes delivery:
 
 Navigation lives in the left sidebar: global links at the top, and the sections
 of whichever project you are in below it.
 
 | Section | What it does |
 |---|---|
-| **Overview** | Open, overdue, blocked, and risk counts; overdue tasks, upcoming milestones, and document readiness at a glance |
-| **Tasks** | Kanban board — Backlog, To do, In progress, Blocked, Done. **Drag a card between columns** to change its status; click a card for the detail panel |
+| **Overview** | Approved and uncovered requirements, open/overdue/blocked/risk counts, and overdue tasks, upcoming milestones, and document readiness at a glance |
+| **Requirements** | The requirement register — extract cited drafts from documents, validate or reject them, link agreed scope to delivery tasks, and filter for coverage **Gaps** |
+| **Tasks** | Board/List views for Backlog, To do, In progress, Blocked, Done. **Drag a card between columns** to change its status; click a card or list row for the detail panel |
 | **Timeline** | A **Gantt chart** of tasks and milestones, then what is overdue, due in the next 7 days, and later — plus milestone management |
 | **Documents** | The project's document library (unchanged) |
 | **Risks** | Impact, likelihood, mitigation, and status for each recorded risk |
+| **Review** | Generate cited draft plans, edit proposals, approve/reject in batches, and inspect immutable run history |
+| **Reports** | Generate and revisit saved seven-day status reports with deterministic sections and cited narratives |
 
 Task cards show a priority stripe, assignee, due date (red when overdue),
 estimate, and dependency count. Everything else — description, dates,
@@ -263,11 +316,12 @@ span. Milestones are diamonds. Bar colour follows status — blue in progress,
 green done, red overdue or blocked — and a red line marks today. Anything with
 no date is listed under the chart rather than silently dropped.
 
-**Everything in this phase is entered by hand.** Records carry a Manual badge
-today; the `AI suggested` badge, the draft/approved review states, and the
-citation lists under a card exist for a later phase where tasks and risks can be
-proposed from a document. Nothing is generated yet, and no LLM call is made
-anywhere in this feature.
+Manual records are immediately official and carry a **Manual** badge. Generated
+records start as **AI suggested / Draft** and are excluded from boards,
+timelines, dashboards, summaries, reports, dependency candidates, and chat
+grounding until a person approves them in Review. Rejected proposals stay in
+run history for audit. Approved AI records retain their citations and reviewer
+timestamp.
 
 ### Where things live
 
@@ -292,8 +346,9 @@ confirmation names both:
 
 - **Kept, unassigned:** documents, chat conversations, evaluation cases. Their
   `projectId` is nullable, so they survive.
-- **Permanently deleted:** tasks, milestones, and risks. Their `projectId` is
-  not nullable — a task with no project would be unreachable in every view.
+- **Permanently deleted:** requirements, tasks, milestones, and risks. Their
+  `projectId` is not nullable — a task with no project would be unreachable in
+  every view.
 
 ### Tuning the refusal threshold
 
@@ -310,18 +365,18 @@ on dense-vector similarity alone.
 
 Two independent guards, so neither depends on the model behaving well:
 
-1. **Retrieval gate (before the model is called).** Vector and PostgreSQL
-   full-text candidate rankings are fused. If no chunk clears
-   `RAG_MIN_SCORE` and no chunk matches the full-text query, the refusal is
-   returned immediately without spending a model request. Deterministic and
-   free.
+1. **Evidence gate (before the model is called).** Vector and PostgreSQL
+   full-text candidate rankings are fused. Global chat refuses unless a
+   qualifying document chunk exists. Project chat can also proceed from an
+   exact project snapshot or relevant approved live record; it refuses only
+   when neither evidence family exists.
 
-2. **Citation whitelist (after the model replies).** Retrieved chunks are
-   labelled `S1…Sn` in the prompt — real database IDs are never sent to the
-   model. Returned identifiers are resolved through a server-side map, and
-   anything not in it is dropped. An answer left with no valid citation is
-   downgraded to a refusal, because an uncitable claim is exactly the shape a
-   hallucination takes.
+2. **Citation whitelist (after the model replies).** Document chunks are
+   labelled `S1…Sn`; live source kinds use disjoint opaque labels. Real database
+   IDs are never sent to the model. Returned identifiers are resolved through a
+   server-side map, unknown labels are dropped, and an answer left with no valid
+   citation becomes a refusal. Mixed answers must cite the required evidence
+   families and use separate requirements/current-state headings.
 
 Every answer stores the question, retrieved chunk IDs, model name, latency, and
 any user feedback, so answers can be audited after the fact.
@@ -351,7 +406,8 @@ npm run db:studio    # Prisma Studio
 ```
 prisma/
   schema.prisma            data model (Unsupported("vector(1536)") for embeddings)
-  migrations/              pgvector/HNSW, full-text GIN, project layer, project management
+  migrations/              pgvector/HNSW, full-text GIN, project layer, project
+                           management, requirement register
 src/
   app/
     (app)/                 projects (tabbed workspace), chat, all documents, admin
@@ -364,9 +420,14 @@ src/
     storage/               StorageProvider + local-disk impl
     ingest/                validate-upload, extract, chunk, pipeline
     rag/                   hybrid retrieve/ranking, prompt, citations, answer
+    grounding/             shared document-citation verification
+    generation/            shared context selection; plan and requirements prompts,
+                           validation, persistence, review
+    reports/               deterministic weekly snapshots, health, narrative persistence
     pm/                    rules (pure dates/status), scoped summaries, selections
 tests/                     vitest — chunking, citations, retrieval, access, refusals,
-                           uploads, project-management rules and isolation
+                           uploads, project-management rules and isolation,
+                           requirement rules, schemas, extraction, validation
 ```
 
 See [CLAUDE.md](CLAUDE.md) for invariants and conventions, and

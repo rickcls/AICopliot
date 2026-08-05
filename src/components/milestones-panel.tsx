@@ -26,6 +26,7 @@ export interface MilestoneCitationRow {
   chunk: {
     id: string;
     pageNumber: number | null;
+    sectionTitle: string | null;
     document: { id: string; originalFilename: string };
   };
 }
@@ -36,6 +37,7 @@ export interface MilestoneRow {
   description: string | null;
   /** ISO string — Dates are serialised before crossing to the client. */
   targetDate: string | null;
+  completedAt: string | null;
   status: MilestoneStatus;
   source: "manual" | "ai_suggested";
   citations: MilestoneCitationRow[];
@@ -366,7 +368,15 @@ export function MilestonesPanel({
                         {citation.chunk.pageNumber
                           ? ` p.${citation.chunk.pageNumber}`
                           : ""}
+                        {citation.chunk.sectionTitle
+                          ? ` · ${citation.chunk.sectionTitle}`
+                          : ""}
                       </a>
+                      {citation.excerpt ? (
+                        <p className="mt-0.5 text-slate-500 italic">
+                          “{citation.excerpt}”
+                        </p>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

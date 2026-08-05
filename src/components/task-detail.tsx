@@ -163,6 +163,12 @@ export function TaskDetail({
               </dd>
             </div>
             <div>
+              <dt className="text-xs text-slate-500">Milestone</dt>
+              <dd className="mt-0.5 truncate">
+                {task.milestone?.title ?? "—"}
+              </dd>
+            </div>
+            <div>
               <dt className="text-xs text-slate-500">Origin</dt>
               <dd className="mt-0.5">
                 <Badge tone={task.source === "manual" ? "neutral" : "info"}>
@@ -210,7 +216,15 @@ export function TaskDetail({
                       {citation.chunk.pageNumber
                         ? ` · p.${citation.chunk.pageNumber}`
                         : ""}
+                      {citation.chunk.sectionTitle
+                        ? ` · ${citation.chunk.sectionTitle}`
+                        : ""}
                     </a>
+                    {citation.purpose === "milestone_link" ? (
+                      <Badge tone="info" className="ml-1.5">
+                        Milestone link
+                      </Badge>
+                    ) : null}
                     {citation.excerpt ? (
                       <p className="mt-1 text-slate-600 italic">
                         “{citation.excerpt}”

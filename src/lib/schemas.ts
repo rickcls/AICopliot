@@ -27,8 +27,8 @@ export const modelAnswerSchema = z.object({
 });
 export type ModelAnswer = z.infer<typeof modelAnswerSchema>;
 
-/** Citation as rendered to the user, resolved back to real records. */
-export const citationSchema = z.object({
+const documentCitationSchema = z.object({
+  kind: z.literal("document"),
   chunkId: z.string(),
   documentId: z.string(),
   filename: z.string(),
@@ -38,7 +38,53 @@ export const citationSchema = z.object({
   score: z.number(),
   matchType: z.enum(["semantic", "lexical", "hybrid"]).optional(),
 });
-export type Citation = z.infer<typeof citationSchema>;
+
+const projectCitationKindSchema = z.enum([
+  "task",
+  "milestone",
+  "risk",
+  "dependency",
+  "requirement",
+  "project_snapshot",
+]);
+
+export const projectCitationSchema = z.object({
+  kind: projectCitationKindSchema,
+  title: z.string(),
+  excerpt: z.string(),
+  observedAt: z.string().datetime(),
+  href: z.string().startsWith("/"),
+  snapshot: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean(), z.null()]),
+  ),
+});
+
+/** Citation as rendered to the user, resolved back to a frozen source record. */
+export const citationSchema = z.discriminatedUnion("kind", [
+  documentCitationSchema,
+  projectCitationSchema,
+]);
+
+export interface DocumentCitation extends z.infer<typeof documentCitationSchema> {
+  title?: never;
+  observedAt?: never;
+  href?: never;
+  snapshot?: never;
+}
+
+export interface ProjectCitation extends z.infer<typeof projectCitationSchema> {
+  chunkId?: never;
+  documentId?: never;
+  filename?: never;
+  pageNumber?: never;
+  sectionTitle?: never;
+  score?: never;
+  matchType?: never;
+}
+
+/** Discriminated union keeps existing document fields safe after narrowing. */
+export type Citation = DocumentCitation | ProjectCitation;
 
 // --- API inputs ------------------------------------------------------------
 
@@ -128,6 +174,7 @@ const taskFields = {
   status: taskStatusSchema,
   priority: taskPrioritySchema,
   assigneeId: z.string().min(1).nullable().optional(),
+  milestoneId: z.string().min(1).nullable().optional(),
   estimatedHours: z.coerce
     .number()
     .min(0, "Estimate cannot be negative")
@@ -191,6 +238,7 @@ export const updateMilestoneSchema = z
 
 const riskFields = {
   description: z.string().trim().min(1, "Risk description is required").max(4000),
+  milestoneId: z.string().min(1).nullable().optional(),
   impact: riskLevelSchema,
   likelihood: riskLevelSchema,
   mitigation: optionalText(4000),
@@ -208,6 +256,66 @@ export const updateRiskSchema = z
   .object(riskFields)
   .partial()
   .refine(requiresOneField, "Provide at least one field to update");
+
+// --- Requirements ----------------------------------------------------------
+
+export const requirementTypeSchema = z.enum([
+  "business",
+  "functional",
+  "non_functional",
+  "constraint",
+]);
+export const requirementPrioritySchema = z.enum([
+  "must",
+  "should",
+  "could",
+  "wont",
+]);
+export const requirementStatusSchema = z.enum([
+  "draft",
+  "needs_clarification",
+  "validated",
+  "approved",
+  "rejected",
+]);
+export const requirementConfidenceSchema = z.enum(["high", "medium", "low"]);
+export const requirementLinkTargetSchema = z.enum([
+  "task",
+  "milestone",
+  "risk",
+]);
+
+const requirementFields = {
+  title: z.string().trim().min(1, "Requirement title is required").max(200),
+  description: optionalText(4000),
+  type: requirementTypeSchema,
+  priority: requirementPrioritySchema,
+  status: requirementStatusSchema,
+  acceptanceCriteria: optionalText(4000),
+  assumptions: optionalText(4000),
+  confidence: requirementConfidenceSchema,
+  stakeholder: optionalText(200),
+};
+
+export const createRequirementSchema = z.object({
+  ...requirementFields,
+  type: requirementFields.type.default("functional"),
+  priority: requirementFields.priority.default("should"),
+  // Writing a requirement down is not agreeing it, so a manual record starts as
+  // a draft exactly like an extracted one.
+  status: requirementFields.status.default("draft"),
+  confidence: requirementFields.confidence.default("medium"),
+});
+
+export const updateRequirementSchema = z
+  .object(requirementFields)
+  .partial()
+  .refine(requiresOneField, "Provide at least one field to update");
+
+export const createRequirementLinkSchema = z.object({
+  targetType: requirementLinkTargetSchema,
+  targetId: z.string().min(1, "Select a record to link"),
+});
 
 export const feedbackSchema = z.object({
   chatMessageId: z.string().min(1),

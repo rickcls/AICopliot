@@ -1,15 +1,16 @@
 # PLANNING.md
 
-Living plan and decision log for AI Ops Copilot.
+Living plan and decision log for ScopePilot — AI Project Delivery Copilot.
 
 ---
 
 ## Goal
 
-A secure, single-workspace internal knowledge assistant for IT operations teams:
-create project workspaces, upload operational documents into each project, ask
-questions within a selected scope, and get answers grounded strictly in those
-documents with verifiable citations.
+A secure, single-workspace requirements-discovery and delivery assistant: create
+project workspaces, upload source documents, extract reviewable cited
+requirements and reviewable cited plans, trace agreed scope to the work that
+delivers it, and ask questions grounded in documents and approved live project
+records.
 
 **Explicitly out of scope**, now and later unless deliberately revisited:
 multi-agent orchestration, autonomous loops, external tool calling, ServiceNow
@@ -18,7 +19,7 @@ and generation — it answers questions, it does not act.
 
 ---
 
-## Status: MVP complete + first enhancement pass shipped
+## Status: ScopePilot core copilot loop implemented
 
 ### Shipped after the MVP
 
@@ -27,6 +28,10 @@ and generation — it answers questions, it does not act.
 | **Conversation memory** | Follow-ups were broken — `answerQuestion` took a bare string and prior turns were never sent to the model. Now the chat route loads prior turns, and `src/lib/rag/rewrite.ts` rewrites the follow-up into a standalone question **before embedding**. |
 | **Evaluation metrics** | `/admin/evaluations` stored cases but computed nothing. Now: golden-set expectations (`expectedKeywords`, `shouldRefuse`), deterministic auto-scoring, aggregate metrics (auto pass rate, refusal accuracy, citation rate, latency p50/p95), and a **Re-run all** regression button. |
 | **Retry for failed ingestion** | A failed document was permanently stuck — the only `/process` call was on upload. Retry buttons added to the dashboard and the document detail page. |
+| **Cited plan generation + Review** | Selected ready documents become bounded, cited draft milestones, tasks, risks, and dependency edges. A human edits and approves/rejects them before official PM reads can see them. |
+| **Combined project Q&A** | Project questions ground against document retrieval and deterministic snapshots of official live records in parallel. Global questions stay document-only. |
+| **Saved weekly reports** | Exact UTC-window sections and server-derived health are saved with a concise cited narrative, immutable history, and source snapshots. |
+| **Requirement register** | Selected documents become cited draft requirements with MoSCoW priority, acceptance criteria, assumptions, and honest confidence. A human validates or rejects each one in the register; approved requirements link to delivery records, and uncovered scope is a computed number rather than a memory. |
 
 Two things worth remembering from that pass:
 
@@ -70,8 +75,13 @@ Retrieval quality is where the engineering is.
 | Evaluation page persists and displays cases | Done |
 | Hybrid retrieval handles semantic questions and exact identifiers | Done — vector + PostgreSQL FTS with reciprocal-rank fusion |
 | Users can create projects containing separate document libraries | Done — project workspace, targeted upload, reassignment, and safe deletion |
-| Chat and evaluations can be restricted to one project | Done — both retrieval paths filter at query time |
-| Projects track tasks, dependencies, milestones, risks, and a timeline | Done — manual CRUD, workspace- and project-scoped, no model call involved |
+| Chat and evaluations can be restricted to one project | Done — project cases automatically combine document and official live-data grounding |
+| Projects track tasks, dependencies, milestones, risks, and a timeline | Done — manual CRUD plus human-approved cited AI proposals |
+| Selected project documents can generate a cited, reviewable draft plan | Done — bounded context, structured validation, audit run, atomic drafts |
+| Draft/rejected proposals never affect operational project state | Done — one canonical official predicate across PM reads and normal mutations |
+| Weekly status reports preserve exact sections and cited history | Done — deterministic snapshot plus model-written narrative only |
+| Project documents yield cited draft requirements for human validation | Done — extraction run, opaque labels, uncited proposals dropped, register review |
+| Agreed scope is traceable to the work delivering it | Done — `RequirementLink`, uncovered/unvalidated rules, coverage on the overview and in project chat |
 | Dashboard surfaces overdue, blocked, and upcoming work | Done — counts and lists share one filter definition |
 | Type-check, lint, tests, production build pass | Done |
 | README covers setup, env, migrations, pgvector, manual test | Done |
@@ -135,11 +145,19 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 20 | Project tabs are nested routes, not client-side tab state | Each tab fetches only its own data, is linkable, and gets one shared `loading.tsx`. The cost is that layouts cannot pass data down, solved by React `cache` in `src/lib/pm/project.ts`. |
 | 21 | All date/status logic is pure, in `src/lib/pm/rules.ts` | "Overdue" and "blocked" appear on a dashboard card, a project overview, and a timeline bucket. One definition, directly unit-testable, means a count and the list beneath it cannot disagree — the same reasoning as chunking and citation validation. |
 | 22 | Update schemas carry no Zod defaults | `.partial()` does **not** strip `.default()`. A defaulted field materialises on a PATCH and silently overwrites a value the caller never mentioned — caught by a test that asserted `{ status }` should not also set `priority`. `optionalText` keeps `undefined` (leave alone) distinct from `null`/`""` (clear) for the same reason. |
-| 23 | AI-facing tables shipped unused in the manual phase | `GenerationRun`, the three citation tables, and the `source` / `generationStatus` columns cost nothing empty, and mean the generation phase needs no second migration against a database that by then holds real data. |
+| 23 | Generated work uses an explicit official-record predicate | Manual/not-applicable and AI/approved are the only operational records. The same helper is used by boards, timelines, summaries, reports, dependency candidates, and live chat grounding so draft leakage is testable in one place. |
 | 24 | Sidebar replaces the top nav; app shell is full width | The board and Gantt need horizontal room, and `max-w-5xl` was squeezing five columns into ~180px each. The sidebar also carries project sections, so the tab strip was removed — two navigation systems disagree about where you are. |
 | 25 | `Task.startDate` added | A Gantt bar needs a duration. Without a start date a task has a deadline only, and any bar length would be invented. Nullable, so a due-date-only task honestly renders as a point rather than a fabricated span. |
 | 26 | Gantt built from a pure geometry module, no charting library | `src/lib/pm/gantt.ts` returns offsets and widths as percentages, so the chart is plain CSS — no measurement, no layout effects, no bundle cost, and the arithmetic is unit-testable instead of buried in JSX. |
 | 27 | Drag-and-drop uses native HTML5 events | One status change per drop does not justify a dependency. The drop handler reads the id from `dataTransfer` rather than React state, because state set in `dragstart` is not guaranteed committed when `drop` fires — a bug found in browser testing. The status `<select>` remains as the accessible path. |
+| 28 | Plan generation is an audited proposal transaction | A `processing` run exists before the provider call; opaque cited output is normalized before one transaction writes drafts, links, dependencies, and citations. Review is the only path to approval. |
+| 29 | Weekly reports split facts from prose | UTC windows, exact sections, counts, and health are deterministic. The model writes only the concise cited narrative, so it cannot omit a blocker or invent a date. |
+| 30 | Requirements carry **two** status axes, not one | `generationStatus` answers "did a human accept this record?", `status` answers "is this agreed scope?". Collapsing them loses the distinction the register exists for: a manually typed requirement is a legitimate record *and* an unagreed draft, and an AI proposal a reviewer moved to `needs_clarification` has been kept without being agreed. Baselined scope requires both, in one builder, so a card's count and the list beneath it cannot disagree. |
+| 31 | The register shows drafts; the Review page does not | Extends invariant 10 rather than breaking it. A draft task has no operational meaning. A draft requirement — "we think they asked for this, unconfirmed" — is precisely what a consultant works from, and `needs_clarification` is the list of things to take back to the client. Hiding it in run history would delete the feature's value. Two reads (the register page and its collection GET) and one item PATCH are the documented exceptions; every operational read still uses the baselined predicate. |
+| 32 | `RequirementLink` uses three nullable FKs, not `targetId` | A `targetType` + opaque id pair has no referential integrity, so deleting a task would leave a link the coverage query still counts. Real FKs cascade; a hand-written CHECK keeps the discriminator and the columns in agreement. Still one table, so Phase 3's matrix needs no migration or backfill. |
+| 33 | `sequence Int` rather than a stored `REQ-001` string | Traceability needs stable human-readable keys, but a stored string sorts wrong past 999 and freezes the format forever. The integer sorts correctly and `formatRequirementCode()` is the single place the rendering lives. |
+| 34 | A new `GenerationRunType` value gets its own migration file | Postgres refuses to use an enum value in the transaction that added it, and Prisma wraps each migration file in one. The partial unique index for active requirement runs references `'requirements'`, so the `ALTER TYPE` had to ship separately. The earlier `GenerationRunStatus` addition survived in one file only because nothing referenced its new value — not precedent. |
+| 35 | Extraction reuses the plan pipeline instead of forking it | Citation resolution, the S-label context builder, the audit lifecycle, and the single JSON repair attempt were already correct and tested. The only flow-specific part was the retrieval probes, so `selectDocumentContext` takes its queries as an argument — the second implementation that justifies the parameter. |
 
 ### Deviations from the original spec (approved)
 
@@ -190,14 +208,14 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 ## Enhancement roadmap
 
 Ranked by how much each moves the project past "an LLM with a vector database
-bolted on". Items 1–3 are shipped; 4–8 are not.
+bolted on". Items 1–4 are shipped; 5–8 remain roadmap work.
 
 | # | Item | Status | Why it matters |
 |---|---|---|---|
 | 1 | Evaluation metrics + regression suite | **Shipped** | Anyone can wire an LLM to a vector DB. Being able to say *"refusal accuracy is 0.95, here's the suite that catches regressions"* is the part that is actually engineering. It also makes every item below measurable instead of vibes. |
 | 2 | Conversation memory with query rewriting | **Shipped** | Was the single biggest reason the app felt worse than a chat window. |
 | 3 | Retry for failed ingestion | **Shipped** | Small, but a stuck document with no recovery is an obvious rough edge. |
-| 4 | **Hybrid search** (pgvector + Postgres full-text) | Next | Dense embeddings are weak on exact tokens — `ORA-01555`, `primary.db`, CVE IDs. Cosine similarity understands *meaning*, not *string identity*. Highest-value retrieval fix for an IT-ops corpus. |
+| 4 | **Hybrid search** (pgvector + Postgres full-text) | **Shipped** | Dense embeddings are weak on exact identifiers. Reciprocal-rank fusion preserves semantic recall while promoting exact project terms. |
 | 5 | Streaming responses | Next | ~2.7s of spinner reads as broken. Cheap, disproportionate perceived-quality gain. |
 | 6 | Cross-document synthesis | Later | *"Which runbooks mention Redis, and do they conflict?"* The question you genuinely cannot answer by pasting one file. Needs retrieval that spreads across documents rather than concentrating in the best-matching one. |
 | 7 | Re-ranking (top ~30 → ~8) | Later | Cheap recall win once there is enough corpus for `RAG_TOP_K=8` to be the binding constraint. Measure with item 1 first. |
@@ -246,10 +264,9 @@ Completed in Phase 4:
 - Project workspaces that contain their own documents, project-targeted uploads,
   cross-project reassignment, and project-scoped chat and evaluations.
 
-**Phase 4b — document-grounded project generation** (schema already in place)
+**Completed Phase 4b — document-grounded project generation and delivery loop**
 
-The manual project layer is complete. Generation is deliberately *not* built
-yet. When it is, the citation guarantees must extend rather than fork:
+The citation guarantees extend rather than fork:
 
 1. Keep `S1..Sn` for document chunks and give structured records their own
    disjoint opaque labels. Real database IDs still never reach the model; only
@@ -268,9 +285,11 @@ yet. When it is, the citation guarantees must extend rather than fork:
 4. Record the run in `GenerationRun`, write proposals as
    `source: ai_suggested, generationStatus: draft`, and require an explicit human
    action to approve. Nothing writes to a project without a click.
-5. Store the chat scope (`documents | project_data | both`) on
+5. Store the chat scope (`documents | project_combined`) on
    `ChatConversation` and start a fresh conversation when it changes, the same
    rule `projectId` already follows.
+6. Build weekly facts deterministically from official records, then ask the
+   model only for a cited narrative and persist the complete immutable snapshot.
 
 **Phase 5 — knowledge health and collaboration**
 - Dashboard for refusals, low-confidence topics, feedback trends, frequently

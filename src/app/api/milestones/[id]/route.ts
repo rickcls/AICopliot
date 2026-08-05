@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import {
+  completedAtOnStatusChange,
+  officialRecordWhere,
+} from "@/lib/pm/rules";
 import { milestoneSelect } from "@/lib/pm/select";
 import { updateMilestoneSchema } from "@/lib/schemas";
 
@@ -24,14 +28,19 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     const existing = await prisma.milestone.findFirst({
-      where: { id, workspaceId },
-      select: { id: true },
+      where: officialRecordWhere({ id, workspaceId }),
+      select: { id: true, status: true },
     });
     if (!existing) {
       return NextResponse.json({ error: "Milestone not found" }, { status: 404 });
     }
 
     const data = parsed.data;
+    const completedAt = completedAtOnStatusChange(
+      existing.status,
+      data.status,
+      "completed",
+    );
     const milestone = await prisma.milestone.update({
       where: { id: existing.id },
       data: {
@@ -41,6 +50,7 @@ export async function PATCH(request: Request, { params }: Params) {
           : {}),
         ...(data.targetDate !== undefined ? { targetDate: data.targetDate } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(completedAt !== undefined ? { completedAt } : {}),
       },
       select: milestoneSelect,
     });
@@ -57,7 +67,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     const { id } = await params;
 
     const existing = await prisma.milestone.findFirst({
-      where: { id, workspaceId },
+      where: officialRecordWhere({ id, workspaceId }),
       select: { id: true },
     });
     if (!existing) {

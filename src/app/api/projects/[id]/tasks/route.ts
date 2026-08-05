@@ -6,6 +6,11 @@ import {
   requireWorkspaceMember,
 } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { findOfficialProjectMilestone } from "@/lib/pm/project";
+import {
+  completedAtOnCreate,
+  officialRecordWhere,
+} from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
 import { createTaskSchema } from "@/lib/schemas";
 
@@ -20,7 +25,7 @@ export async function GET(_request: Request, { params }: Params) {
     const project = await requireProject(workspaceId, id);
 
     const tasks = await prisma.task.findMany({
-      where: { workspaceId, projectId: project.id },
+      where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: [{ createdAt: "asc" }],
       select: taskSelect,
     });
@@ -51,6 +56,21 @@ export async function POST(request: Request, { params }: Params) {
     if (parsed.data.assigneeId) {
       await requireWorkspaceMember(workspaceId, parsed.data.assigneeId);
     }
+    if (parsed.data.milestoneId) {
+      const milestone = await findOfficialProjectMilestone(
+        workspaceId,
+        project.id,
+        parsed.data.milestoneId,
+      );
+      if (!milestone) {
+        return NextResponse.json(
+          { error: "Milestone not found in this project" },
+          { status: 404 },
+        );
+      }
+    }
+
+    const now = new Date();
 
     const task = await prisma.task.create({
       data: {
@@ -61,9 +81,11 @@ export async function POST(request: Request, { params }: Params) {
         status: parsed.data.status,
         priority: parsed.data.priority,
         assigneeId: parsed.data.assigneeId ?? null,
+        milestoneId: parsed.data.milestoneId ?? null,
         estimatedHours: parsed.data.estimatedHours ?? null,
         startDate: parsed.data.startDate ?? null,
         dueDate: parsed.data.dueDate ?? null,
+        completedAt: completedAtOnCreate(parsed.data.status, "done", now),
       },
       select: taskSelect,
     });

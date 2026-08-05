@@ -154,6 +154,15 @@ describe("update inputs require a field", () => {
       assigneeId: null,
     });
   });
+
+  it("accepts assigning or clearing a project milestone", () => {
+    expect(updateTaskSchema.parse({ milestoneId: "milestone-1" })).toEqual({
+      milestoneId: "milestone-1",
+    });
+    expect(updateTaskSchema.parse({ milestoneId: null })).toEqual({
+      milestoneId: null,
+    });
+  });
 });
 
 describe("milestone input", () => {
@@ -196,6 +205,18 @@ describe("risk input", () => {
     expect(
       createRiskSchema.safeParse({ description: "x", status: "closed" }).success,
     ).toBe(false);
+  });
+
+  it("accepts assigning and clearing a project milestone", () => {
+    expect(
+      createRiskSchema.parse({
+        description: "Untested failover",
+        milestoneId: "milestone-1",
+      }).milestoneId,
+    ).toBe("milestone-1");
+    expect(updateRiskSchema.parse({ milestoneId: null })).toEqual({
+      milestoneId: null,
+    });
   });
 });
 
