@@ -98,6 +98,7 @@ export interface TaskRow {
 export interface MemberOption {
   id: string;
   name: string;
+  email: string;
 }
 
 export interface MilestoneOption {
@@ -134,6 +135,44 @@ export const STATUS_PILL: Record<TaskStatusColor, string> = {
   pink: "bg-pink-600",
   cyan: "bg-cyan-600",
 };
+
+/**
+ * Pale fills for editable status controls. Overrides the quiet control's
+ * transparent/slate hover so the chosen column stays coloured at rest.
+ */
+export const STATUS_SOFT: Record<TaskStatusColor, string> = {
+  slate: "bg-slate-100 text-slate-700 hover:bg-slate-200/80 focus-visible:bg-slate-100",
+  blue: "bg-blue-50 text-blue-700 hover:bg-blue-100/80 focus-visible:bg-blue-50",
+  amber: "bg-amber-50 text-amber-800 hover:bg-amber-100/80 focus-visible:bg-amber-50",
+  red: "bg-red-50 text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
+  emerald:
+    "bg-emerald-50 text-emerald-700 hover:bg-emerald-100/80 focus-visible:bg-emerald-50",
+  violet:
+    "bg-violet-50 text-violet-700 hover:bg-violet-100/80 focus-visible:bg-violet-50",
+  pink: "bg-pink-50 text-pink-700 hover:bg-pink-100/80 focus-visible:bg-pink-50",
+  cyan: "bg-cyan-50 text-cyan-700 hover:bg-cyan-100/80 focus-visible:bg-cyan-50",
+};
+
+/** Flag icon colour — same scale as the board card stripe. */
+export const PRIORITY_FLAG = {
+  low: "text-slate-400",
+  medium: "text-blue-500",
+  high: "text-amber-500",
+  urgent: "text-red-500",
+} as const;
+
+/**
+ * Soft chip behind a priority select. `low` stays near-invisible on purpose —
+ * the column exists to find the urgent rows.
+ */
+export const PRIORITY_SOFT = {
+  low: "bg-transparent text-slate-400 hover:bg-slate-100 focus-visible:bg-white",
+  medium:
+    "bg-blue-50 text-blue-700 hover:bg-blue-100/80 focus-visible:bg-blue-50",
+  high: "bg-amber-50 text-amber-800 hover:bg-amber-100/80 focus-visible:bg-amber-50",
+  urgent:
+    "bg-red-50 font-semibold text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
+} as const;
 
 export function statusColorToken(
   status: Pick<TaskStatusOption, "color" | "category">,

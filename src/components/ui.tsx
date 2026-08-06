@@ -67,10 +67,12 @@ export function Input({
   );
 }
 
+// `ComponentProps` rather than `TextareaHTMLAttributes` so `ref` is accepted as
+// an ordinary prop — the chat composer needs one to auto-grow the field.
 export function Textarea({
   className,
   ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: React.ComponentProps<"textarea">) {
   return (
     <textarea
       className={cn(
@@ -101,6 +103,24 @@ export function Select({
     />
   );
 }
+
+/**
+ * Metadata reads as quiet label/value rows rather than a grid of boxed inputs.
+ *
+ * Every control used to carry a permanent border and white fill, so a form with
+ * seven of them read as seven competing objects and the description — the only
+ * field that needs room to think in — was the smallest thing on screen. Here the
+ * chrome only appears on hover and focus, so at rest the block reads as a short
+ * list of facts, and the description gets the space.
+ *
+ * Lives here rather than in `task-form.tsx` because the task detail panel and
+ * the chat composer use it too, and importing a style constant *through* an
+ * unrelated form component is the same drift `SectionHeader` was extracted to fix.
+ */
+export const QUIET_CONTROL =
+  "w-full max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
+
+export const ROW_LABEL = "text-xs font-medium text-slate-500";
 
 export function Card({
   className,

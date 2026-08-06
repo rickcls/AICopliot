@@ -1,20 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Maximize2, X } from "lucide-react";
-import { Badge, Button, ErrorState, Input, Select, Spinner } from "@/components/ui";
+import { Flag, Maximize2, UserRound, X } from "lucide-react";
+import {
+  Avatar,
+  Badge,
+  Button,
+  ErrorState,
+  Input,
+  QUIET_CONTROL,
+  ROW_LABEL,
+  Select,
+  Spinner,
+} from "@/components/ui";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDependencies } from "@/components/task-dependencies";
 import {
-  QUIET_CONTROL,
-  ROW_LABEL,
   draftFrom,
   toPartialPayload,
   type TaskDraft,
 } from "@/components/task-form";
 import {
+  PRIORITY_FLAG,
+  PRIORITY_SOFT,
+  STATUS_DOT,
+  STATUS_SOFT,
   TASK_PRIORITIES,
   isTaskOverdue,
+  statusColorToken,
   type MemberOption,
   type MilestoneOption,
   type TaskCommentRow,
@@ -155,6 +168,11 @@ export function TaskDetail({
     (dependency) => dependency.dependsOnTask.status.category !== "done",
   );
 
+  const selectedStatus =
+    statuses.find((status) => status.id === draft.statusId) ?? task.status;
+  const statusTone = statusColorToken(selectedStatus);
+  const assignee = members.find((member) => member.id === draft.assigneeId);
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button
@@ -214,10 +232,14 @@ export function TaskDetail({
             <label htmlFor="detail-status" className={ROW_LABEL}>
               Status
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                aria-hidden
+                className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[statusTone])}
+              />
               <Select
                 id="detail-status"
-                className={QUIET_CONTROL}
+                className={cn(QUIET_CONTROL, "font-medium", STATUS_SOFT[statusTone])}
                 value={draft.statusId}
                 disabled={disabled}
                 onChange={(event) =>
@@ -235,7 +257,17 @@ export function TaskDetail({
             <label htmlFor="detail-assignee" className={ROW_LABEL}>
               Assignee
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              {assignee ? (
+                <Avatar name={assignee.name} email={assignee.email} />
+              ) : (
+                <span
+                  aria-hidden
+                  className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-400"
+                >
+                  <UserRound className="size-3.5" />
+                </span>
+              )}
               <Select
                 id="detail-assignee"
                 className={QUIET_CONTROL}
@@ -255,10 +287,19 @@ export function TaskDetail({
             <label htmlFor="detail-priority" className={ROW_LABEL}>
               Priority
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <Flag
+                aria-hidden
+                fill="currentColor"
+                className={cn("size-3.5 shrink-0", PRIORITY_FLAG[draft.priority])}
+              />
               <Select
                 id="detail-priority"
-                className={cn(QUIET_CONTROL, "capitalize")}
+                className={cn(
+                  QUIET_CONTROL,
+                  "capitalize",
+                  PRIORITY_SOFT[draft.priority],
+                )}
                 value={draft.priority}
                 disabled={disabled}
                 onChange={(event) =>
@@ -320,7 +361,12 @@ export function TaskDetail({
               <Input
                 id="detail-due"
                 type="date"
-                className={cn(QUIET_CONTROL, "w-auto max-w-none px-2")}
+                className={cn(
+                  QUIET_CONTROL,
+                  "w-auto max-w-none px-2",
+                  isTaskOverdue(task) &&
+                    "bg-red-50 text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
+                )}
                 value={draft.dueDate}
                 disabled={disabled}
                 aria-label="Due date"

@@ -27,8 +27,17 @@ export const modelAnswerSchema = z.object({
 });
 export type ModelAnswer = z.infer<typeof modelAnswerSchema>;
 
+/**
+ * The opaque prompt label this citation was returned under ("S1", "Q3") — never
+ * a database ID, so invariant 3 is untouched. Optional because every row
+ * persisted to `ChatMessage.citations` before this field existed lacks the key,
+ * and replaying a stored thread must keep parsing them.
+ */
+const citationLabel = z.string().optional();
+
 const documentCitationSchema = z.object({
   kind: z.literal("document"),
+  label: citationLabel,
   chunkId: z.string(),
   documentId: z.string(),
   filename: z.string(),
@@ -50,6 +59,7 @@ const projectCitationKindSchema = z.enum([
 
 export const projectCitationSchema = z.object({
   kind: projectCitationKindSchema,
+  label: citationLabel,
   title: z.string(),
   excerpt: z.string(),
   observedAt: z.string().datetime(),

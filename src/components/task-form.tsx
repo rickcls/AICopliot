@@ -1,10 +1,25 @@
 "use client";
 
-import { Button, Input, Select, Spinner, Textarea } from "@/components/ui";
+import { Flag, UserRound } from "lucide-react";
+import {
+  Avatar,
+  Button,
+  Input,
+  QUIET_CONTROL,
+  ROW_LABEL,
+  Select,
+  Spinner,
+  Textarea,
+} from "@/components/ui";
 import { Modal, ModalBody, ModalFooter } from "@/components/modal";
 import { cn } from "@/lib/utils";
 import {
+  PRIORITY_FLAG,
+  PRIORITY_SOFT,
+  STATUS_DOT,
+  STATUS_SOFT,
   TASK_PRIORITIES,
+  statusColorToken,
   toDateInput,
   type MemberOption,
   type MilestoneOption,
@@ -99,20 +114,6 @@ export function toPartialPayload(
   return payload;
 }
 
-/**
- * Metadata reads as quiet label/value rows rather than a grid of boxed inputs.
- *
- * Every control used to carry a permanent border and white fill, so a form with
- * seven of them read as seven competing objects and the description — the only
- * field that needs room to think in — was the smallest thing on screen. Here the
- * chrome only appears on hover and focus, so at rest the block reads as a short
- * list of facts, and the description gets the space.
- */
-export const QUIET_CONTROL =
-  "w-full max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
-
-export const ROW_LABEL = "text-xs font-medium text-slate-500";
-
 export function TaskForm({
   draft,
   statuses,
@@ -142,6 +143,12 @@ export function TaskForm({
     draft.startDate > draft.dueDate;
 
   const submittable = draft.title.trim() !== "" && !saving && !datesInverted;
+
+  const selectedStatus = statuses.find((status) => status.id === draft.statusId);
+  const statusTone = selectedStatus
+    ? statusColorToken(selectedStatus)
+    : "slate";
+  const assignee = members.find((member) => member.id === draft.assigneeId);
 
   return (
     <Modal
@@ -188,7 +195,17 @@ export function TaskForm({
             <label htmlFor="task-assignee" className={ROW_LABEL}>
               Assignee
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              {assignee ? (
+                <Avatar name={assignee.name} email={assignee.email} />
+              ) : (
+                <span
+                  aria-hidden
+                  className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-400"
+                >
+                  <UserRound className="size-3.5" />
+                </span>
+              )}
               <Select
                 id="task-assignee"
                 className={QUIET_CONTROL}
@@ -210,10 +227,14 @@ export function TaskForm({
             <label htmlFor="task-status" className={ROW_LABEL}>
               Status
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                aria-hidden
+                className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[statusTone])}
+              />
               <Select
                 id="task-status"
-                className={QUIET_CONTROL}
+                className={cn(QUIET_CONTROL, "font-medium", STATUS_SOFT[statusTone])}
                 value={draft.statusId}
                 onChange={(event) =>
                   onChange({ ...draft, statusId: event.target.value })
@@ -231,10 +252,19 @@ export function TaskForm({
             <label htmlFor="task-priority" className={ROW_LABEL}>
               Priority
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <Flag
+                aria-hidden
+                fill="currentColor"
+                className={cn("size-3.5 shrink-0", PRIORITY_FLAG[draft.priority])}
+              />
               <Select
                 id="task-priority"
-                className={cn(QUIET_CONTROL, "capitalize")}
+                className={cn(
+                  QUIET_CONTROL,
+                  "capitalize",
+                  PRIORITY_SOFT[draft.priority],
+                )}
                 value={draft.priority}
                 onChange={(event) =>
                   onChange({

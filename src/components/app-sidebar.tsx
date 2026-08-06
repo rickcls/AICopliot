@@ -39,7 +39,11 @@ const GLOBAL_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/documents", label: "All Documents", icon: FileText },
-  { href: "/chat", label: "Ask", icon: MessageSquare },
+  // Ask keeps its highlight on /chat/<conversationId>, because a thread has no
+  // other entry in this nav. It is deliberately not a blanket prefix rule: on
+  // /projects/<id> the project row below already carries aria-current, and a
+  // second one on "Projects" would announce two current pages in one nav.
+  { href: "/chat", label: "Ask", icon: MessageSquare, matchChildren: true },
 ] as const;
 
 /** Hidden on the rail, shown once there is room for text. */
@@ -117,7 +121,11 @@ export function AppSidebar({
                 href={link.href}
                 label={link.label}
                 icon={link.icon}
-                active={pathname === link.href}
+                active={
+                  pathname === link.href ||
+                  ("matchChildren" in link &&
+                    pathname.startsWith(`${link.href}/`))
+                }
               />
             </li>
           ))}

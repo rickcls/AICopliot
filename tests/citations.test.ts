@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { validateAnswer } from "@/lib/rag/citations";
 import { REFUSAL_TEXT, type SourceMap } from "@/lib/rag/prompt";
+import type {
+  ProjectGroundingSource,
+  ProjectSourceKind,
+} from "@/lib/rag/project-context";
 import type { RetrievedChunk } from "@/lib/rag/retrieve";
 import type { ModelAnswer } from "@/lib/schemas";
 
@@ -27,6 +31,22 @@ function chunk(id: string, content: string): RetrievedChunk {
 
 function sourceMap(...chunks: RetrievedChunk[]): SourceMap {
   return new Map(chunks.map((c, i) => [`S${i + 1}`, c]));
+}
+
+function projectSource(
+  kind: ProjectSourceKind,
+  id: string,
+  title: string,
+): ProjectGroundingSource {
+  return {
+    kind,
+    id,
+    title,
+    content: `${title} — current record content.`,
+    href: `/projects/p1/${kind}s`,
+    observedAt: "2026-08-06T00:00:00.000Z",
+    snapshot: { title },
+  };
 }
 
 function answer(overrides: Partial<ModelAnswer> = {}): ModelAnswer {
@@ -94,6 +114,62 @@ describe("validateAnswer — accepting valid citations", () => {
     );
 
     expect(result.citations.map((c) => c.chunkId)).toEqual(["c1", "c2"]);
+  });
+});
+
+describe("validateAnswer — labels carried onto the rendered citation", () => {
+  it("records the label a document citation was returned under", () => {
+    const map = sourceMap(chunk("c1", "Content one."), chunk("c2", "Content two."));
+    const result = validateAnswer(
+      answer({
+        citations: [
+          { sourceId: "S2", quote: "" },
+          { sourceId: "S1", quote: "" },
+        ],
+      }),
+      map,
+    );
+
+    expect(result.citations.map((c) => c.label)).toEqual(["S2", "S1"]);
+  });
+
+  it("normalises a lower-case label so it matches the rendered answer text", () => {
+    const map = sourceMap(chunk("c1", "Content one."));
+    const result = validateAnswer(
+      answer({ citations: [{ sourceId: " s1 ", quote: "" }] }),
+      map,
+    );
+
+    expect(result.citations[0].label).toBe("S1");
+  });
+
+  it("carries the per-family label on a live project citation", () => {
+    const map: SourceMap = new Map([
+      ["T1", projectSource("task", "task-1", "Migrate the database")],
+      ["Q1", projectSource("requirement", "req-1", "REQ-007 Single sign-on")],
+    ]);
+    const result = validateAnswer(
+      answer({
+        citations: [
+          { sourceId: "T1", quote: "" },
+          { sourceId: "Q1", quote: "" },
+        ],
+      }),
+      map,
+    );
+
+    expect(result.citations.map((c) => c.label)).toEqual(["T1", "Q1"]);
+    expect(result.citations.map((c) => c.kind)).toEqual(["task", "requirement"]);
+  });
+
+  it("leaves a refusal with no labels, because it has no citations", () => {
+    const result = validateAnswer(
+      answer({ answer: "Unsupported claim.", citations: [] }),
+      sourceMap(chunk("c1", "Some source.")),
+    );
+
+    expect(result.refused).toBe(true);
+    expect(result.citations).toEqual([]);
   });
 });
 

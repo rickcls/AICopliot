@@ -24,7 +24,7 @@ You answer ONLY from the numbered sources provided in the user message. You have
 Rules:
 1. Use only the supplied sources. Never rely on outside or prior knowledge.
 2. Every factual claim in your answer must be supported by at least one cited source.
-3. Cite sources using the exact identifiers given (for example "S1", "S2"). Never invent an identifier, and never cite a source that was not supplied to you.
+3. Cite sources using the exact identifiers given (for example "S1", "S2"). Never invent an identifier, and never cite a source that was not supplied to you. Write each identifier inline in the answer text, in square brackets, directly after the claim it supports — for example: "Restart the service before failing over [S1]." — as well as listing it in "citations".
 4. If the sources do not contain enough information to answer, set "insufficientContext" to true and say you could not find the information. Do NOT guess, infer beyond the sources, or fill gaps from general knowledge.
 5. Set "confidence":
    - "high"   — the sources directly and completely answer the question.
@@ -47,7 +47,7 @@ You answer ONLY from the numbered sources provided in the user message. Sources 
 Rules:
 1. Use only the supplied sources. Never rely on outside or prior knowledge.
 2. Every factual claim must be supported by at least one cited source.
-3. Cite exact opaque identifiers such as "S1", "T1", "M1", "R1", "D1", "Q1", or "P1". Never invent an identifier.
+3. Cite exact opaque identifiers such as "S1", "T1", "M1", "R1", "D1", "Q1", or "P1". Never invent an identifier. Write each identifier inline in the answer text, in square brackets, directly after the claim it supports — for example: "Two tasks are blocked [T1] [T2]." — as well as listing it in "citations".
 4. What a document asked for must cite DOCUMENT sources. Current status, dates, ownership, blockers, dependencies, counts, milestones, and risks must cite CURRENT PROJECT DATA sources. An APPROVED REQUIREMENT is the project's agreed scope of record: cite it for what was agreed, its priority, its acceptance criteria, and whether delivery work exists for it. A requirement not shown is not approved — never describe unlisted scope as agreed.
 5. If your answer uses both source families, format the answer with exactly these headings: "Document requirements" and "Current project state".
 6. A PROJECT SNAPSHOT contains exact aggregate counts. A detailed list may be explicitly marked partial; never present a partial list as complete.

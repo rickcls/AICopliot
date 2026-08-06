@@ -29,6 +29,7 @@ export const getAssignableMembers = cache(async (workspaceId: string) => {
   return members.map(({ user }) => ({
     id: user.id,
     name: user.name ?? user.email,
+    email: user.email,
   }));
 });
 

@@ -242,6 +242,10 @@ model ChatConversation {
   title          String
   groundingScope GroundingScope @default(documents)
   createdAt      DateTime       @default(now())
+  // Not `updatedAt`: the row is never edited, only appended to, and Prisma's
+  // @updatedAt fires only on a write to this model — it would never move for a
+  // child ChatMessage insert. Written by hand in the same transaction.
+  lastMessageAt  DateTime       @default(now())
 
   workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -249,6 +253,7 @@ model ChatConversation {
   messages  ChatMessage[]
 
   @@index([workspaceId, userId])
+  @@index([workspaceId, userId, lastMessageAt(sort: Desc)])
 }
 
 model ChatMessage {
@@ -259,6 +264,10 @@ model ChatMessage {
   citations          Json?
   confidence         AnswerConfidence?
   latencyMs          Int?
+  // Stored rather than derived. `confidence = low && citations = []` happens to
+  // identify a refusal today, but that is a second implicit definition that
+  // rots the moment either grounding guard moves. Mirrors EvaluationCase.refused.
+  refused            Boolean           @default(false)
   // Observability (approved addition to the original spec): lets us inspect
   // which chunks fed an answer and which model produced it.
   modelName          String?

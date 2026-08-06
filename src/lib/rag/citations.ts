@@ -103,6 +103,9 @@ export function validateAnswer(
 
     if (isProjectSource(source)) {
       citations.push({
+        // Already trimmed and upper-cased by resolveDocumentCitations, so the
+        // label here matches the one the answer text was rendered with.
+        label: citation.sourceId,
         kind: source.kind,
         title: source.title,
         excerpt: buildVerifiedExcerpt(citation.excerpt, source.content),
@@ -112,6 +115,7 @@ export function validateAnswer(
       });
     } else {
       citations.push({
+        label: citation.sourceId,
         kind: "document",
         chunkId: source.id,
         documentId: source.documentId,

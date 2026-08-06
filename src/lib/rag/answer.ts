@@ -23,7 +23,7 @@ import {
 } from "./project-context";
 import { hasGroundingEvidence } from "./ranking";
 import { retrieveChunks, type RetrievedChunk } from "./retrieve";
-import { rewriteQuestion, type ChatTurn } from "./rewrite";
+import { needsRewrite, rewriteQuestion, type ChatTurn } from "./rewrite";
 
 /**
  * Question answering.
@@ -45,6 +45,28 @@ export interface AnswerResult extends ValidatedAnswer {
   searchQuery: string;
 }
 
+/**
+ * The pipeline's real boundaries, reported so a caller can show what is
+ * happening rather than an undifferentiated spinner. These are phases, not
+ * tokens: the answer text cannot be streamed, because citation validation may
+ * still downgrade a complete answer to a refusal after the model has finished.
+ */
+export type AnswerPhase =
+  | "rewriting"
+  | "retrieving"
+  | "retrieved"
+  | "reasoning"
+  | "repairing"
+  | "validating";
+
+export interface AnswerProgress {
+  phase: AnswerPhase;
+  /** Chunks that cleared the evidence gate. Only on `retrieved`. */
+  chunkCount?: number;
+  /** Frozen live project records supplied. Only on `retrieved`. */
+  projectSourceCount?: number;
+}
+
 export interface AnswerDeps {
   embeddings?: EmbeddingProvider;
   chat?: ChatProvider;
@@ -55,6 +77,12 @@ export interface AnswerDeps {
   projectId?: string | null;
   groundingScope?: "documents" | "project_combined";
   projectContext?: typeof getProjectGroundingContext;
+  /**
+   * Fire-and-forget phase notifications. The channel is a UI stream that may be
+   * gone long before the answer is finished and persisted, so a throw here is
+   * swallowed: a closed browser tab must never fail an answer.
+   */
+  onProgress?: (progress: AnswerProgress) => void;
 }
 
 /** Models sometimes wrap JSON in prose or a fenced block; recover the object. */
@@ -100,9 +128,19 @@ export async function answerQuestion(
     deps.groundingScope === "project_combined" && Boolean(deps.projectId);
   const refusalText = combined ? PROJECT_REFUSAL_TEXT : undefined;
 
+  const report = (progress: AnswerProgress) => {
+    try {
+      deps.onProgress?.(progress);
+    } catch {
+      // Enqueueing onto a closed stream throws. Swallowing it is the point.
+    }
+  };
+
   // Resolve pronouns and implied subjects against the conversation BEFORE
   // embedding — retrieval quality depends on the standalone form, not the
-  // literal follow-up.
+  // literal follow-up. Reported only when it really happens, so a first
+  // question does not claim a step it skipped.
+  if (needsRewrite(history)) report({ phase: "rewriting" });
   const searchQuery = await rewriteQuestion(question, history, chat);
 
   const emptyProjectContext: ProjectGroundingContext = {
@@ -114,6 +152,7 @@ export async function answerQuestion(
     partial: false,
   };
   const projectContext = deps.projectContext ?? getProjectGroundingContext;
+  report({ phase: "retrieving" });
   const [retrieved, liveContext] = await Promise.all([
     embeddings.embed([searchQuery]).then(([queryEmbedding]) =>
       retrieveChunks(
@@ -131,6 +170,12 @@ export async function answerQuestion(
 
   // --- Guard 1: refuse before calling the model when evidence is too weak ---
   const relevant = retrieved.filter((c) => hasGroundingEvidence(c, minScore));
+  // Reported after the gate, so the count shown is what the model will receive.
+  report({
+    phase: "retrieved",
+    chunkCount: relevant.length,
+    projectSourceCount: liveContext.sources.length,
+  });
   if (relevant.length === 0 && liveContext.sources.length === 0) {
     return {
       ...refusal(refusalText),
@@ -157,12 +202,14 @@ export async function answerQuestion(
     { role: "user" as const, content: buildUserMessage(searchQuery, contextBlock) },
   ];
 
+  report({ phase: "reasoning" });
   let parsed = parseModelAnswer(
     await chat.complete(messages, { jsonMode: true, temperature: 0 }),
   );
 
   // One repair attempt before giving up on malformed output.
   if (!parsed) {
+    report({ phase: "repairing" });
     parsed = parseModelAnswer(
       await chat.complete(
         [
@@ -192,6 +239,7 @@ export async function answerQuestion(
   }
 
   // --- Guard 2: drop uncitable claims ---
+  report({ phase: "validating" });
   const validated = validateAnswer(parsed, sourceMap, {
     refusalText,
     requireMixedHeadings: combined,
