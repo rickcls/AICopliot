@@ -1,13 +1,15 @@
-import { Card } from "@/components/ui";
 import type { GanttModel } from "@/lib/pm/gantt";
 import { cn, formatDay } from "@/lib/utils";
 
 /**
- * Gantt chart.
+ * Gantt grid.
  *
- * Server component — it is read-only, so there is nothing to hydrate. Bars are
- * positioned by percentage from src/lib/pm/gantt.ts, which means plain CSS with
- * no measurement, no charting dependency, and no client JavaScript.
+ * Bars are positioned by percentage from src/lib/pm/gantt.ts, which means plain
+ * CSS with no measurement and no charting dependency.
+ *
+ * Presentational only: the card, header, and the shared "not scheduled" list
+ * belong to src/components/project-timeline.tsx, because the calendar view needs
+ * the same chrome and two copies would drift.
  */
 
 const ROW_LABEL_WIDTH = "12rem";
@@ -29,30 +31,21 @@ function barColor(status: string, overdue: boolean): string {
 export function GanttChart({ model }: { model: GanttModel | null }) {
   if (!model) {
     return (
-      <Card className="p-6">
-        <h2 className="text-sm font-semibold">Nothing scheduled yet</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <div className="px-5 py-10 text-center">
+        <p className="text-sm font-medium text-slate-900">Nothing scheduled yet</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
           Give a task a start and due date, or a milestone a target date, and it
           will appear on the chart.
         </p>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 px-5 py-3">
-        <h2 className="text-sm font-semibold">Schedule</h2>
-        <p className="text-xs text-slate-500">
-          {formatDay(model.start)} – {formatDay(model.end)} · {model.bars.length}{" "}
-          item{model.bars.length === 1 ? "" : "s"}
-        </p>
-      </div>
-
+    <>
       {/* Wide charts scroll inside this container; the page never scrolls sideways. */}
       <div className="overflow-x-auto">
         <div className="min-w-[46rem]">
-          {/* Axis */}
           <div className="flex border-b border-slate-200 bg-slate-50/60">
             <div
               className="shrink-0 border-r border-slate-200"
@@ -73,7 +66,6 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
             </div>
           </div>
 
-          {/* Rows */}
           <div className="relative">
             {model.todayPct !== null ? (
               <div
@@ -179,7 +171,10 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
           or blocked
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rotate-45 rounded-[2px] bg-purple-500" aria-hidden />{" "}
+          <span
+            className="size-2.5 rotate-45 rounded-[2px] bg-purple-500"
+            aria-hidden
+          />{" "}
           milestone
         </span>
         <span className="flex items-center gap-1.5">
@@ -187,24 +182,6 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
           date only
         </span>
       </div>
-
-      {model.undated.length > 0 ? (
-        <div className="border-t border-slate-200 px-5 py-3">
-          <p className="text-xs font-medium text-slate-600">
-            Not scheduled ({model.undated.length})
-          </p>
-          <ul className="mt-1.5 flex flex-wrap gap-1.5">
-            {model.undated.map((item) => (
-              <li
-                key={`${item.kind}-${item.id}`}
-                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-              >
-                {item.title}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </Card>
+    </>
   );
 }

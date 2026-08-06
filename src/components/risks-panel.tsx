@@ -1,16 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import {
   Badge,
   Button,
   Card,
   EmptyState,
   ErrorState,
+  Field,
+  SectionHeader,
   Select,
   Spinner,
   Textarea,
+  type BadgeTone,
 } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
+import { cn } from "@/lib/utils";
 import type { MilestoneOption } from "@/components/task-types";
 
 export type RiskLevel = "low" | "medium" | "high";
@@ -57,6 +64,25 @@ const STATUS_TONE = {
   accepted: "neutral",
 } as const;
 
+/**
+ * Impact and likelihood collapse into one chip, coloured by whichever of the
+ * two is worse.
+ *
+ * They used to be two full badges — "impact: high", "likelihood: medium" — which
+ * is the same mistake the requirement register made: badging every field means
+ * no field stands out, and on a list where almost everything is `high · medium`
+ * two identical amber pills per row carry no signal at all. Colouring by the
+ * worse axis is not a new severity scale, just a rule for which of the two
+ * existing numbers picks the colour; both are still named in the chip and
+ * spelled out again in the expanded body.
+ */
+const LEVEL_RANK = { low: 0, medium: 1, high: 2 } as const;
+
+function exposureTone(impact: RiskLevel, likelihood: RiskLevel): BadgeTone {
+  const worst = LEVEL_RANK[impact] >= LEVEL_RANK[likelihood] ? impact : likelihood;
+  return LEVEL_TONE[worst];
+}
+
 interface Draft {
   description: string;
   milestoneId: string;
@@ -89,7 +115,20 @@ export function RisksPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
+
+  function toggleExpanded(id: string) {
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  const openRisks = risks.filter((risk) => risk.status === "open").length;
 
   function upsert(risk: RiskRow) {
     setRisks((previous) =>
@@ -164,7 +203,13 @@ export function RisksPanel({
       risk.description.length > 60
         ? `${risk.description.slice(0, 60)}…`
         : risk.description;
-    if (!confirm(`Delete this risk?\n\n"${label}"`)) return;
+    const confirmed = await confirm({
+      title: "Delete this risk?",
+      body: <p className="italic">“{label}”</p>,
+      confirmLabel: "Delete risk",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setBusyId(risk.id);
     setError(null);
@@ -176,6 +221,7 @@ export function RisksPanel({
         return;
       }
       setRisks((previous) => previous.filter((item) => item.id !== risk.id));
+      toast.success("Deleted risk");
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -185,14 +231,16 @@ export function RisksPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">Risks</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {risks.length} recorded · manually entered risks and document-derived
-            ones are labelled separately
-          </p>
-        </div>
+      <SectionHeader
+        title="Risks"
+        description={
+          <>
+            {risks.length} recorded
+            {openRisks > 0 ? ` · ${openRisks} still open` : null} · open a row for
+            its mitigation and sources
+          </>
+        }
+      >
         <Button
           type="button"
           onClick={() => {
@@ -202,7 +250,7 @@ export function RisksPanel({
         >
           New risk
         </Button>
-      </div>
+      </SectionHeader>
 
       {error ? <ErrorState message={error} /> : null}
 
@@ -404,121 +452,176 @@ export function RisksPanel({
           }
         />
       ) : (
-        <Card className="divide-y divide-slate-100">
-          {risks.map((risk) => (
-            <div key={risk.id} className="p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <p className="min-w-0 flex-1 text-sm text-pretty">
-                  {risk.description}
-                </p>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone={LEVEL_TONE[risk.impact]}>
-                    impact: {risk.impact}
-                  </Badge>
-                  <Badge tone={LEVEL_TONE[risk.likelihood]}>
-                    likelihood: {risk.likelihood}
-                  </Badge>
-                  <Badge tone={STATUS_TONE[risk.status]}>{risk.status}</Badge>
-                  <Badge tone={risk.source === "manual" ? "neutral" : "info"}>
-                    {risk.source === "manual" ? "Manual" : "AI suggested"}
-                  </Badge>
-                </div>
-              </div>
+        <Card className="overflow-hidden">
+          <ul className="divide-y divide-slate-100">
+            {risks.map((risk) => {
+              const open = expanded.has(risk.id);
+              const busy = busyId === risk.id;
 
-              {risk.mitigation ? (
-                <p className="mt-2 text-xs text-slate-600">
-                  <span className="font-medium">Mitigation: </span>
-                  {risk.mitigation}
-                </p>
-              ) : null}
+              return (
+                <li key={risk.id}>
+                  {/* Wraps below `sm`, where the fixed-width chips would
+                      otherwise leave the description a few characters wide. */}
+                  <div
+                    className={cn(
+                      "flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 transition-colors",
+                      open ? "bg-slate-50" : "hover:bg-slate-50/70",
+                      busy && "opacity-60",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      onClick={() => toggleExpanded(risk.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                    >
+                      <ChevronRight
+                        aria-hidden
+                        className={cn(
+                          "size-3.5 shrink-0 text-slate-400 transition-transform",
+                          open && "rotate-90",
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm text-slate-900">
+                        {risk.description}
+                      </span>
+                    </button>
 
-              {risk.milestone ? (
-                <p className="mt-2 text-xs text-slate-600">
-                  <span className="font-medium">Milestone: </span>
-                  {risk.milestone.title}
-                </p>
-              ) : null}
+                    <div className="flex shrink-0 basis-full items-center gap-1.5 pl-6 sm:basis-auto sm:pl-0">
+                      {risk.source === "ai_suggested" ? (
+                        <Badge tone="info">AI</Badge>
+                      ) : null}
+                      <Badge
+                        tone={exposureTone(risk.impact, risk.likelihood)}
+                        title={`Impact ${risk.impact}, likelihood ${risk.likelihood}`}
+                      >
+                        {risk.impact} × {risk.likelihood}
+                      </Badge>
+                      <Badge tone={STATUS_TONE[risk.status]}>{risk.status}</Badge>
+                    </div>
+                  </div>
 
-              {risk.citations.length > 0 ? (
-                <div className="mt-2">
-                  <p className="text-xs font-medium text-slate-600">Sources</p>
-                  <ul className="mt-1 space-y-1">
-                    {risk.citations.map((citation) => (
-                      <li key={citation.id} className="text-xs">
-                        <a
-                          href={`/documents/${citation.chunk.document.id}`}
-                          className="text-slate-700 underline hover:text-slate-900"
-                        >
-                          {citation.chunk.document.originalFilename}
-                          {citation.chunk.pageNumber
-                            ? ` p.${citation.chunk.pageNumber}`
-                            : ""}
-                          {citation.chunk.sectionTitle
-                            ? ` · ${citation.chunk.sectionTitle}`
-                            : ""}
-                        </a>
-                        {citation.purpose === "milestone_link" ? (
-                          <Badge tone="info" className="ml-1.5">
-                            Milestone link
-                          </Badge>
-                        ) : null}
-                        {citation.excerpt ? (
-                          <p className="mt-0.5 text-slate-500 italic">
-                            “{citation.excerpt}”
+                  {open ? (
+                    <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-9">
+                      {/* A two-column list gives the prose one wide measure
+                          instead of stacking four narrow labelled blocks. */}
+                      <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
+                        <Field name="Risk">
+                          <p className="max-w-3xl text-pretty">
+                            {risk.description}
                           </p>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+                        </Field>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Select
-                  aria-label={`Status for risk: ${risk.description.slice(0, 40)}`}
-                  className="h-8 text-xs"
-                  value={risk.status}
-                  disabled={busyId === risk.id}
-                  onChange={(event) =>
-                    void changeStatus(risk, event.target.value as RiskStatus)
-                  }
-                >
-                  {STATUSES.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busyId === risk.id}
-                  onClick={() => {
-                    setEditingId(risk.id);
-                    setDraft({
-                      description: risk.description,
-                      milestoneId: risk.milestoneId ?? "",
-                      impact: risk.impact,
-                      likelihood: risk.likelihood,
-                      mitigation: risk.mitigation ?? "",
-                      status: risk.status,
-                    });
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-red-700 hover:bg-red-50"
-                  disabled={busyId === risk.id}
-                  onClick={() => void remove(risk)}
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          ))}
+                        <Field name="Mitigation">
+                          {risk.mitigation ? (
+                            <p className="max-w-3xl text-pretty">
+                              {risk.mitigation}
+                            </p>
+                          ) : (
+                            <span className="text-amber-700">
+                              None recorded — nothing is being done about this yet.
+                            </span>
+                          )}
+                        </Field>
+
+                        <Field name="Exposure">
+                          <span className="text-slate-600">
+                            Impact {risk.impact} · likelihood {risk.likelihood}
+                          </span>
+                        </Field>
+
+                        {risk.milestone ? (
+                          <Field name="Milestone">
+                            <span className="text-slate-600">
+                              {risk.milestone.title}
+                            </span>
+                          </Field>
+                        ) : null}
+
+                        {risk.citations.length > 0 ? (
+                          <Field name="Sources">
+                            <ul className="space-y-1.5">
+                              {risk.citations.map((citation) => (
+                                <li key={citation.id}>
+                                  <a
+                                    href={`/documents/${citation.chunk.document.id}`}
+                                    className="text-xs text-slate-700 underline hover:text-slate-900"
+                                  >
+                                    {citation.chunk.document.originalFilename}
+                                    {citation.chunk.pageNumber
+                                      ? ` p.${citation.chunk.pageNumber}`
+                                      : ""}
+                                    {citation.chunk.sectionTitle
+                                      ? ` · ${citation.chunk.sectionTitle}`
+                                      : ""}
+                                  </a>
+                                  {citation.purpose === "milestone_link" ? (
+                                    <Badge tone="info" className="ml-1.5">
+                                      Milestone link
+                                    </Badge>
+                                  ) : null}
+                                  {citation.excerpt ? (
+                                    <p className="mt-0.5 line-clamp-2 max-w-3xl text-xs text-slate-500 italic">
+                                      “{citation.excerpt}”
+                                    </p>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </Field>
+                        ) : null}
+                      </dl>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Select
+                          aria-label={`Status for risk: ${risk.description.slice(0, 40)}`}
+                          className="h-8 text-xs"
+                          value={risk.status}
+                          disabled={busy}
+                          onChange={(event) =>
+                            void changeStatus(risk, event.target.value as RiskStatus)
+                          }
+                        >
+                          {STATUSES.map((status) => (
+                            <option key={status.value} value={status.value}>
+                              {status.label}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() => {
+                            setEditingId(risk.id);
+                            setDraft({
+                              description: risk.description,
+                              milestoneId: risk.milestoneId ?? "",
+                              impact: risk.impact,
+                              likelihood: risk.likelihood,
+                              mitigation: risk.mitigation ?? "",
+                              status: risk.status,
+                            });
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-700 hover:bg-red-50"
+                          disabled={busy}
+                          onClick={() => void remove(risk)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
         </Card>
       )}
     </div>

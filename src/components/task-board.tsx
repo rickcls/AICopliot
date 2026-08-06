@@ -1,8 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, LayoutGrid, List, Plus, Timer } from "lucide-react";
-import { Badge, Button, EmptyState, ErrorState } from "@/components/ui";
+import {
+  CalendarClock,
+  ChevronRight,
+  Flag,
+  GitBranch,
+  LayoutGrid,
+  List,
+  Plus,
+  Timer,
+} from "lucide-react";
+import {
+  Avatar,
+  Button,
+  EmptyState,
+  ErrorState,
+  FOCUS_RING,
+  SectionHeader,
+} from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
 import { TaskCard } from "@/components/task-card";
 import { TaskDetail } from "@/components/task-detail";
 import { TaskForm, type TaskDraft, draftFrom, emptyDraft } from "@/components/task-form";
@@ -21,19 +39,25 @@ export type { TaskRow } from "@/components/task-types";
 type TaskView = "board" | "list";
 type TaskStatusFilter = "all" | TaskStatus;
 
-const PRIORITY_TONE = {
-  low: "neutral",
-  medium: "info",
-  high: "warning",
-  urgent: "danger",
+/**
+ * Priority reads as a coloured flag rather than a text badge. In a list where
+ * every row also carries a status, two same-shaped pills side by side compete
+ * for the same glance; a flag is a different shape, so priority and status stop
+ * fighting. `low` is deliberately near-invisible — the point of a priority
+ * column is to find the urgent rows, not to label the ordinary ones.
+ */
+const PRIORITY_FLAG = {
+  low: "text-slate-300",
+  medium: "text-blue-500",
+  high: "text-amber-500",
+  urgent: "text-red-500",
 } as const;
 
-const STATUS_TONE = {
-  backlog: "neutral",
-  todo: "info",
-  in_progress: "warning",
-  blocked: "danger",
-  done: "success",
+const PRIORITY_TEXT = {
+  low: "text-slate-400",
+  medium: "text-slate-600",
+  high: "text-amber-700",
+  urgent: "font-semibold text-red-700",
 } as const;
 
 const STATUS_DOT = {
@@ -42,6 +66,16 @@ const STATUS_DOT = {
   in_progress: "bg-amber-500",
   blocked: "bg-red-500",
   done: "bg-emerald-500",
+} as const;
+
+/** Solid rather than pale: a group header is a divider, and has to out-weigh
+ *  the rows under it or the list reads as one undifferentiated run. */
+const STATUS_PILL = {
+  backlog: "bg-slate-500",
+  todo: "bg-blue-600",
+  in_progress: "bg-amber-500",
+  blocked: "bg-red-600",
+  done: "bg-emerald-600",
 } as const;
 
 function statusLabel(status: TaskStatus): string {
@@ -78,13 +112,41 @@ export function TaskBoard({
   const [view, setView] = useState<TaskView>("board");
   const [statusFilter, setStatusFilter] =
     useState<TaskStatusFilter>("all");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<TaskStatus>>(
+    () => new Set(),
+  );
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const openTask = tasks.find((task) => task.id === openTaskId) ?? null;
   const filteredTasks =
     statusFilter === "all"
       ? tasks
       : tasks.filter((task) => task.status === statusFilter);
+
+  /**
+   * The list is grouped by status, in board order, so scrolling it tells the
+   * same story as scanning the board left to right.
+   *
+   * Empty groups are dropped rather than rendered as headers with nothing under
+   * them: a project with everything in Backlog would otherwise open on four
+   * empty headings before its first task. The board already shows every status,
+   * including the empty ones you can drop into.
+   */
+  const taskGroups = BOARD_COLUMNS.map((column) => ({
+    status: column.status,
+    label: column.label,
+    tasks: filteredTasks.filter((task) => task.status === column.status),
+  })).filter((group) => group.tasks.length > 0);
+
+  function toggleGroup(status: TaskStatus) {
+    setCollapsedGroups((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(status)) next.add(status);
+      return next;
+    });
+  }
 
   function upsert(task: TaskRow) {
     setTasks((previous) =>
@@ -170,10 +232,20 @@ export function TaskBoard({
     const blocks = tasks.filter((item) =>
       item.dependencies.some((d) => d.dependsOnTaskId === task.id),
     ).length;
-    const warning = blocks
-      ? `Delete "${task.title}"?\n\n${blocks} task(s) depend on it and will lose that dependency.`
-      : `Delete "${task.title}"?`;
-    if (!confirm(warning)) return;
+    const confirmed = await confirm({
+      title: `Delete “${task.title}”?`,
+      body: blocks ? (
+        <p>
+          <span className="font-medium text-red-700">
+            {blocks} task{blocks === 1 ? "" : "s"}
+          </span>{" "}
+          depend on it and will lose that dependency.
+        </p>
+      ) : undefined,
+      confirmLabel: "Delete task",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setBusyId(task.id);
     setError(null);
@@ -195,6 +267,7 @@ export function TaskBoard({
           })),
       );
       setOpenTaskId(null);
+      toast.success(`Deleted “${task.title}”`);
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -218,18 +291,17 @@ export function TaskBoard({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">
-            {view === "board" ? "Board" : "Task list"}
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+      <SectionHeader
+        title={view === "board" ? "Board" : "Task list"}
+        description={
+          <>
             {tasks.length} task{tasks.length === 1 ? "" : "s"}
             {view === "board"
               ? " · drag a card between columns to change its status"
-              : " · review every task in one place"}
-          </p>
-        </div>
+              : " · grouped by status"}
+          </>
+        }
+      >
         <div className="flex items-center gap-2">
           <div
             className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
@@ -276,7 +348,7 @@ export function TaskBoard({
             New task
           </Button>
         </div>
-      </div>
+      </SectionHeader>
 
       {error ? <ErrorState message={error} /> : null}
 
@@ -468,107 +540,223 @@ export function TaskBoard({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-left text-sm xl:min-w-[760px]">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-500">
-                <tr>
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    Task
-                  </th>
-                  <th scope="col" className="px-3 py-3 font-medium">
-                    Status
-                  </th>
-                  <th scope="col" className="px-3 py-3 font-medium">
-                    Priority
-                  </th>
-                  <th scope="col" className="px-3 py-3 font-medium">
-                    Assignee
-                  </th>
-                  <th scope="col" className="px-3 py-3 font-medium">
-                    Due
-                  </th>
-                  <th
-                    scope="col"
-                    className="hidden px-4 py-3 text-right font-medium xl:table-cell"
-                  >
-                    Estimate
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredTasks.map((task) => {
-                  const overdue = isTaskOverdue(task);
+              {/* The Status column is gone: every row sits under a status
+                  heading that already says it, and repeating it on each row was
+                  a column of identical badges taking width from the one column
+                  that needs it. The dot keeps the status legible for a row read
+                  on its own. */}
+              {/* `table-fixed` is what makes the title truncate instead of
+                  forcing the table wider, so every column carries a width and
+                  Task takes the remainder. None of them may be hidden by a
+                  media query: the group header spans a fixed `colSpan`, and a
+                  column that disappears below a breakpoint leaves a phantom one
+                  behind that silently takes its width out of the Task column.
+                  Below `min-w` the whole table scrolls sideways instead. */}
+              <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                  <tr>
+                    <th scope="col" className="px-4 py-2.5 font-medium">
+                      Task
+                    </th>
+                    <th scope="col" className="w-40 px-3 py-2.5 font-medium">
+                      Assignee
+                    </th>
+                    <th scope="col" className="w-28 px-3 py-2.5 font-medium">
+                      Priority
+                    </th>
+                    <th scope="col" className="w-32 px-3 py-2.5 font-medium">
+                      Due
+                    </th>
+                    <th
+                      scope="col"
+                      className="w-24 px-4 py-2.5 text-right font-medium"
+                    >
+                      Estimate
+                    </th>
+                  </tr>
+                </thead>
+
+                {taskGroups.map((group) => {
+                  const collapsed = collapsedGroups.has(group.status);
 
                   return (
-                    <tr
-                      key={task.id}
-                      tabIndex={busyId === task.id ? -1 : 0}
-                      aria-label={`Open ${task.title} details`}
-                      title="Open task details"
-                      onClick={() => setOpenTaskId(task.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setOpenTaskId(task.id);
-                        }
-                      }}
-                      className={cn(
-                        "group cursor-pointer transition-colors hover:bg-slate-50/80 focus-visible:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-400",
-                        busyId === task.id && "pointer-events-none opacity-60",
-                      )}
+                    <tbody
+                      key={group.status}
+                      className="divide-y divide-slate-100 border-b border-slate-200 last:border-b-0"
                     >
-                      <th scope="row" className="max-w-sm px-4 py-3 font-normal">
-                        <span className="line-clamp-2 font-medium text-slate-900 group-hover:underline">
-                          {task.title}
-                        </span>
-                        {task.description ? (
-                          <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
-                            {task.description}
-                          </p>
-                        ) : null}
-                      </th>
-                      <td className="px-3 py-3">
-                        <Badge tone={STATUS_TONE[task.status]}>
-                          {statusLabel(task.status)}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Badge tone={PRIORITY_TONE[task.priority]}>
-                          {task.priority}
-                        </Badge>
-                      </td>
-                      <td className="max-w-40 truncate px-3 py-3 text-slate-600">
-                        {task.assignee?.name ?? task.assignee?.email ?? "Unassigned"}
-                      </td>
-                      <td
-                        className={cn(
-                          "whitespace-nowrap px-3 py-3 text-slate-600",
-                          overdue && "font-medium text-red-700",
-                        )}
-                      >
-                        {task.dueDate ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <CalendarClock className="size-3.5" aria-hidden />
-                            {formatDay(task.dueDate)}
-                            {overdue ? " · overdue" : ""}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="hidden whitespace-nowrap px-4 py-3 text-right text-slate-600 tabular-nums xl:table-cell">
-                        {task.estimatedHours === null ? (
-                          "—"
-                        ) : (
-                          <span className="inline-flex items-center justify-end gap-1.5">
-                            <Timer className="size-3.5" aria-hidden />
-                            {task.estimatedHours}h
-                          </span>
-                        )}
-                      </td>
-                    </tr>
+                      <tr className="bg-slate-50/70">
+                        <th
+                          scope="colgroup"
+                          colSpan={5}
+                          className="px-2.5 py-1.5 text-left font-normal"
+                        >
+                          <button
+                            type="button"
+                            aria-expanded={!collapsed}
+                            onClick={() => toggleGroup(group.status)}
+                            className={cn(
+                              "inline-flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-200/70",
+                              FOCUS_RING,
+                            )}
+                          >
+                            <ChevronRight
+                              aria-hidden
+                              className={cn(
+                                "size-3.5 shrink-0 text-slate-400 transition-transform",
+                                !collapsed && "rotate-90",
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "inline-flex items-center rounded px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white uppercase",
+                                STATUS_PILL[group.status],
+                              )}
+                            >
+                              {group.label}
+                            </span>
+                            <span className="text-xs text-slate-500 tabular-nums">
+                              {group.tasks.length}
+                            </span>
+                          </button>
+                        </th>
+                      </tr>
+
+                      {collapsed
+                        ? null
+                        : group.tasks.map((task) => {
+                            const overdue = isTaskOverdue(task);
+
+                            return (
+                              <tr
+                                key={task.id}
+                                tabIndex={busyId === task.id ? -1 : 0}
+                                aria-label={`Open ${task.title} details`}
+                                title="Open task details"
+                                onClick={() => setOpenTaskId(task.id)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    setOpenTaskId(task.id);
+                                  }
+                                }}
+                                className={cn(
+                                  "group cursor-pointer transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-400",
+                                  busyId === task.id &&
+                                    "pointer-events-none opacity-60",
+                                )}
+                              >
+                                <th
+                                  scope="row"
+                                  className="px-4 py-2.5 text-left font-normal"
+                                >
+                                  <span className="flex items-center gap-2.5">
+                                    <span
+                                      aria-hidden
+                                      className={cn(
+                                        "size-2 shrink-0 rounded-full",
+                                        STATUS_DOT[task.status],
+                                      )}
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                      {/* Truncation is what keeps a row one
+                                          line tall; the title attribute is how
+                                          a long one is still readable. */}
+                                      <span
+                                        title={task.title}
+                                        className="block truncate font-medium text-slate-900 group-hover:underline"
+                                      >
+                                        {task.title}
+                                      </span>
+                                      {task.description ? (
+                                        <span className="mt-0.5 block truncate text-xs text-slate-500">
+                                          {task.description}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                    {task.dependencies.length > 0 ? (
+                                      <span
+                                        title={`Depends on ${task.dependencies.length} task(s)`}
+                                        className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 tabular-nums"
+                                      >
+                                        <GitBranch className="size-3" aria-hidden />
+                                        {task.dependencies.length}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </th>
+                                <td className="px-3 py-2.5">
+                                  {task.assignee ? (
+                                    <span className="flex items-center gap-2">
+                                      <Avatar
+                                        name={task.assignee.name}
+                                        email={task.assignee.email}
+                                        className="size-5"
+                                      />
+                                      <span className="min-w-0 truncate text-xs text-slate-600">
+                                        {task.assignee.name ?? task.assignee.email}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-slate-400">
+                                      Unassigned
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-1.5 text-xs capitalize",
+                                      PRIORITY_TEXT[task.priority],
+                                    )}
+                                  >
+                                    <Flag
+                                      aria-hidden
+                                      fill="currentColor"
+                                      className={cn(
+                                        "size-3.5 shrink-0",
+                                        PRIORITY_FLAG[task.priority],
+                                      )}
+                                    />
+                                    {task.priority}
+                                  </span>
+                                </td>
+                                <td
+                                  className={cn(
+                                    "px-3 py-2.5 text-xs whitespace-nowrap",
+                                    overdue
+                                      ? "font-medium text-red-700"
+                                      : "text-slate-600",
+                                  )}
+                                >
+                                  {task.dueDate ? (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <CalendarClock
+                                        className="size-3.5 shrink-0"
+                                        aria-hidden
+                                      />
+                                      {formatDay(task.dueDate)}
+                                      {overdue ? " · overdue" : ""}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300">—</span>
+                                  )}
+                                </td>
+                                <td className="hidden px-4 py-2.5 text-right text-xs whitespace-nowrap text-slate-600 tabular-nums xl:table-cell">
+                                  {task.estimatedHours === null ? (
+                                    <span className="text-slate-300">—</span>
+                                  ) : (
+                                    <span className="inline-flex items-center justify-end gap-1.5">
+                                      <Timer className="size-3.5" aria-hidden />
+                                      {task.estimatedHours}h
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                    </tbody>
                   );
                 })}
-              </tbody>
               </table>
             </div>
           )}

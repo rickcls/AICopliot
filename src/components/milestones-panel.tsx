@@ -1,17 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import {
   Badge,
   Button,
   Card,
   ErrorState,
+  Field,
   Input,
   Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
-import { formatDay } from "@/lib/utils";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
+import { cn, formatDay } from "@/lib/utils";
 
 export type MilestoneStatus =
   | "not_started"
@@ -85,7 +89,18 @@ export function MilestonesPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
+
+  function toggleExpanded(id: string) {
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
 
   function upsert(milestone: MilestoneRow) {
     setMilestones((previous) =>
@@ -156,7 +171,12 @@ export function MilestonesPanel({
   }
 
   async function remove(milestone: MilestoneRow) {
-    if (!confirm(`Delete milestone "${milestone.title}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete milestone “${milestone.title}”?`,
+      confirmLabel: "Delete milestone",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setBusyId(milestone.id);
     setError(null);
@@ -172,6 +192,7 @@ export function MilestonesPanel({
       setMilestones((previous) =>
         previous.filter((item) => item.id !== milestone.id),
       );
+      toast.success(`Deleted milestone “${milestone.title}”`);
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -327,110 +348,160 @@ export function MilestonesPanel({
           No milestones yet. Add one to mark a checkpoint in this project.
         </p>
       ) : (
-        <ul className="mt-4 divide-y divide-slate-100">
-          {milestones.map((milestone) => (
-            <li key={milestone.id} className="py-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{milestone.title}</p>
-                  {milestone.description ? (
-                    <p className="mt-0.5 text-xs text-pretty text-slate-600">
-                      {milestone.description}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-slate-500">
-                    {milestone.targetDate
-                      ? formatDay(milestone.targetDate)
-                      : "No target date"}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={STATUS_TONE[milestone.status]}>
-                    {milestone.status.replace("_", " ")}
-                  </Badge>
-                  <Badge
-                    tone={milestone.source === "manual" ? "neutral" : "info"}
+        <ul className="mt-3 -mx-1 divide-y divide-slate-100">
+          {milestones.map((milestone) => {
+            const open = expanded.has(milestone.id);
+            const busy = busyId === milestone.id;
+
+            return (
+              <li key={milestone.id}>
+                <div
+                  className={cn(
+                    "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1 py-2 transition-colors",
+                    open ? "bg-slate-50" : "hover:bg-slate-50/70",
+                    busy && "opacity-60",
+                  )}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => toggleExpanded(milestone.id)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   >
-                    {milestone.source === "manual" ? "Manual" : "AI suggested"}
-                  </Badge>
+                    <ChevronRight
+                      aria-hidden
+                      className={cn(
+                        "size-3.5 shrink-0 text-slate-400 transition-transform",
+                        open && "rotate-90",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">
+                      {milestone.title}
+                    </span>
+                  </button>
+
+                  <div className="flex shrink-0 basis-full items-center gap-1.5 pl-5.5 sm:basis-auto sm:pl-0">
+                    <span
+                      className={cn(
+                        "text-xs whitespace-nowrap tabular-nums",
+                        milestone.targetDate ? "text-slate-500" : "text-slate-300",
+                      )}
+                    >
+                      {milestone.targetDate
+                        ? formatDay(milestone.targetDate)
+                        : "no date"}
+                    </span>
+                    {milestone.source === "ai_suggested" ? (
+                      <Badge tone="info">AI</Badge>
+                    ) : null}
+                    <Badge tone={STATUS_TONE[milestone.status]}>
+                      {milestone.status.replace("_", " ")}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
 
-              {milestone.citations.length > 0 ? (
-                <ul className="mt-2 space-y-1">
-                  {milestone.citations.map((citation) => (
-                    <li key={citation.id} className="text-xs">
-                      <a
-                        href={`/documents/${citation.chunk.document.id}`}
-                        className="text-slate-700 underline hover:text-slate-900"
-                      >
-                        {citation.chunk.document.originalFilename}
-                        {citation.chunk.pageNumber
-                          ? ` p.${citation.chunk.pageNumber}`
-                          : ""}
-                        {citation.chunk.sectionTitle
-                          ? ` · ${citation.chunk.sectionTitle}`
-                          : ""}
-                      </a>
-                      {citation.excerpt ? (
-                        <p className="mt-0.5 text-slate-500 italic">
-                          “{citation.excerpt}”
-                        </p>
+                {open ? (
+                  <div className="border-t border-slate-100 bg-slate-50/50 px-1 py-3 pl-6">
+                    <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                      <Field name="Description">
+                        {milestone.description ? (
+                          <p className="max-w-3xl text-pretty">
+                            {milestone.description}
+                          </p>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </Field>
+
+                      {milestone.completedAt ? (
+                        <Field name="Completed">
+                          <span className="text-slate-600">
+                            {formatDay(milestone.completedAt)}
+                          </span>
+                        </Field>
                       ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Select
-                  aria-label={`Status for ${milestone.title}`}
-                  className="h-8 text-xs"
-                  value={milestone.status}
-                  disabled={busyId === milestone.id}
-                  onChange={(event) =>
-                    void changeStatus(
-                      milestone,
-                      event.target.value as MilestoneStatus,
-                    )
-                  }
-                >
-                  {STATUSES.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busyId === milestone.id}
-                  onClick={() => {
-                    setEditingId(milestone.id);
-                    setDraft({
-                      title: milestone.title,
-                      description: milestone.description ?? "",
-                      targetDate: milestone.targetDate
-                        ? milestone.targetDate.slice(0, 10)
-                        : "",
-                      status: milestone.status,
-                    });
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-red-700 hover:bg-red-50"
-                  disabled={busyId === milestone.id}
-                  onClick={() => void remove(milestone)}
-                >
-                  Delete
-                </Button>
-              </div>
-            </li>
-          ))}
+                      {milestone.citations.length > 0 ? (
+                        <Field name="Sources">
+                          <ul className="space-y-1.5">
+                            {milestone.citations.map((citation) => (
+                              <li key={citation.id}>
+                                <a
+                                  href={`/documents/${citation.chunk.document.id}`}
+                                  className="text-xs text-slate-700 underline hover:text-slate-900"
+                                >
+                                  {citation.chunk.document.originalFilename}
+                                  {citation.chunk.pageNumber
+                                    ? ` p.${citation.chunk.pageNumber}`
+                                    : ""}
+                                  {citation.chunk.sectionTitle
+                                    ? ` · ${citation.chunk.sectionTitle}`
+                                    : ""}
+                                </a>
+                                {citation.excerpt ? (
+                                  <p className="mt-0.5 line-clamp-2 max-w-3xl text-xs text-slate-500 italic">
+                                    “{citation.excerpt}”
+                                  </p>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </Field>
+                      ) : null}
+                    </dl>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Select
+                        aria-label={`Status for ${milestone.title}`}
+                        className="h-8 text-xs"
+                        value={milestone.status}
+                        disabled={busy}
+                        onChange={(event) =>
+                          void changeStatus(
+                            milestone,
+                            event.target.value as MilestoneStatus,
+                          )
+                        }
+                      >
+                        {STATUSES.map((status) => (
+                          <option key={status.value} value={status.value}>
+                            {status.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditingId(milestone.id);
+                          setDraft({
+                            title: milestone.title,
+                            description: milestone.description ?? "",
+                            targetDate: milestone.targetDate
+                              ? milestone.targetDate.slice(0, 10)
+                              : "",
+                            status: milestone.status,
+                          });
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-700 hover:bg-red-50"
+                        disabled={busy}
+                        onClick={() => void remove(milestone)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>

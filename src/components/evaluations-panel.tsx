@@ -12,6 +12,8 @@ import {
   Spinner,
   Textarea,
 } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
 import type { Metrics } from "@/lib/evaluation/scoring";
 import { formatDate } from "@/lib/utils";
 
@@ -107,6 +109,8 @@ export function EvaluationsPanel({
   const [running, setRunning] = useState(false);
   const [runningAll, setRunningAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
   const [projectId, setProjectId] = useState("");
 
   const load = useCallback(async () => {
@@ -165,13 +169,12 @@ export function EvaluationsPanel({
 
   async function handleRunAll() {
     if (runningAll || rows.length === 0) return;
-    if (
-      !confirm(
-        `Re-run all ${rows.length} case(s) against the current pipeline? This makes a model call per case.`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Re-run all ${rows.length} case${rows.length === 1 ? "" : "s"}?`,
+      body: "Each case is scored against the current pipeline, which costs one model call per case.",
+      confirmLabel: "Run regression suite",
+    });
+    if (!confirmed) return;
 
     setRunningAll(true);
     setError(null);
@@ -191,6 +194,10 @@ export function EvaluationsPanel({
 
       setRows(data.evaluations);
       setMetrics(data.metrics);
+      toast.success(
+        `Re-ran ${data.evaluations.length} case${data.evaluations.length === 1 ? "" : "s"}`,
+        "Metrics below reflect the new run.",
+      );
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -213,13 +220,21 @@ export function EvaluationsPanel({
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this evaluation case?")) return;
+    const confirmed = await confirm({
+      title: "Delete this evaluation case?",
+      body: "Its recorded result leaves the suite, so aggregate metrics will change.",
+      confirmLabel: "Delete case",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
     const response = await fetch(`/api/evaluations?id=${id}`, {
       method: "DELETE",
     }).catch(() => null);
 
     if (response?.ok) {
       await load();
+      toast.success("Deleted evaluation case");
     } else {
       setError("Could not delete that case.");
     }

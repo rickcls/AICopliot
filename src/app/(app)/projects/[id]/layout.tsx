@@ -3,16 +3,19 @@ import { notFound } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { getScopedProject } from "@/lib/pm/project";
+import { ProjectTabs } from "@/components/project-tabs";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Shell shared by every project section.
+ * Shell shared by every project section: breadcrumb, title, and the section
+ * tabs.
  *
- * Section navigation lives in the sidebar, so this is only the header — one
- * navigation system rather than a sidebar and a tab strip disagreeing about
- * where you are. The project lookup is workspace-scoped and deduped with the
- * identical call in each section page via React cache.
+ * The tabs live here rather than in the sidebar so that each navigation answers
+ * one question — the sidebar picks the project, this strip picks the section —
+ * and the two can never disagree about where you are. The project lookup is
+ * workspace-scoped and deduped with the identical call in each section page via
+ * React cache.
  */
 export default async function ProjectLayout({
   children,
@@ -37,7 +40,7 @@ export default async function ProjectLayout({
         <span className="text-slate-900">{project.name}</span>
       </nav>
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-4 pb-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight text-balance">
             {project.name}
@@ -56,6 +59,8 @@ export default async function ProjectLayout({
           Ask this project
         </Link>
       </div>
+
+      <ProjectTabs projectId={project.id} />
 
       <div className="mt-6">{children}</div>
     </div>

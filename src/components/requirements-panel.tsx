@@ -10,11 +10,14 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Field,
   Input,
   Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
 import { formatRequirementCode } from "@/lib/pm/rules";
 import { cn } from "@/lib/utils";
 
@@ -211,21 +214,6 @@ function warningsFor(requirement: RequirementRow): string[] {
 }
 
 /** Muted label + readable content, so the body has one measure instead of four. */
-function Field({
-  name,
-  children,
-}: {
-  name: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <>
-      <dt className="text-xs font-medium text-slate-500">{name}</dt>
-      <dd className="min-w-0 text-sm text-slate-700">{children}</dd>
-    </>
-  );
-}
-
 export function RequirementsPanel({
   projectId,
   initialRequirements,
@@ -249,6 +237,8 @@ export function RequirementsPanel({
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -482,13 +472,14 @@ export function RequirementsPanel({
   }
 
   async function remove(requirement: RequirementRow) {
-    if (
-      !confirm(
-        `Delete ${formatRequirementCode(requirement.sequence)}?\n\n"${requirement.title}"`,
-      )
-    ) {
-      return;
-    }
+    const code = formatRequirementCode(requirement.sequence);
+    const confirmed = await confirm({
+      title: `Delete ${code}?`,
+      body: <p className="italic">“{requirement.title}”</p>,
+      confirmLabel: "Delete requirement",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setBusyId(requirement.id);
     setError(null);
@@ -504,6 +495,7 @@ export function RequirementsPanel({
       setRequirements((previous) =>
         previous.filter((item) => item.id !== requirement.id),
       );
+      toast.success(`Deleted ${code}`);
     } catch {
       setError("Could not reach the server.");
     } finally {

@@ -14,6 +14,7 @@ import {
   Spinner,
   Textarea,
 } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import { formatDate } from "@/lib/utils";
 
 type GenerationStatus = "draft" | "approved" | "rejected" | "not_applicable";
@@ -645,6 +646,7 @@ export function ReviewPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const run = initialRuns.find((candidate) => candidate.id === runId) ?? initialRuns[0];
   const proposals = useMemo<Proposal[]>(
@@ -952,7 +954,13 @@ export function ReviewPanel({
                               });
                             }}
                             onReject={async () => {
-                              if (!confirm("Reject this suggestion? It will remain in run history.")) return;
+                              const confirmed = await confirm({
+                                title: "Reject this suggestion?",
+                                body: "It stays in this run's history but will never become an official project record.",
+                                confirmLabel: "Reject",
+                                tone: "danger",
+                              });
+                              if (!confirmed) return;
                               await review({
                                 action: "reject",
                                 items: [{ kind: proposal.kind, id: proposal.id }],

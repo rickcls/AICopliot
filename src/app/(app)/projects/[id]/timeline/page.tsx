@@ -3,90 +3,32 @@ import {
   MilestonesPanel,
   type MilestoneRow,
 } from "@/components/milestones-panel";
-import { GanttChart } from "@/components/gantt-chart";
-import { Badge, Card } from "@/components/ui";
+import {
+  ProjectTimeline,
+  type TimelineRow,
+} from "@/components/project-timeline";
+import { TimelineProgress } from "@/components/timeline-progress";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
-import { buildGantt, type GanttInput } from "@/lib/pm/gantt";
 import { getScopedProject } from "@/lib/pm/project";
+import { countProgress } from "@/lib/pm/progress";
 import { milestoneSelect } from "@/lib/pm/select";
 import {
-  bucketTimeline,
   isMilestoneOpen,
-  isOverdue,
   isTaskOpen,
   officialRecordWhere,
-  DUE_SOON_DAYS,
-  type TimelineItem,
 } from "@/lib/pm/rules";
-import { formatDay } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Read-only chronological view, so it stays a server component — there is no
- * interaction to hydrate apart from the milestone editor at the bottom.
+ * Schedule and progress for one project.
+ *
+ * The rollup is counted here and rendered by a server component; the chart shell
+ * is a client component because its view toggle and month cursor are state. Both
+ * receive the same `now`, so the server render and the hydrated one cannot
+ * disagree about what is overdue.
  */
-
-function Section({
-  title,
-  count,
-  items,
-  tone,
-}: {
-  title: string;
-  count: number;
-  items: TimelineItem[];
-  tone?: "danger" | "warning";
-}) {
-  if (items.length === 0) return null;
-
-  return (
-    <div>
-      <div className="flex items-baseline gap-2 px-1 pb-1.5">
-        <h3
-          className={
-            tone === "danger"
-              ? "text-xs font-semibold tracking-wide text-red-700 uppercase"
-              : tone === "warning"
-                ? "text-xs font-semibold tracking-wide text-amber-700 uppercase"
-                : "text-xs font-semibold tracking-wide text-slate-500 uppercase"
-          }
-        >
-          {title}
-        </h3>
-        <span className="text-xs text-slate-400 tabular-nums">{count}</span>
-      </div>
-      <Card className="divide-y divide-slate-100">
-        {items.map((item) => (
-          <div key={`${item.kind}-${item.id}`} className="px-4 py-2.5">
-            {/* Title gets its own line: side-by-side with the badges it was
-                being truncated to a couple of characters in a narrow column. */}
-            <p className="text-sm text-pretty">{item.title}</p>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <Badge tone={item.kind === "milestone" ? "info" : "neutral"}>
-                {item.kind === "milestone" ? "Milestone" : "Task"}
-              </Badge>
-              <span className="text-xs text-slate-400">{item.status}</span>
-              <span
-                className={
-                  tone === "danger"
-                    ? "ml-auto text-xs font-medium text-red-700 tabular-nums"
-                    : tone === "warning"
-                      ? "ml-auto text-xs font-medium text-amber-700 tabular-nums"
-                      : "ml-auto text-xs text-slate-500 tabular-nums"
-                }
-              >
-                {item.date ? formatDay(item.date) : "No date"}
-              </span>
-            </div>
-          </div>
-        ))}
-      </Card>
-    </div>
-  );
-}
-
 export default async function ProjectTimelinePage({
   params,
 }: {
@@ -119,53 +61,41 @@ export default async function ProjectTimelinePage({
 
   const now = new Date();
 
-  const items: TimelineItem[] = [
-    ...tasks.map((task) => ({
-      id: task.id,
-      kind: "task" as const,
-      title: task.title,
-      date: task.dueDate,
-      open: isTaskOpen(task.status),
-      status: task.status.replace("_", " "),
-    })),
-    ...milestones.map((milestone) => ({
-      id: milestone.id,
-      kind: "milestone" as const,
-      title: milestone.title,
-      date: milestone.targetDate,
-      open: isMilestoneOpen(milestone.status),
-      status: milestone.status.replace("_", " "),
-    })),
-  ];
-
-  const buckets = bucketTimeline(items, now);
-
-  const ganttInput: GanttInput[] = [
-    ...tasks.map((task) => ({
-      id: task.id,
-      kind: "task" as const,
-      title: task.title,
-      start: task.startDate,
-      end: task.dueDate,
+  const taskProgress = countProgress(
+    tasks.map((task) => ({
       status: task.status,
       open: isTaskOpen(task.status),
-      overdue: isOverdue(
-        { date: task.dueDate, open: isTaskOpen(task.status) },
-        now,
-      ),
+      date: task.dueDate,
+    })),
+    now,
+  );
+  const milestoneProgress = countProgress(
+    milestones.map((milestone) => ({
+      status: milestone.status,
+      open: isMilestoneOpen(milestone.status),
+      date: milestone.targetDate,
+    })),
+    now,
+  );
+
+  const rows: TimelineRow[] = [
+    ...tasks.map((task) => ({
+      id: task.id,
+      kind: "task" as const,
+      title: task.title,
+      start: task.startDate ? task.startDate.toISOString() : null,
+      end: task.dueDate ? task.dueDate.toISOString() : null,
+      status: task.status,
+      open: isTaskOpen(task.status),
     })),
     ...milestones.map((milestone) => ({
       id: milestone.id,
       kind: "milestone" as const,
       title: milestone.title,
       start: null,
-      end: milestone.targetDate,
+      end: milestone.targetDate ? milestone.targetDate.toISOString() : null,
       status: milestone.status,
       open: isMilestoneOpen(milestone.status),
-      overdue: isOverdue(
-        { date: milestone.targetDate, open: isMilestoneOpen(milestone.status) },
-        now,
-      ),
     })),
   ];
 
@@ -179,36 +109,11 @@ export default async function ProjectTimelinePage({
       : null,
   }));
 
-  const hasBuckets =
-    buckets.overdue.length > 0 ||
-    buckets.dueSoon.length > 0 ||
-    buckets.upcoming.length > 0;
-
   return (
     <div className="space-y-6">
-      <GanttChart model={buildGantt(ganttInput, now)} />
+      <TimelineProgress tasks={taskProgress} milestones={milestoneProgress} />
 
-      {hasBuckets ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Section
-            title="Overdue"
-            count={buckets.overdue.length}
-            items={buckets.overdue}
-            tone="danger"
-          />
-          <Section
-            title={`Next ${DUE_SOON_DAYS} days`}
-            count={buckets.dueSoon.length}
-            items={buckets.dueSoon}
-            tone="warning"
-          />
-          <Section
-            title="Later"
-            count={buckets.upcoming.length}
-            items={buckets.upcoming}
-          />
-        </div>
-      ) : null}
+      <ProjectTimeline rows={rows} nowIso={now.toISOString()} />
 
       <MilestonesPanel
         projectId={project.id}

@@ -347,6 +347,29 @@ keep it readable:
 - Extraction collapses once the register has content — it is a setup step, not
   something you look at while reviewing.
 
+**These rules are the house pattern for every record list, not a quirk of the
+register.** Risks and milestones were the same shape of mistake — a risk rendered
+its description, mitigation, milestone, a Sources block with full excerpts, and a
+`<select>` plus two buttons, so five risks were ~1,350px of scrolling. Both now
+collapse to one line and expand into the same two-column `<dl>`. When you add a
+list, follow it: **one line per record, exceptions badged rather than fields,
+prose in the expansion.**
+
+The shared pieces live in `src/components/ui.tsx` so the lists cannot drift
+apart again: `SectionHeader` (every panel had grown its own, at three different
+heading weights), `Field` (the `<dl>` pair — a fragment, because a wrapper would
+make each pair one grid cell and collapse the two columns), `Avatar`, and badge
+tones carrying a `ring-inset` so a pale pill still has an edge on a white row.
+
+Two devices earn their keep in dense rows. **Priority is a coloured flag, not a
+badge** — next to a status pill, two same-shaped pills compete for one glance,
+and `low` is deliberately near-invisible because the column exists to find the
+urgent rows. **A risk's impact and likelihood collapse to one chip coloured by
+whichever is worse**; that is a rule for picking a colour, not a new severity
+scale, and both levels stay named in the chip and again in the expansion.
+Wherever colour replaces a word, the word goes to `sr-only` — see the flag on
+`task-card.tsx`.
+
 ## Project management notes
 
 `/projects/[id]` has sections — Overview, Requirements, Tasks, Timeline,
@@ -358,14 +381,33 @@ children and do not re-render, so the project lookup goes through `getScopedProj
 `src/lib/pm/project.ts`, wrapped in React `cache` so the layout and the page
 share one query.
 
-**`src/components/app-sidebar.tsx` is the only navigation, and it is always
-visible.** It holds global links and, for the project you are currently in, its
-sections — derived from `usePathname`, because the layout rendering it does not
-re-render on navigation. There is deliberately no tab strip: two nav systems
-disagree about where you are, and no toggle: below `md` it narrows to a 56px
-icon rail instead of hiding. Labels are hidden with CSS (`hidden md:inline`)
-rather than conditionally rendered, so the markup is identical at every
-breakpoint and cannot cause a hydration mismatch.
+**Navigation is split by question: the sidebar picks the project, the tab strip
+picks the section.** `src/components/app-sidebar.tsx` holds global links and a
+flat project list; `src/components/project-tabs.tsx` renders the eight sections
+inside the project layout. Both read `usePathname`, because the layouts
+rendering them do not re-render on navigation.
+
+The sections used to nest under the active project in the sidebar, on the
+argument that one nav cannot contradict itself. In practice one control was
+answering two questions, and the resulting tree was tall enough to slide under
+its own footer. Splitting them keeps that guarantee — there is still exactly one
+place that says which project and one that says which section — so **do not
+re-add section links to the sidebar, and do not add a second project switcher to
+the tab strip.**
+
+Neither is behind a toggle. Below `md` the sidebar narrows to a 56px icon rail
+instead of hiding, with labels hidden by CSS (`hidden md:inline`) rather than
+conditionally rendered, so the markup is identical at every breakpoint and
+cannot cause a hydration mismatch. The tab strip scrolls sideways rather than
+wrapping — a two-row strip reads as two groups and hides which row you are on —
+and an effect scrolls the active tab into view with `scrollIntoView({ block:
+"nearest", inline: "nearest" })`, so landing on Reports at 375px does not show a
+strip with no visible selection. Both alignments are `nearest` so a tab already
+on screen causes no scroll at all.
+
+The tabs are links with `aria-current`, **not** an ARIA tablist: each one is a
+real navigation to a separate route, and there is no tabpanel, so tablist markup
+would promise assistive technology a widget that does not exist.
 
 The app shell is full width; the old `max-w-5xl` cap is what squeezed five board
 columns into ~180px each. Prose pages (`/chat`, `/documents/[id]`) opt back out
@@ -396,6 +438,42 @@ stays visible, and today is folded into the range so its marker is never
 off-screen. A task with a due date but no `startDate` has a deadline without a
 duration and renders as a point, not an invented span.
 
+`src/lib/pm/calendar.ts` and `src/lib/pm/progress.ts` are the other two pure
+modules, and both exist for the Timeline page.
+
+**The Timeline is a progress rollup plus one chart in two views.** It replaced a
+Gantt over three Overdue/Next-7-days/Later lists that restated the bars they sat
+under. `TimelineProgress` answers "how are we doing" in numbers;
+`ProjectTimeline` toggles Gantt (duration) against a month calendar (deadlines).
+The rules that keep it honest:
+
+- **`countProgress` reuses `isOverdue`/`isDueWithinDays` rather than retyping
+  them.** A headline count disagreeing with the bar beneath it is worse than no
+  count, because a reader cannot tell which is wrong. `overdue`, `dueSoon`, and
+  `undated` partition the open records; `atRisk` is a deliberately overlapping
+  second axis, so one late blocked task reads as both.
+- **The percentage never rounds onto an endpoint it has not reached.** 199/200 is
+  99%, not a 100% sitting beside unfinished work, and 1/200 is 1%, not a 0% that
+  denies finished work. A zero count renders grey whatever its tone — "0 overdue"
+  in red is an alarm for good news.
+- **The calendar is a *deadline* calendar, and Monday-first.** Each item sits on
+  its due or target date only; drawing a multi-day task across every cell it
+  touches needs week-by-week row packing and buries the dates that need
+  attention. Duration is what the Gantt view is for. It renders every item in a
+  cell rather than capping with "+3 more", because the view is read-only and a
+  hidden item could never be revealed.
+- **The grid is built with `Date.UTC`/`getUTC*` throughout.** Local getters would
+  file a 1 August deadline in the July cell west of UTC and disagree with
+  `isOverdue`. Weeks are always seven cells so the grid cannot go ragged.
+- **`initialCalendarMonth` opens on a month with content.** A project entirely in
+  the future would otherwise open on an empty grid and look like it had no work,
+  so it falls back to the nearest dated month, preferring the future on a tie.
+- **`ProjectTimeline` takes `nowIso` from the server** instead of calling
+  `Date.now()`. It is a client component, so overdue, the today marker, and
+  today's cell would otherwise be computed from a different instant at hydration
+  than at render and disagree across a day boundary. Both views derive from the
+  same `rows`, so switching view or month never refetches.
+
 The board's drag-and-drop uses native HTML5 drag events — one status change does
 not justify a dependency. Two rules: the drop handler reads the task id from
 `dataTransfer`, **not** from React state (state set in `dragstart` may not be
@@ -406,13 +484,29 @@ is optimistic and rolls back on failure.
 The Tasks page also has a Board/List switch. Both views render from the same
 client-side `tasks` state in `src/components/task-board.tsx`, so creating,
 editing, deleting, or changing a status stays in sync without a second fetch.
-The List view is a compact table with Jira-style quick filters for All, Backlog,
-To do, In progress, Blocked, and Done; filter counts are derived from the current
-task state and must update with it. The whole list row is mouse- and
+The List view keeps the Jira-style quick filters for All, Backlog, To do, In
+progress, Blocked, and Done; filter counts are derived from the current task
+state and must update with it. The whole list row is mouse- and
 keyboard-activated and opens the same `TaskDetail` slide-over used by board
-cards, including its Edit action. The table keeps task, status, priority,
-assignee, and due date visible at the normal project viewport, shows estimate
-on wider screens, and scrolls horizontally when the viewport is narrower.
+cards, including its Edit action.
+
+**The list is grouped by status, in board order, and the group header is the
+only place the status is written.** Filters and groups are different axes and
+coexist: a filter narrows which rows exist, a group organises the ones that
+survive. Two consequences to preserve:
+
+- **Every column carries a width and none may be hidden by a media query.** The
+  table is `table-fixed` so a long title truncates instead of forcing the table
+  wider, and the group header spans a literal `colSpan`. A column hidden below a
+  breakpoint leaves a phantom column behind that silently takes its width out of
+  the Task column — which is what starved the title to ~170px and truncated
+  every row to "Identify appl…". Below `min-w-[720px]` the whole table scrolls
+  sideways instead.
+- **Empty groups are dropped, and the per-row Status column is gone.** A project
+  with everything in Backlog would otherwise open on four empty headings, and a
+  status badge on every row under a heading that already says it was a column of
+  identical pills. The coloured dot at the row start keeps the status legible
+  for a row read on its own.
 
 Update schemas (`updateTaskSchema` and friends) are built from a field map with
 **no `.default()`**, because `.partial()` does not strip defaults — a defaulted

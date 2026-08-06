@@ -12,6 +12,8 @@ import {
   Spinner,
   Textarea,
 } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
 
 interface ProjectRow {
   id: string;
@@ -36,6 +38,8 @@ export function ProjectsPanel({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   async function createProject(event: React.FormEvent) {
     event.preventDefault();
@@ -75,6 +79,7 @@ export function ProjectsPanel({
       );
       setName("");
       setDescription("");
+      toast.success(`Created “${data.project.name}”`);
       router.push(`/projects/${data.project.id}`);
     } catch {
       setError("Could not reach the server.");
@@ -87,12 +92,6 @@ export function ProjectsPanel({
     // Documents survive as unassigned records; project-management records
     // cannot exist without a project and are destroyed. Say which is which
     // before asking, and name the counts.
-    const keptLines = project.documentCount
-      ? [
-          `${project.documentCount} document(s) will become unassigned and remain available.`,
-        ]
-      : [];
-
     const destroyed = [
       [project.requirementCount, "requirement"],
       [project.taskCount, "task"],
@@ -104,15 +103,33 @@ export function ProjectsPanel({
       .map(([count, noun]) => `${count} ${noun}${count === 1 ? "" : "s"}`)
       .join(", ");
 
-    const warning = [
-      `Delete "${project.name}"?`,
-      ...keptLines,
-      ...(destroyedLabel
-        ? [`${destroyedLabel} will be permanently deleted.`]
-        : []),
-    ].join("\n\n");
+    // An empty project has nothing to warn about, and an empty container still
+    // occupies its margin — leaving a gap that reads as content failing to load.
+    const hasConsequences = destroyedLabel !== "" || project.documentCount > 0;
 
-    if (!confirm(warning)) return;
+    const confirmed = await confirm({
+      title: `Delete “${project.name}”?`,
+      body: hasConsequences ? (
+        <div className="space-y-2">
+          {destroyedLabel ? (
+            <p>
+              <span className="font-medium text-red-700">{destroyedLabel}</span>{" "}
+              will be permanently deleted.
+            </p>
+          ) : null}
+          {project.documentCount ? (
+            <p>
+              {project.documentCount} document
+              {project.documentCount === 1 ? "" : "s"} will become unassigned
+              and remain available.
+            </p>
+          ) : null}
+        </div>
+      ) : undefined,
+      confirmLabel: "Delete project",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setDeletingId(project.id);
     setError(null);
@@ -125,7 +142,15 @@ export function ProjectsPanel({
         setError(data.error ?? "Could not delete the project.");
         return;
       }
-      setProjects((previous) => previous.filter((item) => item.id !== project.id));
+      setProjects((previous) =>
+        previous.filter((item) => item.id !== project.id),
+      );
+      toast.success(`Deleted “${project.name}”`);
+      // The sidebar's project list is rendered by the layout above this page,
+      // so removing the card locally leaves a nav entry pointing at a project
+      // that no longer exists. Local state already dropped the row, so this
+      // refetch changes nothing visible here.
+      router.refresh();
     } catch {
       setError("Could not reach the server.");
     } finally {

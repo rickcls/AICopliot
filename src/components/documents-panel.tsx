@@ -8,9 +8,12 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  SectionHeader,
   Select,
   Spinner,
 } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
 import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
 import { formatBytes, formatDate } from "@/lib/utils";
 
@@ -71,6 +74,8 @@ export function DocumentsPanel({
     fixedProject?.id ?? initialProjectFilter,
   );
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -192,12 +197,18 @@ export function DocumentsPanel({
   });
 
   async function handleDelete(id: string, filename: string) {
-    if (!confirm(`Delete "${filename}"? This also removes its indexed text.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Delete “${filename}”?`,
+      body: "This also removes its indexed text, so it will no longer be available as evidence for answers.",
+      confirmLabel: "Delete document",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
     const response = await fetch(`/api/documents/${id}`, { method: "DELETE" });
     if (response.ok) {
       setDocuments((prev) => prev.filter((d) => d.id !== id));
+      toast.success(`Deleted “${filename}”`);
     } else {
       setLoadError("Could not delete that document.");
     }
@@ -266,17 +277,14 @@ export function DocumentsPanel({
         </div>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">
-            {fixedProject ? "Documents in this project" : "Document library"}
-          </p>
-          {fixedProject ? (
-            <p className="mt-0.5 text-xs text-slate-500">
-              Only these documents are used when asking within this project.
-            </p>
-          ) : null}
-        </div>
+      <SectionHeader
+        title={fixedProject ? "Documents in this project" : "Document library"}
+        description={
+          fixedProject
+            ? "Only these documents are used when asking within this project."
+            : `${documents.length} document${documents.length === 1 ? "" : "s"} across every project.`
+        }
+      >
         {!fixedProject ? (
           <div className="flex items-center gap-2">
             <label htmlFor="project-filter" className="text-xs text-slate-500">
@@ -297,7 +305,7 @@ export function DocumentsPanel({
             </Select>
           </div>
         ) : null}
-      </div>
+      </SectionHeader>
 
       {uploadError ? <ErrorState message={uploadError} /> : null}
       {loadError ? <ErrorState message={loadError} /> : null}

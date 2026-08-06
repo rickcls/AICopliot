@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarClock, GitBranch, Timer } from "lucide-react";
-import { Badge } from "@/components/ui";
+import { CalendarClock, Flag, GitBranch, Sparkles, Timer } from "lucide-react";
+import { Avatar } from "@/components/ui";
 import { cn, formatDay } from "@/lib/utils";
 import type { TaskRow } from "@/components/task-types";
 import { isTaskOverdue } from "@/components/task-types";
@@ -13,6 +13,13 @@ import { isTaskOverdue } from "@/components/task-types";
  * status select plus three buttons, which is why the board read as a wall of
  * widgets. Actions live behind the menu button and the whole card is a drag
  * handle.
+ *
+ * Every fact below the title is one icon-and-number chip on a single wrapping
+ * row. They used to be full text badges — "medium", "AI suggested", "3 sources"
+ * — and at a board column's ~200px each one claimed its own line, so a card with
+ * nothing but a priority and a citation count stood 200px tall. Priority in
+ * particular is already the stripe down the left edge, so spelling it out again
+ * cost a line to repeat what colour had said.
  */
 
 const PRIORITY_STRIPE = {
@@ -22,19 +29,36 @@ const PRIORITY_STRIPE = {
   urgent: "bg-red-500",
 } as const;
 
-const PRIORITY_TONE = {
-  low: "neutral",
-  medium: "info",
-  high: "warning",
-  urgent: "danger",
+const PRIORITY_FLAG = {
+  low: "text-slate-400",
+  medium: "text-blue-500",
+  high: "text-amber-500",
+  urgent: "text-red-500",
 } as const;
 
-/** Initials for the assignee chip; falls back to the email local part. */
-function initials(name: string | null, email: string): string {
-  const source = name?.trim() || email.split("@")[0];
-  const parts = source.split(/[\s._-]+/).filter(Boolean);
-  const letters = parts.slice(0, 2).map((part) => part[0] ?? "");
-  return letters.join("").toUpperCase() || "?";
+/** One chip shape for every fact, so the row reads as a row and not a pile. */
+function Chip({
+  title,
+  tone = "neutral",
+  children,
+}: {
+  title: string;
+  tone?: "neutral" | "danger" | "info";
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+        tone === "neutral" && "bg-slate-100 text-slate-600",
+        tone === "danger" && "bg-red-50 text-red-700",
+        tone === "info" && "bg-blue-50 text-blue-700",
+      )}
+    >
+      {children}
+    </span>
+  );
 }
 
 export function TaskCard({
@@ -79,8 +103,18 @@ export function TaskCard({
         )}
       />
 
-      <div className="py-2.5 pr-2.5 pl-3.5">
+      <div className="py-2 pr-2 pl-3">
         <div className="flex items-start gap-2">
+          {/* The flag replaced a text badge, so the label it dropped is kept
+              for screen readers — colour is the only cue that remains visually. */}
+          <span title={`${task.priority} priority`} className="mt-0.5 shrink-0">
+            <span className="sr-only">{task.priority} priority</span>
+            <Flag
+              aria-hidden
+              fill="currentColor"
+              className={cn("size-3.5", PRIORITY_FLAG[task.priority])}
+            />
+          </span>
           <button
             type="button"
             onClick={onOpen}
@@ -89,61 +123,51 @@ export function TaskCard({
             {task.title}
           </button>
           {task.assignee ? (
-            <span
-              title={task.assignee.name ?? task.assignee.email}
-              className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700"
-            >
-              {initials(task.assignee.name, task.assignee.email)}
-            </span>
+            <Avatar
+              name={task.assignee.name}
+              email={task.assignee.email}
+              className="size-5.5"
+            />
           ) : null}
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <Badge tone={PRIORITY_TONE[task.priority]}>{task.priority}</Badge>
-
+        <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-5.5">
           {task.dueDate ? (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
-                overdue
-                  ? "bg-red-50 text-red-700"
-                  : "bg-slate-100 text-slate-600",
-              )}
+            <Chip
               title={overdue ? "Past its due date" : "Due date"}
+              tone={overdue ? "danger" : "neutral"}
             >
               <CalendarClock className="size-3" aria-hidden />
               {formatDay(task.dueDate)}
-            </span>
+            </Chip>
           ) : null}
 
           {task.estimatedHours !== null ? (
-            <span
-              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600"
-              title="Estimate"
-            >
+            <Chip title="Estimate">
               <Timer className="size-3" aria-hidden />
               {task.estimatedHours}h
-            </span>
+            </Chip>
           ) : null}
 
           {task.dependencies.length > 0 ? (
-            <span
-              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600"
-              title={`Depends on ${task.dependencies.length} task(s)`}
-            >
+            <Chip title={`Depends on ${task.dependencies.length} task(s)`}>
               <GitBranch className="size-3" aria-hidden />
               {task.dependencies.length}
-            </span>
+            </Chip>
           ) : null}
 
+          {/* One chip, not two: "AI suggested" and "3 sources" always appeared
+              together, and a generated task with no citations cannot exist. */}
           {task.source === "ai_suggested" ? (
-            <Badge tone="info">AI suggested</Badge>
-          ) : null}
-          {task.citations.length > 0 ? (
-            <Badge tone="neutral">
-              {task.citations.length} source
-              {task.citations.length === 1 ? "" : "s"}
-            </Badge>
+            <Chip
+              tone="info"
+              title={`AI suggested · ${task.citations.length} source${
+                task.citations.length === 1 ? "" : "s"
+              }`}
+            >
+              <Sparkles className="size-3" aria-hidden />
+              {task.citations.length > 0 ? task.citations.length : "AI"}
+            </Chip>
           ) : null}
         </div>
       </div>
