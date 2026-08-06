@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import {
   baselinedRequirementWhere,
+  DONE_TASK_CATEGORY,
   formatRequirementCode,
   isMilestoneOpen,
   isOverdue,
@@ -134,7 +135,7 @@ async function loadProjectRows(workspaceId: string, projectId: string) {
         id: true,
         title: true,
         description: true,
-        status: true,
+        status: { select: { key: true, label: true, category: true } },
         priority: true,
         startDate: true,
         dueDate: true,
@@ -177,9 +178,21 @@ async function loadProjectRows(workspaceId: string, projectId: string) {
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
-        task: { select: { id: true, title: true, status: true, dueDate: true } },
+        task: {
+          select: {
+            id: true,
+            title: true,
+            status: { select: { key: true, label: true, category: true } },
+            dueDate: true,
+          },
+        },
         dependsOnTask: {
-          select: { id: true, title: true, status: true, dueDate: true },
+          select: {
+            id: true,
+            title: true,
+            status: { select: { key: true, label: true, category: true } },
+            dueDate: true,
+          },
         },
       },
     }),
@@ -201,7 +214,14 @@ async function loadProjectRows(workspaceId: string, projectId: string) {
         confidence: true,
         links: {
           where: { targetType: "task", task: officialRecordWhere({}) },
-          select: { task: { select: { title: true, status: true } } },
+          select: {
+            task: {
+              select: {
+                title: true,
+                status: { select: { category: true } },
+              },
+            },
+          },
         },
       },
     }),
@@ -219,7 +239,8 @@ function taskSource(
   const snapshot = {
     title: task.title,
     description: task.description,
-    status: task.status,
+    status: task.status.category,
+    statusLabel: task.status.label,
     priority: task.priority,
     assignee,
     startDate: isoDay(task.startDate),
@@ -229,7 +250,7 @@ function taskSource(
   };
   const content = [
     `Task: ${task.title}`,
-    `Status: ${display(task.status)}`,
+    `Status: ${task.status.label}`,
     `Priority: ${task.priority}`,
     assignee ? `Assignee: ${assignee}` : "Assignee: unassigned",
     snapshot.startDate ? `Start date: ${snapshot.startDate}` : null,
@@ -381,17 +402,17 @@ function dependencySource(
   const title = `${dependency.task.title} depends on ${dependency.dependsOnTask.title}`;
   const snapshot = {
     task: dependency.task.title,
-    taskStatus: dependency.task.status,
+    taskStatus: dependency.task.status.category,
     taskDueDate: isoDay(dependency.task.dueDate),
     dependsOn: dependency.dependsOnTask.title,
-    dependsOnStatus: dependency.dependsOnTask.status,
+    dependsOnStatus: dependency.dependsOnTask.status.category,
     dependsOnDueDate: isoDay(dependency.dependsOnTask.dueDate),
-    blocking: dependency.dependsOnTask.status !== "done",
+    blocking: dependency.dependsOnTask.status.category !== DONE_TASK_CATEGORY,
   };
   const content = [
     `Dependency: ${title}`,
-    `Dependent task status: ${display(dependency.task.status)}`,
-    `Prerequisite status: ${display(dependency.dependsOnTask.status)}`,
+    `Dependent task status: ${dependency.task.status.label}`,
+    `Prerequisite status: ${dependency.dependsOnTask.status.label}`,
     snapshot.taskDueDate ? `Dependent due date: ${snapshot.taskDueDate}` : null,
     snapshot.dependsOnDueDate
       ? `Prerequisite due date: ${snapshot.dependsOnDueDate}`
@@ -515,7 +536,7 @@ function buildSnapshotSource(
   selectedCount: number,
   relevantCount: number,
 ): ProjectGroundingSource {
-  const openTasks = tasks.filter((task) => isTaskOpen(task.status));
+  const openTasks = tasks.filter((task) => isTaskOpen(task.status.category));
   const openMilestones = milestones.filter((milestone) =>
     isMilestoneOpen(milestone.status),
   );
@@ -537,8 +558,8 @@ function buildSnapshotSource(
   );
   const dependencyBlockers = dependencies.filter(
     (dependency) =>
-      dependency.task.status !== "done" &&
-      dependency.dependsOnTask.status !== "done",
+      dependency.task.status.category !== DONE_TASK_CATEGORY &&
+      dependency.dependsOnTask.status.category !== DONE_TASK_CATEGORY,
   );
   const uncoveredRequirements = requirements.filter(
     (requirement) => requirement.links.length === 0,
@@ -554,7 +575,7 @@ function buildSnapshotSource(
   );
   const partial = selectedCount < relevantCount;
   const red =
-    tasks.some((task) => task.status === "blocked") ||
+    tasks.some((task) => task.status.category === "blocked") ||
     milestones.some((milestone) => milestone.status === "blocked") ||
     overdueTasks.length > 0 ||
     overdueMilestones.length > 0 ||
@@ -576,7 +597,8 @@ function buildSnapshotSource(
     taskCount: tasks.length,
     openTaskCount: openTasks.length,
     doneTaskCount: tasks.length - openTasks.length,
-    blockedTaskCount: tasks.filter((task) => task.status === "blocked").length,
+    blockedTaskCount: tasks.filter((task) => task.status.category === "blocked")
+      .length,
     overdueTaskCount: overdueTasks.length,
     dueSoonTaskCount: dueSoonTasks.length,
     milestoneCount: milestones.length,

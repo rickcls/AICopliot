@@ -7,6 +7,7 @@ const fakes = vi.hoisted(() => {
     projectRisk: { create: vi.fn() },
     taskDependency: { create: vi.fn() },
     generationRun: { update: vi.fn() },
+    projectTaskStatus: { findMany: vi.fn() },
   };
   const prisma = {
     document: { findMany: vi.fn() },
@@ -101,6 +102,20 @@ function setupBase() {
     sourceLabels,
   });
   fakes.tx.task.create.mockResolvedValue({ id: "task-1" });
+  fakes.tx.projectTaskStatus.findMany.mockResolvedValue([
+    {
+      id: "status-backlog",
+      key: "backlog",
+      category: "open",
+      isDefault: true,
+    },
+    {
+      id: "status-done",
+      key: "done",
+      category: "done",
+      isDefault: false,
+    },
+  ]);
   fakes.tx.generationRun.update.mockResolvedValue({
     id: "run-1",
     status: "draft",

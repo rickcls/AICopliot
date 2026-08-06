@@ -10,6 +10,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { defaultTaskStatusRows } from "../src/lib/pm/task-statuses";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
@@ -73,6 +74,19 @@ async function seedDemoProject(workspaceId: string, userId: string) {
     },
   });
 
+  await prisma.projectTaskStatus.createMany({
+    data: defaultTaskStatusRows(workspaceId, project.id),
+  });
+  const statuses = await prisma.projectTaskStatus.findMany({
+    where: { projectId: project.id },
+  });
+  const statusIdByKey = new Map(statuses.map((status) => [status.key, status.id]));
+  const statusId = (key: string): string => {
+    const id = statusIdByKey.get(key);
+    if (!id) throw new Error(`Seed: missing default task status "${key}"`);
+    return id;
+  };
+
   // One overdue, one blocked, and one done, so the dashboard and timeline have
   // something to show on a fresh install.
   const [reviewRunbook, stagingDrill, updateRunbook, uatSignOff] =
@@ -84,12 +98,13 @@ async function seedDemoProject(workspaceId: string, userId: string) {
           title: "Review the failover runbook against current topology",
           description:
             "The runbook still references the retired secondary in DC2.",
-          status: "done",
+          statusId: statusId("done"),
           priority: "high",
           assigneeId: userId,
           estimatedHours: 4,
           startDate: dayOffset(-21),
           dueDate: dayOffset(-14),
+          completedAt: dayOffset(-14),
         },
       }),
       prisma.task.create({
@@ -98,7 +113,7 @@ async function seedDemoProject(workspaceId: string, userId: string) {
           projectId: project.id,
           title: "Run a failover drill in staging",
           description: "Full promote-and-rollback cycle with timings recorded.",
-          status: "in_progress",
+          statusId: statusId("in_progress"),
           priority: "urgent",
           assigneeId: userId,
           estimatedHours: 12,
@@ -111,7 +126,7 @@ async function seedDemoProject(workspaceId: string, userId: string) {
           workspaceId,
           projectId: project.id,
           title: "Update the runbook with measured recovery times",
-          status: "blocked",
+          statusId: statusId("blocked"),
           priority: "medium",
           estimatedHours: 3,
           startDate: dayOffset(1),
@@ -123,7 +138,7 @@ async function seedDemoProject(workspaceId: string, userId: string) {
           workspaceId,
           projectId: project.id,
           title: "Schedule UAT sign-off with the service owners",
-          status: "todo",
+          statusId: statusId("todo"),
           priority: "low",
           estimatedHours: 1,
           startDate: dayOffset(14),

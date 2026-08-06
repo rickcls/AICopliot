@@ -110,12 +110,16 @@ export const assignDocumentProjectSchema = z.object({
 
 // --- Project management ----------------------------------------------------
 
-export const taskStatusSchema = z.enum([
-  "backlog",
-  "todo",
-  "in_progress",
-  "blocked",
-  "done",
+export const taskStatusCategorySchema = z.enum(["open", "blocked", "done"]);
+export const taskStatusColorSchema = z.enum([
+  "slate",
+  "blue",
+  "amber",
+  "red",
+  "emerald",
+  "violet",
+  "pink",
+  "cyan",
 ]);
 export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 export const milestoneStatusSchema = z.enum([
@@ -171,7 +175,8 @@ const requiresOneField = (value: object) =>
 const taskFields = {
   title: z.string().trim().min(1, "Task title is required").max(200),
   description: optionalText(4000),
-  status: taskStatusSchema,
+  /** ProjectTaskStatus id — resolved against the project on every write. */
+  statusId: z.string().min(1),
   priority: taskPrioritySchema,
   assigneeId: z.string().min(1).nullable().optional(),
   milestoneId: z.string().min(1).nullable().optional(),
@@ -199,7 +204,8 @@ const DATE_ORDER_MESSAGE = "Start date must be on or before the due date";
 export const createTaskSchema = z
   .object({
     ...taskFields,
-    status: taskFields.status.default("backlog"),
+    // Omitted → the project's default column (usually Backlog).
+    statusId: taskFields.statusId.optional(),
     priority: taskFields.priority.default("medium"),
   })
   .refine(startBeforeDue, {
@@ -215,8 +221,30 @@ export const updateTaskSchema = z
   // past the other is validated against the stored row in the route handler.
   .refine(startBeforeDue, { message: DATE_ORDER_MESSAGE, path: ["startDate"] });
 
+export const createTaskStatusSchema = z.object({
+  label: z.string().trim().min(1, "Status name is required").max(40),
+  category: taskStatusCategorySchema.default("open"),
+  color: taskStatusColorSchema.optional(),
+});
+
+export const updateTaskStatusSchema = z
+  .object({
+    label: z.string().trim().min(1, "Status name is required").max(40),
+    category: taskStatusCategorySchema,
+    color: taskStatusColorSchema.nullable(),
+    isDefault: z.boolean(),
+  })
+  .partial()
+  .refine(requiresOneField, "Provide at least one field to update");
+
 export const createTaskDependencySchema = z.object({
   dependsOnTaskId: z.string().min(1, "Select a task"),
+});
+
+export const createTaskCommentSchema = z.object({
+  // Trimmed before the length check so a comment of only whitespace is rejected
+  // rather than stored as an empty row.
+  body: z.string().trim().min(1, "Write a comment first").max(4000),
 });
 
 const milestoneFields = {

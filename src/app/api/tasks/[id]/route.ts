@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { findOfficialProjectMilestone } from "@/lib/pm/project";
 import {
   completedAtOnStatusChange,
+  DONE_TASK_CATEGORY,
   officialRecordWhere,
 } from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
@@ -28,14 +29,13 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
-    // findFirst on (id, workspaceId): a task ID from another workspace does not
-    // resolve, so the update below can only ever touch our own row.
     const existing = await prisma.task.findFirst({
       where: officialRecordWhere({ id, workspaceId }),
       select: {
         id: true,
         projectId: true,
-        status: true,
+        statusId: true,
+        status: { select: { category: true } },
         startDate: true,
         dueDate: true,
       },
@@ -63,9 +63,6 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const data = parsed.data;
 
-    // The schema can only compare dates that arrive together. Moving just one
-    // of them has to be checked against what is already stored, or a task could
-    // end up finishing before it starts.
     const nextStart =
       data.startDate !== undefined ? data.startDate : existing.startDate;
     const nextDue = data.dueDate !== undefined ? data.dueDate : existing.dueDate;
@@ -76,10 +73,29 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
+    let nextCategory = existing.status.category;
+    if (data.statusId !== undefined && data.statusId !== existing.statusId) {
+      const status = await prisma.projectTaskStatus.findFirst({
+        where: {
+          id: data.statusId,
+          workspaceId,
+          projectId: existing.projectId,
+        },
+        select: { id: true, category: true },
+      });
+      if (!status) {
+        return NextResponse.json(
+          { error: "Status not found in this project" },
+          { status: 404 },
+        );
+      }
+      nextCategory = status.category;
+    }
+
     const completedAt = completedAtOnStatusChange(
-      existing.status,
-      data.status,
-      "done",
+      existing.status.category,
+      data.statusId !== undefined ? nextCategory : undefined,
+      DONE_TASK_CATEGORY,
     );
 
     const task = await prisma.task.update({
@@ -89,7 +105,7 @@ export async function PATCH(request: Request, { params }: Params) {
         ...(data.description !== undefined
           ? { description: data.description }
           : {}),
-        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.statusId !== undefined ? { statusId: data.statusId } : {}),
         ...(data.priority !== undefined ? { priority: data.priority } : {}),
         ...(data.assigneeId !== undefined
           ? { assigneeId: data.assigneeId }
@@ -126,7 +142,6 @@ export async function DELETE(_request: Request, { params }: Params) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Dependencies in both directions cascade with the row.
     await prisma.task.delete({ where: { id: existing.id } });
     return NextResponse.json({ ok: true });
   } catch (error) {

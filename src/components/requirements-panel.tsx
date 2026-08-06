@@ -49,7 +49,11 @@ export interface RequirementCitationRow {
 export interface RequirementLinkRow {
   id: string;
   targetType: "task" | "milestone" | "risk";
-  task: { id: string; title: string; status: string } | null;
+  task: {
+    id: string;
+    title: string;
+    status: { id: string; key: string; label: string; category: string };
+  } | null;
   milestone: { id: string; title: string; status: string } | null;
   risk: { id: string; description: string; status: string } | null;
 }

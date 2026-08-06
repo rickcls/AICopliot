@@ -16,7 +16,7 @@ import {
   upcomingMilestoneWhere,
   DUE_SOON_DAYS,
   OPEN_MILESTONE_STATUSES,
-  OPEN_TASK_STATUSES,
+  OPEN_TASK_CATEGORIES,
   type TimelineItem,
 } from "@/lib/pm/rules";
 
@@ -101,15 +101,15 @@ describe("due within the next 7 days", () => {
 });
 
 describe("blocked (dashboard)", () => {
-  it("treats only the blocked status as blocked, regardless of dates", () => {
+  it("treats only the blocked category as blocked, regardless of dates", () => {
     const where = blockedTaskWhere("ws-1");
-    expect(where.status).toBe("blocked");
+    expect(where.status).toEqual({ category: "blocked" });
     expect(where).not.toHaveProperty("dueDate");
   });
 
   it("counts blocked as open work, and done as closed", () => {
     expect(isTaskOpen("blocked")).toBe(true);
-    expect(isTaskOpen("in_progress")).toBe(true);
+    expect(isTaskOpen("open")).toBe(true);
     expect(isTaskOpen("done")).toBe(false);
   });
 
@@ -120,8 +120,10 @@ describe("blocked (dashboard)", () => {
 
   it("a blocked task that is also overdue appears in both counts", () => {
     // The two filters are independent by design: 'blocked' says nothing about
-    // dates, and 'overdue' includes every open status.
-    expect(overdueTaskWhere("ws-1", NOW).status.in).toContain("blocked");
+    // dates, and 'overdue' includes every open category.
+    expect(overdueTaskWhere("ws-1", NOW).status.category.in).toContain(
+      "blocked",
+    );
   });
 });
 
@@ -216,7 +218,7 @@ describe("scoped query filters", () => {
 
   it("overdue excludes done work inside the query, not after it", () => {
     const where = overdueTaskWhere("ws-1", NOW);
-    expect(where.status.in).not.toContain("done");
+    expect(where.status.category.in).not.toContain("done");
     expect(where.dueDate.lt).toEqual(startOfUtcDay(NOW));
   });
 
@@ -229,7 +231,9 @@ describe("scoped query filters", () => {
   it("a project counts as active only while it has unfinished work", () => {
     const where = activeProjectWhere("ws-1");
     expect(where.workspaceId).toBe("ws-1");
-    expect(where.OR[0].tasks?.some.status.in).toEqual([...OPEN_TASK_STATUSES]);
+    expect(where.OR[0].tasks?.some.status.category.in).toEqual([
+      ...OPEN_TASK_CATEGORIES,
+    ]);
     expect(where.OR[0].tasks?.some.OR).toEqual([
       { source: "manual", generationStatus: "not_applicable" },
       { source: "ai_suggested", generationStatus: "approved" },
@@ -241,7 +245,7 @@ describe("scoped query filters", () => {
       { source: "manual", generationStatus: "not_applicable" },
       { source: "ai_suggested", generationStatus: "approved" },
     ]);
-    expect(OPEN_TASK_STATUSES).not.toContain("done");
+    expect(OPEN_TASK_CATEGORIES).not.toContain("done");
     expect(OPEN_MILESTONE_STATUSES).not.toContain("completed");
   });
 

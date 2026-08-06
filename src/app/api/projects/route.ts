@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { defaultTaskStatusRows } from "@/lib/pm/task-statuses";
 import { createProjectSchema } from "@/lib/schemas";
 
 export async function GET() {
@@ -52,23 +53,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const project = await prisma.project.create({
-      data: {
-        workspaceId,
-        name: parsed.data.name,
-        description: parsed.data.description || null,
-      },
-      include: {
-        _count: {
-          select: {
-            documents: true,
-            tasks: true,
-            milestones: true,
-            risks: true,
-            requirements: true,
+    const project = await prisma.$transaction(async (tx) => {
+      const created = await tx.project.create({
+        data: {
+          workspaceId,
+          name: parsed.data.name,
+          description: parsed.data.description || null,
+        },
+      });
+
+      await tx.projectTaskStatus.createMany({
+        data: defaultTaskStatusRows(workspaceId, created.id),
+      });
+
+      return tx.project.findFirstOrThrow({
+        where: { id: created.id, workspaceId },
+        include: {
+          _count: {
+            select: {
+              documents: true,
+              tasks: true,
+              milestones: true,
+              risks: true,
+              requirements: true,
+            },
           },
         },
-      },
+      });
     });
 
     return NextResponse.json({ project }, { status: 201 });

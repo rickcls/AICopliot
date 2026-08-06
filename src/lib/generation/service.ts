@@ -278,6 +278,22 @@ async function persistDraftPlan(input: PersistDraftInput) {
 
   return prisma.$transaction(
     async (tx) => {
+      // Plan generation still emits the classic keys (backlog/todo/…). Map them
+      // onto this project's columns; unknown keys fall back to the default.
+      const projectStatuses = await tx.projectTaskStatus.findMany({
+        where: { workspaceId, projectId },
+        orderBy: { position: "asc" },
+        select: { id: true, key: true, category: true, isDefault: true },
+      });
+      const statusByKey = new Map(
+        projectStatuses.map((status) => [status.key, status]),
+      );
+      const defaultStatus =
+        projectStatuses.find((status) => status.isDefault) ?? projectStatuses[0];
+      if (!defaultStatus) {
+        throw new Error("This project has no task statuses configured");
+      }
+
       const milestoneIds = new Map<string, string>();
       for (const proposal of validated.milestones) {
         const milestone = await tx.milestone.create({
@@ -307,17 +323,20 @@ async function persistDraftPlan(input: PersistDraftInput) {
 
       const taskIds = new Map<string, string>();
       for (const proposal of validated.tasks) {
+        const boardStatus =
+          statusByKey.get(proposal.status) ?? defaultStatus;
         const task = await tx.task.create({
           data: {
             workspaceId,
             projectId,
             title: proposal.title,
             description: proposal.description,
-            status: proposal.status,
+            statusId: boardStatus.id,
             priority: proposal.priority,
             startDate: isoDayToDate(proposal.startDate),
             dueDate: isoDayToDate(proposal.dueDate),
-            completedAt: proposal.status === "done" ? new Date() : null,
+            completedAt:
+              boardStatus.category === "done" ? new Date() : null,
             milestoneId: proposal.milestoneRef
               ? milestoneIds.get(proposal.milestoneRef) ?? null
               : null,

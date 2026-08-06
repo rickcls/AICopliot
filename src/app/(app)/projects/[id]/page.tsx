@@ -5,7 +5,7 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getScopedProject } from "@/lib/pm/project";
 import { getProjectSummary } from "@/lib/pm/summary";
-import { officialRecordWhere, overdueTaskWhere } from "@/lib/pm/rules";
+import { blockedTaskWhere, officialRecordWhere, overdueTaskWhere } from "@/lib/pm/rules";
 import { formatDay } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -78,11 +78,7 @@ export default async function ProjectOverviewPage({
       select: { id: true, title: true, targetDate: true, status: true },
     }),
     prisma.task.findMany({
-      where: officialRecordWhere({
-        workspaceId,
-        projectId: project.id,
-        status: "blocked" as const,
-      }),
+      where: blockedTaskWhere(workspaceId, project.id),
       orderBy: { createdAt: "asc" },
       take: 5,
       select: { id: true, title: true },

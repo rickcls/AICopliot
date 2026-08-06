@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { TaskBoard } from "@/components/task-board";
-import type { TaskRow } from "@/components/task-types";
+import type { TaskRow, TaskStatusOption } from "@/components/task-types";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import {
@@ -9,7 +9,7 @@ import {
   getScopedProject,
 } from "@/lib/pm/project";
 import { officialRecordWhere } from "@/lib/pm/rules";
-import { taskSelect } from "@/lib/pm/select";
+import { taskSelect, taskStatusSelect } from "@/lib/pm/select";
 
 export const dynamic = "force-dynamic";
 
@@ -18,37 +18,48 @@ export default async function ProjectTasksPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { workspaceId } = await requireWorkspace();
+  const { workspaceId, user } = await requireWorkspace();
   const { id } = await params;
 
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
 
-  const [tasks, members, milestones] = await Promise.all([
+  const [tasks, statuses, members, milestones] = await Promise.all([
     prisma.task.findMany({
       where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: { createdAt: "asc" },
       select: taskSelect,
     }),
+    prisma.projectTaskStatus.findMany({
+      where: { workspaceId, projectId: project.id },
+      orderBy: { position: "asc" },
+      select: taskStatusSelect,
+    }),
     getAssignableMembers(workspaceId),
     getProjectMilestoneOptions(workspaceId, project.id),
   ]);
 
-  // Dates are serialised here rather than in the client component, which cannot
-  // receive Date instances across the server/client boundary.
   const initialTasks: TaskRow[] = tasks.map((task) => ({
     ...task,
     startDate: task.startDate ? task.startDate.toISOString() : null,
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
     completedAt: task.completedAt ? task.completedAt.toISOString() : null,
+    comments: task.comments.map((comment) => ({
+      ...comment,
+      createdAt: comment.createdAt.toISOString(),
+    })),
   }));
+
+  const initialStatuses: TaskStatusOption[] = statuses;
 
   return (
     <TaskBoard
       projectId={project.id}
       initialTasks={initialTasks}
+      initialStatuses={initialStatuses}
       members={members}
       milestones={milestones}
+      currentUserId={user.id}
     />
   );
 }

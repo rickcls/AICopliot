@@ -94,7 +94,7 @@ export function TaskDependencies({
                   <span
                     aria-hidden
                     className={
-                      dependency.dependsOnTask.status === "done"
+                      dependency.dependsOnTask.status.category === "done"
                         ? "size-1.5 shrink-0 rounded-full bg-emerald-500"
                         : "size-1.5 shrink-0 rounded-full bg-amber-500"
                     }

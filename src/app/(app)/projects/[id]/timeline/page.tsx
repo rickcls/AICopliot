@@ -49,7 +49,7 @@ export default async function ProjectTimelinePage({
         title: true,
         startDate: true,
         dueDate: true,
-        status: true,
+        status: { select: { category: true } },
       },
     }),
     prisma.milestone.findMany({
@@ -63,8 +63,8 @@ export default async function ProjectTimelinePage({
 
   const taskProgress = countProgress(
     tasks.map((task) => ({
-      status: task.status,
-      open: isTaskOpen(task.status),
+      status: task.status.category,
+      open: isTaskOpen(task.status.category),
       date: task.dueDate,
     })),
     now,
@@ -85,8 +85,8 @@ export default async function ProjectTimelinePage({
       title: task.title,
       start: task.startDate ? task.startDate.toISOString() : null,
       end: task.dueDate ? task.dueDate.toISOString() : null,
-      status: task.status,
-      open: isTaskOpen(task.status),
+      status: task.status.category,
+      open: isTaskOpen(task.status.category),
     })),
     ...milestones.map((milestone) => ({
       id: milestone.id,

@@ -1,4 +1,5 @@
 import {
+  DONE_TASK_CATEGORY,
   isDueWithinDays,
   isMilestoneOpen,
   isOverdue,
@@ -13,11 +14,17 @@ const MS_PER_DAY = 86_400_000;
 export type ProjectHealth = "green" | "amber" | "red";
 export type StatusReportItemKind = "task" | "milestone" | "risk" | "dependency";
 
+export interface ReportTaskStatus {
+  key: string;
+  label: string;
+  category: "open" | "blocked" | "done";
+}
+
 export interface ReportTaskInput {
   id: string;
   title: string;
   description: string | null;
-  status: "backlog" | "todo" | "in_progress" | "blocked" | "done";
+  status: ReportTaskStatus;
   priority: "low" | "medium" | "high" | "urgent";
   dueDate: Date | null;
   completedAt: Date | null;
@@ -132,7 +139,7 @@ function taskItem(
     kind: "task",
     id: task.id,
     title: task.title,
-    status: task.status,
+    status: task.status.label,
     date: isoDay(date),
     detail: [
       `Priority: ${task.priority}`,
@@ -194,7 +201,7 @@ function dependencyItem(
     title: `${dependency.task.title} depends on ${dependency.dependsOnTask.title}`,
     status: "blocked_by_prerequisite",
     date: null,
-    detail: `Prerequisite status: ${dependency.dependsOnTask.status.replaceAll("_", " ")}`,
+    detail: `Prerequisite status: ${dependency.dependsOnTask.status.label}`,
     href: `/projects/${projectId}/tasks`,
   };
 }
@@ -232,7 +239,11 @@ export function buildDeterministicStatusReport(
 
   const completed = sortItems([
     ...data.tasks
-      .filter((task) => task.status === "done" && inCompletedWindow(task.completedAt))
+      .filter(
+        (task) =>
+          task.status.category === DONE_TASK_CATEGORY &&
+          inCompletedWindow(task.completedAt),
+      )
       .map((task) => taskItem(task, data.project.id, task.completedAt)),
     ...data.milestones
       .filter(
@@ -246,7 +257,7 @@ export function buildDeterministicStatusReport(
   ]);
   const blockers = sortItems([
     ...data.tasks
-      .filter((task) => task.status === "blocked")
+      .filter((task) => task.status.category === "blocked")
       .map((task) => taskItem(task, data.project.id)),
     ...data.milestones
       .filter((milestone) => milestone.status === "blocked")
@@ -256,7 +267,7 @@ export function buildDeterministicStatusReport(
     ...data.tasks
       .filter((task) =>
         isOverdue(
-          { date: task.dueDate, open: isTaskOpen(task.status) },
+          { date: task.dueDate, open: isTaskOpen(task.status.category) },
           today,
         ),
       )
@@ -276,7 +287,7 @@ export function buildDeterministicStatusReport(
   const upcoming = sortItems([
     ...data.tasks
       .filter(
-        (task) => isTaskOpen(task.status) && inUpcomingWindow(task.dueDate),
+        (task) => isTaskOpen(task.status.category) && inUpcomingWindow(task.dueDate),
       )
       .map((task) => taskItem(task, data.project.id)),
     ...data.milestones
@@ -294,8 +305,8 @@ export function buildDeterministicStatusReport(
   const risks = activeRiskRows.map((risk) => riskItem(risk, data.project.id));
   const blockingDependencies = data.dependencies.filter(
     (dependency) =>
-      dependency.task.status !== "done" &&
-      dependency.dependsOnTask.status !== "done",
+      dependency.task.status.category !== DONE_TASK_CATEGORY &&
+      dependency.dependsOnTask.status.category !== DONE_TASK_CATEGORY,
   );
   const dependencyBlockers = blockingDependencies.map((dependency) =>
     dependencyItem(dependency, data.project.id),
@@ -310,7 +321,7 @@ export function buildDeterministicStatusReport(
   const dueSoon =
     data.tasks.some((task) =>
       isDueWithinDays(
-        { date: task.dueDate, open: isTaskOpen(task.status) },
+        { date: task.dueDate, open: isTaskOpen(task.status.category) },
         today,
       ),
     ) ||
@@ -344,7 +355,7 @@ export function buildDeterministicStatusReport(
     health,
     counts: {
       tasks: data.tasks.length,
-      openTasks: data.tasks.filter((task) => isTaskOpen(task.status)).length,
+      openTasks: data.tasks.filter((task) => isTaskOpen(task.status.category)).length,
       completedTasksInPeriod: completed.filter((item) => item.kind === "task").length,
       milestones: data.milestones.length,
       openMilestones: data.milestones.filter((milestone) =>

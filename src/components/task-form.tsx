@@ -1,21 +1,22 @@
 "use client";
 
-import { Button, Card, Input, Select, Spinner, Textarea } from "@/components/ui";
+import { Button, Input, Select, Spinner, Textarea } from "@/components/ui";
+import { Modal, ModalBody, ModalFooter } from "@/components/modal";
+import { cn } from "@/lib/utils";
 import {
-  BOARD_COLUMNS,
   TASK_PRIORITIES,
   toDateInput,
   type MemberOption,
   type MilestoneOption,
   type TaskPriority,
   type TaskRow,
-  type TaskStatus,
+  type TaskStatusOption,
 } from "@/components/task-types";
 
 export interface TaskDraft {
   title: string;
   description: string;
-  status: TaskStatus;
+  statusId: string;
   priority: TaskPriority;
   assigneeId: string;
   milestoneId: string;
@@ -24,11 +25,11 @@ export interface TaskDraft {
   dueDate: string;
 }
 
-export function emptyDraft(status: TaskStatus = "backlog"): TaskDraft {
+export function emptyDraft(statusId: string): TaskDraft {
   return {
     title: "",
     description: "",
-    status,
+    statusId,
     priority: "medium",
     assigneeId: "",
     milestoneId: "",
@@ -42,7 +43,7 @@ export function draftFrom(task: TaskRow): TaskDraft {
   return {
     title: task.title,
     description: task.description ?? "",
-    status: task.status,
+    statusId: task.statusId,
     priority: task.priority,
     assigneeId: task.assigneeId ?? "",
     milestoneId: task.milestoneId ?? "",
@@ -57,7 +58,7 @@ function toPayload(draft: TaskDraft) {
   return {
     title: draft.title.trim(),
     description: draft.description.trim() || null,
-    status: draft.status,
+    statusId: draft.statusId,
     priority: draft.priority,
     assigneeId: draft.assigneeId || null,
     milestoneId: draft.milestoneId || null,
@@ -67,10 +68,54 @@ function toPayload(draft: TaskDraft) {
   };
 }
 
-const fieldLabel = "mb-1 block text-xs font-medium text-slate-600";
+/**
+ * The same field mapping as `toPayload`, but for a *partial* edit — one field
+ * changed in the detail panel rather than a whole form submitted.
+ *
+ * It must stay partial. `updateTaskSchema` is built with no `.default()`
+ * precisely so a PATCH cannot resurrect a field the caller never mentioned, and
+ * sending the full draft for a single-field edit would throw that away: two
+ * people editing different fields of the same task would each overwrite the
+ * other's with whatever their panel happened to be showing.
+ */
+export function toPartialPayload(
+  patch: Partial<TaskDraft>,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (patch.title !== undefined) payload.title = patch.title.trim();
+  if (patch.description !== undefined)
+    payload.description = patch.description.trim() || null;
+  if (patch.statusId !== undefined) payload.statusId = patch.statusId;
+  if (patch.priority !== undefined) payload.priority = patch.priority;
+  if (patch.assigneeId !== undefined)
+    payload.assigneeId = patch.assigneeId || null;
+  if (patch.milestoneId !== undefined)
+    payload.milestoneId = patch.milestoneId || null;
+  if (patch.startDate !== undefined) payload.startDate = patch.startDate || null;
+  if (patch.dueDate !== undefined) payload.dueDate = patch.dueDate || null;
+  if (patch.estimatedHours !== undefined)
+    payload.estimatedHours =
+      patch.estimatedHours === "" ? null : patch.estimatedHours;
+  return payload;
+}
+
+/**
+ * Metadata reads as quiet label/value rows rather than a grid of boxed inputs.
+ *
+ * Every control used to carry a permanent border and white fill, so a form with
+ * seven of them read as seven competing objects and the description — the only
+ * field that needs room to think in — was the smallest thing on screen. Here the
+ * chrome only appears on hover and focus, so at rest the block reads as a short
+ * list of facts, and the description gets the space.
+ */
+export const QUIET_CONTROL =
+  "w-full max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
+
+export const ROW_LABEL = "text-xs font-medium text-slate-500";
 
 export function TaskForm({
   draft,
+  statuses,
   members,
   milestones,
   saving,
@@ -80,6 +125,7 @@ export function TaskForm({
   onSubmit,
 }: {
   draft: TaskDraft;
+  statuses: TaskStatusOption[];
   members: MemberOption[];
   milestones: MilestoneOption[];
   saving: boolean;
@@ -95,201 +141,241 @@ export function TaskForm({
     draft.dueDate !== "" &&
     draft.startDate > draft.dueDate;
 
+  const submittable = draft.title.trim() !== "" && !saving && !datesInverted;
+
   return (
-    <Card className="p-4">
+    <Modal
+      title={editing ? "Edit task" : "New task"}
+      // No subtitle: the fields below already carry their own defaults and
+      // placeholders, and a line of explanation above them was one more thing
+      // to read before starting to type.
+      onClose={saving ? () => {} : onCancel}
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (!draft.title.trim() || saving || datesInverted) return;
+          if (!submittable) return;
           onSubmit(toPayload(draft));
         }}
-        className="space-y-3"
+        className="flex min-h-0 flex-1 flex-col"
       >
-        <p className="text-sm font-semibold">
-          {editing ? "Edit task" : "New task"}
-        </p>
-
-        <div>
-          <label htmlFor="task-title" className={fieldLabel}>
-            Title
-          </label>
+        <ModalBody>
+          {/* The task's name is the heading of the thing being edited, not one
+              more labelled field among seven, so it is typed at heading size
+              with no box around it. */}
           <Input
             id="task-title"
             value={draft.title}
             onChange={(event) => onChange({ ...draft, title: event.target.value })}
-            placeholder="e.g. Validate failover runbook against staging"
+            placeholder="Task name"
+            aria-label="Task name"
             maxLength={200}
             disabled={saving}
-            autoFocus
+            required
+            // Not React's `autoFocus` — see the note in `Modal`.
+            data-autofocus
+            // The focus ring is deliberately *not* removed with the border: it
+            // is the app's one focus treatment, and a borderless field with no
+            // ring gives a keyboard user nothing to locate.
+            className="h-auto border-transparent bg-transparent px-0 py-1 text-xl font-semibold text-slate-900 placeholder:text-slate-300 focus-visible:border-transparent disabled:bg-transparent"
           />
-        </div>
 
-        <div>
-          <label htmlFor="task-description" className={fieldLabel}>
-            Description <span className="font-normal text-slate-400">(optional)</span>
-          </label>
-          <Textarea
-            id="task-description"
-            value={draft.description}
-            onChange={(event) =>
-              onChange({ ...draft, description: event.target.value })
-            }
-            rows={2}
-            maxLength={4000}
-            disabled={saving}
-          />
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
-          <div>
-            <label htmlFor="task-status" className={fieldLabel}>
-              Status
-            </label>
-            <Select
-              id="task-status"
-              className="w-full"
-              value={draft.status}
-              onChange={(event) =>
-                onChange({ ...draft, status: event.target.value as TaskStatus })
-              }
-              disabled={saving}
-            >
-              {BOARD_COLUMNS.map((column) => (
-                <option key={column.status} value={column.status}>
-                  {column.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div>
-            <label htmlFor="task-priority" className={fieldLabel}>
-              Priority
-            </label>
-            <Select
-              id="task-priority"
-              className="w-full"
-              value={draft.priority}
-              onChange={(event) =>
-                onChange({
-                  ...draft,
-                  priority: event.target.value as TaskPriority,
-                })
-              }
-              disabled={saving}
-            >
-              {TASK_PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>
-                  {priority}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div>
-            <label htmlFor="task-assignee" className={fieldLabel}>
+          {/* A plain grid, not the `<dl>` the record lists use: these are form
+              controls, and wrapping them in a description list makes a screen
+              reader announce a six-item list around fields whose own labels
+              already say everything. */}
+          <div className="mt-3 grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5">
+            <label htmlFor="task-assignee" className={ROW_LABEL}>
               Assignee
             </label>
-            <Select
-              id="task-assignee"
-              className="w-full"
-              value={draft.assigneeId}
-              onChange={(event) =>
-                onChange({ ...draft, assigneeId: event.target.value })
-              }
-              disabled={saving}
-            >
-              <option value="">Unassigned</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </Select>
-          </div>
+            <div>
+              <Select
+                id="task-assignee"
+                className={QUIET_CONTROL}
+                value={draft.assigneeId}
+                onChange={(event) =>
+                  onChange({ ...draft, assigneeId: event.target.value })
+                }
+                disabled={saving}
+              >
+                <option value="">Unassigned</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-          <div>
-            <label htmlFor="task-milestone" className={fieldLabel}>
+            <label htmlFor="task-status" className={ROW_LABEL}>
+              Status
+            </label>
+            <div>
+              <Select
+                id="task-status"
+                className={QUIET_CONTROL}
+                value={draft.statusId}
+                onChange={(event) =>
+                  onChange({ ...draft, statusId: event.target.value })
+                }
+                disabled={saving}
+              >
+                {statuses.map((status) => (
+                  <option key={status.id} value={status.id}>
+                    {status.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <label htmlFor="task-priority" className={ROW_LABEL}>
+              Priority
+            </label>
+            <div>
+              <Select
+                id="task-priority"
+                className={cn(QUIET_CONTROL, "capitalize")}
+                value={draft.priority}
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    priority: event.target.value as TaskPriority,
+                  })
+                }
+                disabled={saving}
+              >
+                {TASK_PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority} className="capitalize">
+                    {priority}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <label htmlFor="task-milestone" className={ROW_LABEL}>
               Milestone
             </label>
-            <Select
-              id="task-milestone"
-              className="w-full"
-              value={draft.milestoneId}
-              onChange={(event) =>
-                onChange({ ...draft, milestoneId: event.target.value })
-              }
-              disabled={saving}
+            <div>
+              <Select
+                id="task-milestone"
+                className={QUIET_CONTROL}
+                value={draft.milestoneId}
+                onChange={(event) =>
+                  onChange({ ...draft, milestoneId: event.target.value })
+                }
+                disabled={saving}
+              >
+                <option value="">None</option>
+                {milestones.map((milestone) => (
+                  <option key={milestone.id} value={milestone.id}>
+                    {milestone.title}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {/* Start and due share one row: they are one span, and splitting
+                them cost a whole row to say so twice. */}
+            <label htmlFor="task-start" className={ROW_LABEL}>
+              Dates
+            </label>
+            <div className="flex flex-wrap items-center gap-1">
+              <Input
+                id="task-start"
+                type="date"
+                className={cn(QUIET_CONTROL, "w-auto max-w-none")}
+                value={draft.startDate}
+                onChange={(event) =>
+                  onChange({ ...draft, startDate: event.target.value })
+                }
+                disabled={saving}
+                aria-label="Start date"
+                aria-invalid={datesInverted || undefined}
+                aria-describedby={datesInverted ? "task-date-error" : undefined}
+              />
+              <span aria-hidden className="text-slate-300">
+                →
+              </span>
+              <Input
+                id="task-due"
+                type="date"
+                className={cn(QUIET_CONTROL, "w-auto max-w-none")}
+                value={draft.dueDate}
+                onChange={(event) =>
+                  onChange({ ...draft, dueDate: event.target.value })
+                }
+                disabled={saving}
+                aria-label="Due date"
+                aria-invalid={datesInverted || undefined}
+                aria-describedby={datesInverted ? "task-date-error" : undefined}
+              />
+            </div>
+
+            <label htmlFor="task-estimate" className={ROW_LABEL}>
+              Estimate
+            </label>
+            <div className="flex items-center gap-1.5">
+              <Input
+                id="task-estimate"
+                type="number"
+                min={0}
+                step="0.5"
+                // "0" rather than a dash: an empty number field is still null,
+                // and a dash placeholder reads as a value already set.
+                placeholder="0"
+                className={cn(QUIET_CONTROL, "w-20 max-w-none")}
+                value={draft.estimatedHours}
+                onChange={(event) =>
+                  onChange({ ...draft, estimatedHours: event.target.value })
+                }
+                disabled={saving}
+              />
+              <span className="text-xs text-slate-400">hours</span>
+            </div>
+          </div>
+
+          {datesInverted ? (
+            <p
+              id="task-date-error"
+              role="alert"
+              className="mt-2 text-xs font-medium text-red-700"
             >
-              <option value="">None</option>
-              {milestones.map((milestone) => (
-                <option key={milestone.id} value={milestone.id}>
-                  {milestone.title}
-                </option>
-              ))}
-            </Select>
-          </div>
+              Start date must be on or before the due date.
+            </p>
+          ) : draft.startDate || draft.dueDate ? (
+            // Only once a date exists. Explaining how dates draw on the
+            // timeline to someone who has not entered one is a line of text
+            // earning nothing.
+            <p className="mt-2 text-xs text-slate-500">
+              A start and due date together draw a bar on the timeline; a due
+              date alone shows as a single marker.
+            </p>
+          ) : null}
 
-          <div>
-            <label htmlFor="task-start" className={fieldLabel}>
-              Start
+          {/* The one field that needs room to think in, so it gets the space
+              the seven boxed inputs above it used to take. */}
+          <div className="mt-5">
+            <label
+              htmlFor="task-description"
+              className="mb-1.5 block text-xs font-medium text-slate-500"
+            >
+              Description
             </label>
-            <Input
-              id="task-start"
-              type="date"
-              value={draft.startDate}
+            <Textarea
+              id="task-description"
+              value={draft.description}
               onChange={(event) =>
-                onChange({ ...draft, startDate: event.target.value })
+                onChange({ ...draft, description: event.target.value })
               }
+              placeholder="What does this task involve?"
+              maxLength={4000}
               disabled={saving}
+              className="min-h-56 resize-y leading-relaxed"
             />
           </div>
+        </ModalBody>
 
-          <div>
-            <label htmlFor="task-due" className={fieldLabel}>
-              Due
-            </label>
-            <Input
-              id="task-due"
-              type="date"
-              value={draft.dueDate}
-              onChange={(event) =>
-                onChange({ ...draft, dueDate: event.target.value })
-              }
-              disabled={saving}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="task-estimate" className={fieldLabel}>
-              Estimate (h)
-            </label>
-            <Input
-              id="task-estimate"
-              type="number"
-              min={0}
-              step="0.5"
-              value={draft.estimatedHours}
-              onChange={(event) =>
-                onChange({ ...draft, estimatedHours: event.target.value })
-              }
-              disabled={saving}
-            />
-          </div>
-        </div>
-
-        {datesInverted ? (
-          <p role="alert" className="text-xs font-medium text-red-700">
-            Start date must be on or before the due date.
-          </p>
-        ) : (
-          <p className="text-xs text-slate-500">
-            A start and due date together draw a bar on the timeline; a due date
-            alone shows as a single marker.
-          </p>
-        )}
-
-        <div className="flex justify-end gap-2">
+        <ModalFooter>
           <Button
             type="button"
             variant="secondary"
@@ -298,10 +384,7 @@ export function TaskForm({
           >
             Cancel
           </Button>
-          <Button
-            type="submit"
-            disabled={saving || !draft.title.trim() || datesInverted}
-          >
+          <Button type="submit" disabled={!submittable}>
             {saving ? (
               <>
                 <Spinner className="border-white/40 border-t-white" />
@@ -313,8 +396,8 @@ export function TaskForm({
               "Create task"
             )}
           </Button>
-        </div>
+        </ModalFooter>
       </form>
-    </Card>
+    </Modal>
   );
 }

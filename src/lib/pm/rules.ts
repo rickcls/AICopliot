@@ -3,7 +3,7 @@ import type {
   MilestoneStatus,
   RecordSource,
   RequirementStatus,
-  TaskStatus,
+  TaskStatusCategory,
 } from "@/generated/prisma/enums";
 
 /**
@@ -16,15 +16,24 @@ import type {
  * Dates are compared at UTC day granularity. `<input type="date">` submits
  * `YYYY-MM-DD`, which parses as UTC midnight, so a task due today must not read
  * as overdue merely because the viewer is west of UTC.
+ *
+ * Task *columns* are per-project (`ProjectTaskStatus`). These helpers key off
+ * `TaskStatusCategory` only — never a label or key — so a custom "QA" column
+ * with category `open` stays overdue-eligible the same way `todo` does.
  */
 
-/** Statuses representing work that is not finished. */
-export const OPEN_TASK_STATUSES = [
-  "backlog",
-  "todo",
-  "in_progress",
+/** Categories representing work that is not finished. */
+export const OPEN_TASK_CATEGORIES = [
+  "open",
   "blocked",
-] as const satisfies readonly TaskStatus[];
+] as const satisfies readonly TaskStatusCategory[];
+
+/** The single category that means the work is finished. */
+export const DONE_TASK_CATEGORY = "done" as const satisfies TaskStatusCategory;
+
+/** The category that means the work is stuck. */
+export const BLOCKED_TASK_CATEGORY =
+  "blocked" as const satisfies TaskStatusCategory;
 
 /** Milestone statuses representing work that is not finished. */
 export const OPEN_MILESTONE_STATUSES = [
@@ -168,8 +177,10 @@ export function isDueWithinDays(
   return offset >= 0 && offset <= days;
 }
 
-export function isTaskOpen(status: TaskStatus): boolean {
-  return (OPEN_TASK_STATUSES as readonly TaskStatus[]).includes(status);
+export function isTaskOpen(category: TaskStatusCategory): boolean {
+  return (OPEN_TASK_CATEGORIES as readonly TaskStatusCategory[]).includes(
+    category,
+  );
 }
 
 export function isMilestoneOpen(status: MilestoneStatus): boolean {
@@ -321,7 +332,7 @@ export function overdueTaskWhere(
   return officialRecordWhere({
     workspaceId,
     ...(projectId ? { projectId } : {}),
-    status: { in: [...OPEN_TASK_STATUSES] },
+    status: { category: { in: [...OPEN_TASK_CATEGORIES] } },
     dueDate: { lt: startOfUtcDay(now) },
   });
 }
@@ -330,7 +341,7 @@ export function blockedTaskWhere(workspaceId: string, projectId?: string) {
   return officialRecordWhere({
     workspaceId,
     ...(projectId ? { projectId } : {}),
-    status: "blocked" as const,
+    status: { category: BLOCKED_TASK_CATEGORY },
   });
 }
 
@@ -416,7 +427,7 @@ export function activeProjectWhere(workspaceId: string) {
       {
         tasks: {
           some: officialRecordWhere({
-            status: { in: [...OPEN_TASK_STATUSES] },
+            status: { category: { in: [...OPEN_TASK_CATEGORIES] } },
           }),
         },
       },

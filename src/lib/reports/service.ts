@@ -101,7 +101,7 @@ async function loadStatusReportSourceData(
         id: true,
         title: true,
         description: true,
-        status: true,
+        status: { select: { key: true, label: true, category: true } },
         priority: true,
         dueDate: true,
         completedAt: true,
@@ -147,8 +147,20 @@ async function loadStatusReportSourceData(
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
-        task: { select: { id: true, title: true, status: true } },
-        dependsOnTask: { select: { id: true, title: true, status: true } },
+        task: {
+          select: {
+            id: true,
+            title: true,
+            status: { select: { key: true, label: true, category: true } },
+          },
+        },
+        dependsOnTask: {
+          select: {
+            id: true,
+            title: true,
+            status: { select: { key: true, label: true, category: true } },
+          },
+        },
       },
     }),
   ]);

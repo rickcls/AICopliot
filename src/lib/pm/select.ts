@@ -29,6 +29,17 @@ const taskOrRiskCitationSelect = {
   purpose: true,
 } as const;
 
+/** Shape every task payload exposes for its board column. */
+export const taskStatusSelect = {
+  id: true,
+  key: true,
+  label: true,
+  category: true,
+  position: true,
+  color: true,
+  isDefault: true,
+} as const;
+
 /**
  * Only official targets are selected, so a coverage chip on a requirement row
  * agrees with the uncovered count on the overview — both exclude proposals a
@@ -48,7 +59,13 @@ const officialLinksSelect = {
   select: {
     id: true,
     targetType: true,
-    task: { select: { id: true, title: true, status: true } },
+    task: {
+      select: {
+        id: true,
+        title: true,
+        status: { select: taskStatusSelect },
+      },
+    },
     milestone: { select: { id: true, title: true, status: true } },
     risk: { select: { id: true, description: true, status: true } },
   },
@@ -59,7 +76,8 @@ export const taskSelect = {
   projectId: true,
   title: true,
   description: true,
-  status: true,
+  statusId: true,
+  status: { select: taskStatusSelect },
   priority: true,
   assigneeId: true,
   milestoneId: true,
@@ -82,11 +100,30 @@ export const taskSelect = {
       dependsOnTaskId: true,
       source: true,
       generationStatus: true,
-      dependsOnTask: { select: { title: true, status: true } },
+      dependsOnTask: {
+        select: {
+          title: true,
+          status: { select: taskStatusSelect },
+        },
+      },
       citations: { select: citationBaseSelect },
     },
   },
   citations: { select: taskOrRiskCitationSelect },
+  // Comments ride along with the task rather than being fetched when the detail
+  // panel opens, so the create/update/list responses stay one shape and the
+  // client can replace a row in place without dropping the thread. Worth
+  // revisiting if a single task ever accumulates enough discussion to make the
+  // board query heavy — the natural fix is a count here and a fetch on open.
+  comments: {
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      body: true,
+      createdAt: true,
+      author: { select: { id: true, name: true, email: true } },
+    },
+  },
 } as const;
 
 export const milestoneSelect = {

@@ -100,7 +100,8 @@ export async function editDraftProposal(
         id: true,
         startDate: true,
         dueDate: true,
-        status: true,
+        statusId: true,
+        status: { select: { id: true, key: true, category: true } },
         milestoneId: true,
         citations: {
           where: { purpose: "milestone_link" },
@@ -122,6 +123,29 @@ export async function editDraftProposal(
         400,
       );
     }
+
+    let nextStatusId: string | undefined;
+    let nextCategory = existing.status.category;
+    if (data.status !== undefined) {
+      // Review still edits by the classic key; resolve to this project's column.
+      const boardStatus = await prisma.projectTaskStatus.findFirst({
+        where: {
+          workspaceId: context.workspaceId,
+          projectId: context.projectId,
+          key: data.status,
+        },
+        select: { id: true, category: true },
+      });
+      if (!boardStatus) {
+        throw new GenerationRequestError(
+          `Status “${data.status}” is not configured on this project`,
+          400,
+        );
+      }
+      nextStatusId = boardStatus.id;
+      nextCategory = boardStatus.category;
+    }
+
     if (data.milestoneId) {
       const milestone = await prisma.milestone.findFirst({
         where: {
@@ -162,6 +186,12 @@ export async function editDraftProposal(
           where: { taskId: existing.id, purpose: "milestone_link" },
         });
       }
+      const completedAt =
+        nextStatusId === undefined || nextCategory === existing.status.category
+          ? undefined
+          : nextCategory === "done"
+            ? new Date()
+            : null;
       const updated = await tx.task.updateMany({
         where: scope,
         data: {
@@ -169,15 +199,10 @@ export async function editDraftProposal(
         ...(data.description !== undefined
           ? { description: data.description }
           : {}),
-        ...(data.status !== undefined
+        ...(nextStatusId !== undefined
           ? {
-              status: data.status,
-              completedAt:
-                data.status === "done"
-                  ? existing.status === "done"
-                    ? undefined
-                    : new Date()
-                  : null,
+              statusId: nextStatusId,
+              ...(completedAt !== undefined ? { completedAt } : {}),
             }
           : {}),
         ...(data.priority !== undefined ? { priority: data.priority } : {}),

@@ -192,7 +192,7 @@ describe("updates and deletes are scoped before they run", () => {
     if (!existing) return null;
     return mockPrisma.task.update({
       where: { id: existing.id },
-      data: { status: "done" },
+      data: { statusId: "status-done" },
     });
   }
 

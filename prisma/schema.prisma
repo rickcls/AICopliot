@@ -44,6 +44,7 @@ model User {
   reviewedTaskDependencies TaskDependency[]   @relation("TaskDependencyReviewer")
   reviewedRequirements     Requirement[]      @relation("RequirementReviewer")
   createdRequirementLinks  RequirementLink[]  @relation("RequirementLinkCreator")
+  taskComments             TaskComment[]      @relation("TaskCommentAuthor")
 }
 
 model Account {
@@ -90,6 +91,7 @@ model Workspace {
 
   tasks                   Task[]
   taskDependencies        TaskDependency[]
+  taskStatuses            ProjectTaskStatus[]
   milestones              Milestone[]
   risks                   ProjectRisk[]
   requirements            Requirement[]
@@ -100,6 +102,7 @@ model Workspace {
   riskCitations           RiskCitation[]
   taskDependencyCitations TaskDependencyCitation[]
   generationRuns          GenerationRun[]
+  taskComments            TaskComment[]
 
   @@index([ownerId])
 }
@@ -121,6 +124,7 @@ model Project {
   // they remain meaningful unassigned. The records below cannot exist without a
   // project (projectId is non-nullable), so they cascade instead.
   tasks          Task[]
+  taskStatuses   ProjectTaskStatus[]
   milestones     Milestone[]
   risks          ProjectRisk[]
   requirements   Requirement[]
@@ -341,10 +345,10 @@ model EvaluationCase {
 // review-only; operational reads admit only approved AI records.
 // ---------------------------------------------------------------------------
 
-enum TaskStatus {
-  backlog
-  todo
-  in_progress
+/// Semantic role of a project task column. Labels and keys are per-project;
+/// category is what overdue, completion timestamps, blockers, and reports key off.
+enum TaskStatusCategory {
+  open
   blocked
   done
 }
@@ -354,6 +358,35 @@ enum TaskPriority {
   medium
   high
   urgent
+}
+
+/// A board/list column for one project. Seeded with the classic five on create;
+/// users may add, rename, or remove columns as long as at least one `open` and
+/// one `done` remain. Tasks point here by id — never at a global enum.
+model ProjectTaskStatus {
+  id          String             @id @default(cuid())
+  workspaceId String
+  projectId   String
+  /// Stable slug unique within the project. Defaults reuse backlog/todo/… so
+  /// plan generation can still map model output by key; custom rows get a
+  /// slugified label.
+  key         String
+  label       String
+  category    TaskStatusCategory
+  position    Int
+  /// Optional UI token (`slate`, `blue`, …). Null falls back to the category.
+  color       String?
+  /// New tasks land here when the client omits a status.
+  isDefault   Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@unique([projectId, key])
+  @@index([workspaceId, projectId, position])
 }
 
 enum MilestoneStatus {
@@ -445,7 +478,7 @@ model Task {
   projectId        String
   title            String
   description      String?
-  status           TaskStatus       @default(backlog)
+  statusId         String
   priority         TaskPriority     @default(medium)
   assigneeId       String?
   milestoneId      String?
@@ -463,20 +496,22 @@ model Task {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status        ProjectTaskStatus  @relation(fields: [statusId], references: [id], onDelete: Restrict)
   // Removing a person unassigns their work rather than deleting it.
-  assignee      User?          @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  milestone     Milestone?     @relation("TaskMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
-  generationRun GenerationRun? @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
-  reviewedBy    User?          @relation("TaskReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  assignee      User?              @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  milestone     Milestone?         @relation("TaskMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
+  generationRun GenerationRun?     @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
+  reviewedBy    User?              @relation("TaskReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   dependencies     TaskDependency[]  @relation("DependentTask")
   dependents       TaskDependency[]  @relation("DependencyTask")
   citations        TaskCitation[]
   requirementLinks RequirementLink[]
+  comments         TaskComment[]
 
-  @@index([workspaceId, projectId, status])
+  @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])
   @@index([workspaceId, startDate])
   @@index([workspaceId, completedAt])
@@ -484,6 +519,33 @@ model Task {
   @@index([generationRunId])
   @@index([reviewedById])
   @@index([assigneeId])
+  @@index([statusId])
+}
+
+/// Human discussion on a task.
+///
+/// Deliberately outside the source/generationStatus model the delivery records
+/// share: a comment is not a proposal awaiting review, so it has no draft state
+/// and never enters `officialRecordWhere()`. It is also not grounding evidence —
+/// project chat answers from documents and official records, and letting
+/// free-text commentary in would put unreviewed opinion behind a citation.
+model TaskComment {
+  id          String   @id @default(cuid())
+  workspaceId String
+  taskId      String
+  /// Nullable so removing a person leaves the discussion intact rather than
+  /// deleting history, matching the assignee rule on Task.
+  authorId    String?
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User?     @relation("TaskCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, taskId, createdAt])
+  @@index([authorId])
 }
 
 model TaskDependency {

@@ -11,7 +11,8 @@ import {
   startOfUtcDay,
   DUE_SOON_DAYS,
   OPEN_REQUIREMENT_STATUSES,
-  OPEN_TASK_STATUSES,
+  OPEN_TASK_CATEGORIES,
+  DONE_TASK_CATEGORY,
   officialRecordWhere,
 } from "./rules";
 
@@ -139,14 +140,14 @@ export async function getProjectSummary(
       where: officialRecordWhere({
         workspaceId,
         projectId,
-        status: { not: "done" as const },
+        status: { category: { not: DONE_TASK_CATEGORY } },
       }),
     }),
     prisma.task.count({
       where: officialRecordWhere({
         workspaceId,
         projectId,
-        status: "done" as const,
+        status: { category: DONE_TASK_CATEGORY },
       }),
     }),
     prisma.task.count({ where: overdueTaskWhere(workspaceId, now, projectId) }),
@@ -155,7 +156,7 @@ export async function getProjectSummary(
       where: officialRecordWhere({
         workspaceId,
         projectId,
-        status: { in: [...OPEN_TASK_STATUSES] },
+        status: { category: { in: [...OPEN_TASK_CATEGORIES] } },
         dueDate: { gte: startOfUtcDay(now), lte: dueSoonCutoff },
       }),
     }),

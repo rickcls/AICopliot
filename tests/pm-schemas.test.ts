@@ -15,22 +15,25 @@ describe("task input", () => {
 
     expect(result).toMatchObject({
       title: "Patch the gateway",
-      status: "backlog",
       priority: "medium",
     });
+    expect(result.statusId).toBeUndefined();
   });
 
   it("rejects a blank title", () => {
     expect(createTaskSchema.safeParse({ title: "   " }).success).toBe(false);
   });
 
-  it("rejects an unknown status or priority", () => {
-    expect(
-      createTaskSchema.safeParse({ title: "x", status: "archived" }).success,
-    ).toBe(false);
+  it("rejects an unknown priority", () => {
     expect(
       createTaskSchema.safeParse({ title: "x", priority: "critical" }).success,
     ).toBe(false);
+  });
+
+  it("accepts a project status id", () => {
+    expect(
+      createTaskSchema.parse({ title: "x", statusId: "status-1" }).statusId,
+    ).toBe("status-1");
   });
 
   it("rejects a negative estimate", () => {
@@ -73,7 +76,9 @@ describe("task input", () => {
   it("leaves an omitted description undefined, so a PATCH cannot erase it", () => {
     // The distinction that matters: absent means "leave alone", empty means
     // "clear". Collapsing them wipes text the caller never mentioned.
-    expect(updateTaskSchema.parse({ status: "done" }).description).toBeUndefined();
+    expect(
+      updateTaskSchema.parse({ statusId: "status-1" }).description,
+    ).toBeUndefined();
     expect(updateTaskSchema.parse({ description: "" }).description).toBeNull();
   });
 });
@@ -144,8 +149,8 @@ describe("update inputs require a field", () => {
   });
 
   it("accepts a single-field status change", () => {
-    expect(updateTaskSchema.parse({ status: "done" })).toEqual({
-      status: "done",
+    expect(updateTaskSchema.parse({ statusId: "status-1" })).toEqual({
+      statusId: "status-1",
     });
   });
 

@@ -120,8 +120,9 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    dependency approval prerequisites in one transaction.
 
 12. **Completion timestamps are transitions, not edit timestamps.** Entering
-   task `done` or milestone `completed` sets `completedAt`; reopening clears it;
-   unrelated edits preserve it. Weekly reports depend on this distinction.
+ a task status whose category is `done`, or a milestone `completed`, sets
+ `completedAt`; reopening clears it; unrelated edits preserve it. Weekly
+ reports depend on this distinction.
 
 13. **Project chat has two evidence families.** Global chat is document-only.
    Project chat always uses `project_combined`: document retrieval and official
@@ -478,17 +479,26 @@ The board's drag-and-drop uses native HTML5 drag events — one status change do
 not justify a dependency. Two rules: the drop handler reads the task id from
 `dataTransfer`, **not** from React state (state set in `dragstart` may not be
 committed when `drop` runs), and the status `<select>` in the detail panel stays
-as the keyboard-accessible equivalent, so the board is never drag-only. The move
-is optimistic and rolls back on failure.
+as the keyboard-accessible equivalent, so neither view is drag-only. The list
+uses a grip handle for the same reason a whole-row drag would fight the
+click-to-open row. The move is optimistic and rolls back on failure.
+
+**Task columns are per-project (`ProjectTaskStatus`), not a global enum.**
+New projects are seeded with the classic five (Backlog → Done). Users can add
+or remove columns via the Statuses control; at least one `open` and one `done`
+must remain, and a column with tasks cannot be deleted until they are moved.
+Semantics — overdue, completion timestamps, blockers, reports — key off
+`TaskStatusCategory` (`open | blocked | done`), never the label. Plan generation
+still emits the classic keys and maps them onto the project's rows by `key`.
+Each column/group still has an Add that seeds `emptyDraft(statusId)`.
 
 The Tasks page also has a Board/List switch. Both views render from the same
 client-side `tasks` state in `src/components/task-board.tsx`, so creating,
 editing, deleting, or changing a status stays in sync without a second fetch.
-The List view keeps the Jira-style quick filters for All, Backlog, To do, In
-progress, Blocked, and Done; filter counts are derived from the current task
-state and must update with it. The whole list row is mouse- and
-keyboard-activated and opens the same `TaskDetail` slide-over used by board
-cards, including its Edit action.
+The List view keeps the Jira-style quick filters for the project's statuses;
+filter counts are derived from the current task state and must update with it.
+The whole list row is mouse- and keyboard-activated and opens the same
+`TaskDetail` slide-over used by board cards, including its Edit action.
 
 **The list is grouped by status, in board order, and the group header is the
 only place the status is written.** Filters and groups are different axes and
@@ -500,13 +510,113 @@ survive. Two consequences to preserve:
   wider, and the group header spans a literal `colSpan`. A column hidden below a
   breakpoint leaves a phantom column behind that silently takes its width out of
   the Task column — which is what starved the title to ~170px and truncated
-  every row to "Identify appl…". Below `min-w-[720px]` the whole table scrolls
+  every row to "Identify appl…". Below `min-w-[760px]` the whole table scrolls
   sideways instead.
-- **Empty groups are dropped, and the per-row Status column is gone.** A project
-  with everything in Backlog would otherwise open on four empty headings, and a
-  status badge on every row under a heading that already says it was a column of
-  identical pills. The coloured dot at the row start keeps the status legible
-  for a row read on its own.
+- **Empty groups stay, and the per-row Status column is gone.** The list is a
+  drop target and an Add surface the way the board is, so an empty Done group
+  you can drop into earns its heading. A status badge on every row under a
+  heading that already says it would be a column of identical pills. The
+  coloured dot at the row start keeps the status legible for a row read on its
+  own.
+
+**Creating and editing a task is a modal, built on `src/components/modal.tsx`.**
+It was an inline `Card` that pushed the board down the page, which meant the
+thing you were describing scrolled out of sight while you typed. `Modal` uses
+the native `<dialog>` and `showModal()` for the same reasons `confirm-dialog.tsx`
+does — the browser supplies the focus trap, Escape, background inertness, and
+top-layer painting, and the top layer is what clears the sticky `z-30` sidebar
+without a z-index arms race. Three rules that are easy to undo by accident:
+
+- **A backdrop click must not close it.** That is the deliberate difference from
+  the confirmation dialog, which holds no input. This one wraps a part-typed
+  form, and a stray click while reaching for a field is the most common way to
+  lose that work. Escape still closes, because a focus trap with no obvious
+  keyboard exit is just a trap — but Escape is deliberate and a misplaced click
+  is not.
+- **Initial focus is placed by hand via `[data-autofocus]`, not React's
+  `autoFocus`.** Child effects run before the parent's, so `autoFocus` fires
+  while the dialog is still `display: none` and the focus is thrown away;
+  `showModal()` then runs its own algorithm and lands on the first focusable
+  element, which is the close button. The form used to open with the X focused
+  and needed a Tab before you could type.
+- **The flex column goes on a wrapper inside the dialog, never the dialog.**
+  `display` is what the UA toggles to hide a closed `<dialog>`, so setting
+  `flex` on the element itself leaves it visible when closed.
+
+**Inside it, the layout follows Asana's task pane rather than a form.** The name
+is typed at heading size with no box, the metadata sits in quiet label/value
+rows, and the description gets the remaining height. Two earlier attempts were
+worse: a flat `lg:grid-cols-7` gave each `<select>` about 100px — narrower than
+"In progress" or any real milestone title — and the two-column pairs that
+replaced it still drew seven bordered white boxes, so the form read as seven
+competing objects with the description the smallest thing on screen.
+
+- **Metadata controls are chrome-less at rest** (`QUIET_CONTROL`), showing their
+  border and fill only on hover and focus. That is what drops the apparent item
+  count without removing a single field.
+- **The controls are capped at `max-w-sm`, not stretched to the panel.** Empty
+  space to the right of a short value is what makes the block read as a list of
+  facts rather than a wall of inputs — same as the reference.
+- **Start and due share one row.** They describe one span, and separate rows
+  spent two labels saying so.
+- **The timeline hint only renders once a date exists.** Explaining how dates
+  draw on the timeline to someone who has entered none is a line earning
+  nothing.
+- **The row grid is plain `div`s, not the `<dl>` the record lists use.** These
+  are form controls with their own labels; a description list makes a screen
+  reader announce a six-item list around them for nothing.
+- **The title keeps the app's focus ring even though it loses its border.** A
+  borderless field with no ring leaves a keyboard user nothing to locate.
+
+**`task-detail.tsx` is where a task is edited, not just read.** It was read-only
+apart from the status `<select>`, with an Edit button that closed the panel and
+reopened the record in the form — so changing a due date meant leaving the thing
+you were looking at. Every field is now editable in place, in the same quiet
+rows as the create modal, and the panel therefore owns a `TaskDraft` and does
+its own PATCHing instead of reporting changes upward. Its rules:
+
+- **Each edit sends only the field that changed**, via `toPartialPayload`.
+  Sending the whole draft would defeat the no-`.default()` design of
+  `updateTaskSchema`: two people editing different fields of one task would
+  each overwrite the other's with whatever their panel happened to be showing.
+- **The draft moves before the request and is restored on failure.** A `<select>`
+  bound to the server value visibly snaps back to the old option while the PATCH
+  is in flight, which reads as the app rejecting the change.
+- **Text commits on blur, selects on change.** Saving a title per keystroke is a
+  request per character. An emptied title is treated as a cancelled edit rather
+  than a save the server would reject.
+- **The panel is keyed on `task.id` by the board**, so opening a different task
+  remounts it and the draft starts from that record. This is deliberately not an
+  effect copying props into state.
+- **The expand control reopens the task in the form modal**, handing over the
+  panel's current draft rather than the stored record, so an edit still being
+  typed survives the switch. The panel's label column is `4.5rem` rather than the
+  modal's `6rem` — at 448px, 6rem left the two date inputs wrapping with the
+  arrow orphaned between them.
+- **There is no Save button, because there is nothing to submit.** The footer
+  reports save state instead.
+
+**`TaskComment` is human discussion, and deliberately outside every other model
+here.** It has no `source`/`generationStatus`, so it is not a proposal awaiting
+review and never touches `officialRecordWhere()`; the comment routes are the
+only task routes that do *not* use that predicate, because a draft task awaiting
+review is exactly what reviewers need to discuss. It is also **not grounding
+evidence** — project chat answers from documents and official records, and
+letting free-text commentary in would put unreviewed opinion behind a citation.
+
+- `authorId` is `SET NULL` and `taskId` is `CASCADE`, following invariant 9's
+  reasoning: removing a person must not delete a thread other people replied to,
+  but a comment on a deleted task is unreachable in every view.
+- The author is always the session user, never a value from the request body,
+  and only the author may delete their own comment.
+- Comments ride along in `taskSelect` rather than being fetched when the panel
+  opens, so the create/update/list responses stay one shape and the client can
+  replace a row in place without dropping the thread. If a single task ever
+  accumulates enough discussion to make the board query heavy, the fix is a
+  count in `taskSelect` and a fetch on open.
+- Posting is **not** optimistic: a comment is a durable statement attributed to
+  you by name, so it appears once the server has stored it rather than being
+  drawn immediately and quietly vanishing on failure.
 
 Update schemas (`updateTaskSchema` and friends) are built from a field map with
 **no `.default()`**, because `.partial()` does not strip defaults — a defaulted

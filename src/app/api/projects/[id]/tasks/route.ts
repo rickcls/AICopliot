@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { findOfficialProjectMilestone } from "@/lib/pm/project";
 import {
   completedAtOnCreate,
+  DONE_TASK_CATEGORY,
   officialRecordWhere,
 } from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
@@ -16,6 +17,31 @@ import { createTaskSchema } from "@/lib/schemas";
 
 interface Params {
   params: Promise<{ id: string }>;
+}
+
+async function resolveProjectStatus(
+  workspaceId: string,
+  projectId: string,
+  statusId: string | undefined,
+) {
+  if (statusId) {
+    return prisma.projectTaskStatus.findFirst({
+      where: { id: statusId, workspaceId, projectId },
+      select: { id: true, category: true },
+    });
+  }
+
+  const fallback = await prisma.projectTaskStatus.findFirst({
+    where: { workspaceId, projectId, isDefault: true },
+    select: { id: true, category: true },
+  });
+  if (fallback) return fallback;
+
+  return prisma.projectTaskStatus.findFirst({
+    where: { workspaceId, projectId },
+    orderBy: { position: "asc" },
+    select: { id: true, category: true },
+  });
 }
 
 export async function GET(_request: Request, { params }: Params) {
@@ -51,8 +77,6 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
-    // An assignee ID from the client is only accepted once it is confirmed to
-    // belong to this workspace's membership.
     if (parsed.data.assigneeId) {
       await requireWorkspaceMember(workspaceId, parsed.data.assigneeId);
     }
@@ -70,6 +94,18 @@ export async function POST(request: Request, { params }: Params) {
       }
     }
 
+    const status = await resolveProjectStatus(
+      workspaceId,
+      project.id,
+      parsed.data.statusId,
+    );
+    if (!status) {
+      return NextResponse.json(
+        { error: "Status not found in this project" },
+        { status: 404 },
+      );
+    }
+
     const now = new Date();
 
     const task = await prisma.task.create({
@@ -78,14 +114,18 @@ export async function POST(request: Request, { params }: Params) {
         projectId: project.id,
         title: parsed.data.title,
         description: parsed.data.description ?? null,
-        status: parsed.data.status,
+        statusId: status.id,
         priority: parsed.data.priority,
         assigneeId: parsed.data.assigneeId ?? null,
         milestoneId: parsed.data.milestoneId ?? null,
         estimatedHours: parsed.data.estimatedHours ?? null,
         startDate: parsed.data.startDate ?? null,
         dueDate: parsed.data.dueDate ?? null,
-        completedAt: completedAtOnCreate(parsed.data.status, "done", now),
+        completedAt: completedAtOnCreate(
+          status.category,
+          DONE_TASK_CATEGORY,
+          now,
+        ),
       },
       select: taskSelect,
     });

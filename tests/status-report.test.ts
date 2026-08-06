@@ -7,17 +7,26 @@ import {
   type ReportMilestoneInput,
   type ReportRiskInput,
   type ReportTaskInput,
+  type ReportTaskStatus,
   type StatusReportSourceData,
 } from "@/lib/reports/status-report";
 
 const NOW = new Date("2026-08-05T18:30:00.000Z");
+
+function status(
+  category: ReportTaskStatus["category"],
+  key: string = category,
+  label: string = key,
+): ReportTaskStatus {
+  return { key, label, category };
+}
 
 function task(overrides: Partial<ReportTaskInput> = {}): ReportTaskInput {
   return {
     id: "task-1",
     title: "Ship release",
     description: null,
-    status: "todo",
+    status: status("open", "todo", "To do"),
     priority: "medium",
     dueDate: null,
     completedAt: null,
@@ -59,11 +68,15 @@ function dependency(
 ): ReportDependencyInput {
   return {
     id: "dependency-1",
-    task: { id: "task-1", title: "Run UAT", status: "todo" },
+    task: {
+      id: "task-1",
+      title: "Run UAT",
+      status: status("open", "todo", "To do"),
+    },
     dependsOnTask: {
       id: "task-2",
       title: "Security approval",
-      status: "in_progress",
+      status: status("open", "in_progress", "In progress"),
     },
     ...overrides,
   };
@@ -90,19 +103,19 @@ describe("weekly UTC windows", () => {
           task({
             id: "completed-start",
             title: "Window start",
-            status: "done",
+            status: status("done", "done", "Done"),
             completedAt: new Date("2026-07-30T00:00:00.000Z"),
           }),
           task({
             id: "completed-before",
             title: "Before window",
-            status: "done",
+            status: status("done", "done", "Done"),
             completedAt: new Date("2026-07-29T23:59:59.999Z"),
           }),
           task({
             id: "completed-end",
             title: "Today",
-            status: "done",
+            status: status("done", "done", "Done"),
             completedAt: new Date("2026-08-05T23:59:59.999Z"),
           }),
           task({ id: "next-start", title: "Tomorrow", dueDate: new Date("2026-08-06") }),
@@ -134,7 +147,12 @@ describe("project health", () => {
   it("gives red precedence to blockers and overdue work", () => {
     const report = buildDeterministicStatusReport(
       data({
-        tasks: [task({ status: "blocked", dueDate: new Date("2026-08-10") })],
+        tasks: [
+          task({
+            status: status("blocked", "blocked", "Blocked"),
+            dueDate: new Date("2026-08-10"),
+          }),
+        ],
         milestones: [milestone({ status: "at_risk" })],
       }),
       NOW,
@@ -187,8 +205,16 @@ describe("deterministic sections and source snapshot", () => {
           dependency(),
           dependency({
             id: "dependency-done",
-            task: { id: "task-3", title: "Deploy", status: "todo" },
-            dependsOnTask: { id: "task-4", title: "Build", status: "done" },
+            task: {
+              id: "task-3",
+              title: "Deploy",
+              status: status("open", "todo", "To do"),
+            },
+            dependsOnTask: {
+              id: "task-4",
+              title: "Build",
+              status: status("done", "done", "Done"),
+            },
           }),
         ],
       }),
