@@ -80,6 +80,9 @@ export function ProjectsPanel({
       setName("");
       setDescription("");
       toast.success(`Created “${data.project.name}”`);
+      // The sidebar's project list comes from the layout, not this panel's
+      // local state — same reason delete calls refresh below.
+      router.refresh();
       router.push(`/projects/${data.project.id}`);
     } catch {
       setError("Could not reach the server.");

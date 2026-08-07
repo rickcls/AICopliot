@@ -32,19 +32,6 @@ export default async function DocumentDetailPage({
 
   if (!document) notFound();
 
-  const chunkSample = await prisma.documentChunk.findMany({
-    where: { documentId: document.id, workspaceId },
-    orderBy: { chunkIndex: "asc" },
-    take: 5,
-    select: {
-      id: true,
-      chunkIndex: true,
-      pageNumber: true,
-      sectionTitle: true,
-      content: true,
-    },
-  });
-
   return (
     // Extracted document text is prose; cap the width so lines stay readable.
     <div className="mx-auto w-full max-w-4xl">
@@ -104,29 +91,14 @@ export default async function DocumentDetailPage({
         ))}
       </dl>
 
-      {chunkSample.length > 0 ? (
+      {document.chunkCount > 0 ? (
         <section className="mt-8">
-          <h2 className="text-sm font-semibold">
-            Indexed chunks{" "}
-            <span className="font-normal text-slate-500">
-              (first {chunkSample.length} of {document.chunkCount})
-            </span>
-          </h2>
-          <div className="mt-3 space-y-2">
-            {chunkSample.map((chunk) => (
-              <Card key={chunk.id} className="p-4">
-                <p className="text-xs text-slate-500">
-                  Chunk {chunk.chunkIndex}
-                  {chunk.pageNumber !== null ? ` · page ${chunk.pageNumber}` : ""}
-                  {chunk.sectionTitle ? ` · ${chunk.sectionTitle}` : ""}
-                </p>
-                <p className="mt-2 text-sm text-pretty text-slate-700">
-                  {chunk.content.slice(0, 400)}
-                  {chunk.content.length > 400 ? "…" : ""}
-                </p>
-              </Card>
-            ))}
-          </div>
+          <Link
+            href={`/documents/${document.id}/chunks`}
+            className="inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"
+          >
+            Review indexed chunks ({document.chunkCount})
+          </Link>
         </section>
       ) : null}
 
