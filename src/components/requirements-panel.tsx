@@ -8,8 +8,16 @@ import {
 } from "@/lib/pm/filters";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ChevronRight, FileText, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Check,
+  ChevronRight,
+  FileText,
+  Grid3x3,
+  ListChecks,
+  Sparkles,
+} from "lucide-react";
+import { TraceabilityMatrix } from "@/components/traceability-matrix";
 import {
   Badge,
   Button,
@@ -19,6 +27,7 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FOCUS_RING,
   Input,
   SearchField,
   SectionHeader,
@@ -226,17 +235,136 @@ function warningsFor(requirement: RequirementRow): string[] {
   return warnings;
 }
 
+export interface LinkTargetOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * Linked records as removable chips, plus an inline picker for one more.
+ *
+ * One component for tasks, milestones, and risks, so the three edges of the
+ * traceability matrix cannot drift apart. Only official records reach
+ * `options` — the API refuses anything else — so a link can never be satisfied
+ * by a draft proposal.
+ */
+function LinkEditor({
+  noun,
+  code,
+  links,
+  options,
+  empty,
+  busy,
+  onLink,
+  onUnlink,
+}: {
+  noun: string;
+  code: string;
+  links: Array<{ id: string; targetId: string; label: string; done: boolean }>;
+  options: LinkTargetOption[];
+  empty: React.ReactNode;
+  busy: boolean;
+  onLink: (targetId: string) => Promise<void>;
+  onUnlink: (linkId: string) => Promise<void>;
+}) {
+  const [picking, setPicking] = useState(false);
+  const available = options.filter(
+    (option) => !links.some((link) => link.targetId === option.id),
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {links.length === 0 ? (
+        <span className="text-slate-400">{empty}</span>
+      ) : (
+        links.map((link) => (
+          <span
+            key={link.id}
+            className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700"
+          >
+            {link.done ? (
+              <Check
+                className="size-3 shrink-0 text-emerald-600"
+                aria-label="done"
+              />
+            ) : null}
+            <span className="min-w-0 truncate" title={link.label}>
+              {link.label}
+            </span>
+            <button
+              type="button"
+              aria-label={`Unlink ${link.label}`}
+              className="text-slate-400 hover:text-red-700"
+              disabled={busy}
+              onClick={() => void onUnlink(link.id)}
+            >
+              ×
+            </button>
+          </span>
+        ))
+      )}
+
+      {picking ? (
+        <Select
+          aria-label={`Link a ${noun} to ${code}`}
+          className="h-7 max-w-xs py-0 text-xs"
+          defaultValue=""
+          disabled={busy}
+          // Focus lands on the picker the moment it replaces the button, so a
+          // keyboard user is not left on an element that just disappeared.
+          autoFocus
+          onBlur={() => setPicking(false)}
+          onChange={async (event) => {
+            const targetId = event.target.value;
+            if (!targetId) return;
+            await onLink(targetId);
+            setPicking(false);
+          }}
+        >
+          <option value="">Select a {noun}…</option>
+          {available.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <button
+          type="button"
+          className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+          disabled={busy || available.length === 0}
+          title={
+            options.length === 0
+              ? `This project has no official ${noun}s yet`
+              : undefined
+          }
+          onClick={() => setPicking(true)}
+        >
+          + Link {noun}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Muted label + readable content, so the body has one measure instead of four. */
 export function RequirementsPanel({
   projectId,
   initialRequirements,
   readyDocuments,
   taskOptions,
+  milestoneOptions,
+  riskOptions,
   activeRun,
   initialFilter = "all",
+  initialOpenId = null,
 }: {
   projectId: string;
   initialFilter?: RegisterFilter;
+  milestoneOptions: LinkTargetOption[];
+  riskOptions: LinkTargetOption[];
+  /** From `?req=`: a traced-requirement chip elsewhere opens this row. */
+  initialOpenId?: string | null;
   initialRequirements: RequirementRow[];
   readyDocuments: ReadyDocument[];
   taskOptions: TaskOption[];
@@ -246,11 +374,28 @@ export function RequirementsPanel({
   const [requirements, setRequirements] = useState(initialRequirements);
   const [filter, setFilter] = useState<RegisterFilter>(initialFilter);
   const [refine, setRefine] = useState<RequirementFilter>(EMPTY_REQUIREMENT_FILTER);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"register" | "matrix">("register");
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () =>
+      new Set(
+        initialOpenId &&
+          initialRequirements.some((item) => item.id === initialOpenId)
+          ? [initialOpenId]
+          : [],
+      ),
+  );
+
+  // Bring a deep-linked row into view once. Scrolling is a side effect on the
+  // DOM, not state, so it belongs in an effect rather than in render.
+  useEffect(() => {
+    if (!initialOpenId) return;
+    document
+      .getElementById(`requirement-${initialOpenId}`)
+      ?.scrollIntoView({ block: "center" });
+  }, [initialOpenId]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<Draft | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [linkingId, setLinkingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const confirm = useConfirm();
@@ -451,23 +596,26 @@ export function RequirementsPanel({
     }
   }
 
-  async function linkTask(requirement: RequirementRow, taskId: string) {
-    if (!taskId) return;
+  async function link(
+    requirement: RequirementRow,
+    targetType: "task" | "milestone" | "risk",
+    targetId: string,
+  ) {
+    if (!targetId) return;
     setBusyId(requirement.id);
     setError(null);
     try {
       const response = await fetch(`/api/requirements/${requirement.id}/links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetType: "task", targetId: taskId }),
+        body: JSON.stringify({ targetType, targetId }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not link that task.");
+        setError(data.error ?? `Could not link that ${targetType}.`);
         return;
       }
       upsert(data.requirement);
-      setLinkingId(null);
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -723,6 +871,36 @@ export function RequirementsPanel({
           </>
         }
       >
+        <div
+          role="group"
+          aria-label="Requirements view"
+          className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+        >
+          {(
+            [
+              ["register", "Register", ListChecks],
+              ["matrix", "Matrix", Grid3x3],
+            ] as const
+          ).map(([value, text, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={view === value}
+              onClick={() => setView(value)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+                FOCUS_RING,
+                view === value
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900",
+              )}
+            >
+              <Icon className="size-3.5" aria-hidden />
+              {text}
+            </button>
+          ))}
+        </div>
+        {view === "register" ? (
         <Button
           type="button"
           size="sm"
@@ -735,6 +913,7 @@ export function RequirementsPanel({
         >
           {expanded.size > 0 ? "Collapse all" : "Expand all"}
         </Button>
+        ) : null}
         <Button
           type="button"
           size="sm"
@@ -1140,6 +1319,22 @@ export function RequirementsPanel({
             ) : null}
           </div>
 
+          {view === "matrix" ? (
+            <TraceabilityMatrix
+              projectId={projectId}
+              requirements={visible}
+              onOpen={(id) => {
+                setView("register");
+                setExpanded((previous) => new Set(previous).add(id));
+                requestAnimationFrame(() =>
+                  document
+                    .getElementById(`requirement-${id}`)
+                    ?.scrollIntoView({ block: "center" }),
+                );
+              }}
+            />
+          ) : (
+          <>
           {/* Reviewing a whole extraction is the point of this page, so the
               batch path is first-class rather than 19 individual dropdowns. */}
           {selectedVisible.length > 0 ? (
@@ -1236,7 +1431,11 @@ export function RequirementsPanel({
                 const code = formatRequirementCode(requirement.sequence);
 
                 return (
-                  <li key={requirement.id}>
+                  <li
+                    key={requirement.id}
+                    id={`requirement-${requirement.id}`}
+                    className="scroll-mt-24"
+                  >
                     {/* Wraps below `sm`: at 375px the fixed-width badges left
                         roughly 60px for the title, truncating every row to
                         "Evalua…". The metadata drops to its own line instead. */}
@@ -1355,76 +1554,79 @@ export function RequirementsPanel({
                           </Field>
 
                           <Field name="Delivery">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {links.length === 0 ? (
-                                <span
-                                  className={cn(
-                                    isUncovered(requirement)
-                                      ? "text-red-700"
-                                      : "text-slate-400",
-                                  )}
-                                >
-                                  {isUncovered(requirement)
-                                    ? "No delivery task — this approved requirement is uncovered."
-                                    : "No linked task yet."}
-                                </span>
-                              ) : (
-                                links.map((link) => (
-                                  <span
-                                    key={link.id}
-                                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700"
-                                  >
-                                    {link.task?.title}
-                                    <button
-                                      type="button"
-                                      aria-label={`Unlink ${link.task?.title}`}
-                                      className="text-slate-400 hover:text-red-700"
-                                      disabled={busy}
-                                      onClick={() =>
-                                        void unlink(requirement, link.id)
-                                      }
-                                    >
-                                      ×
-                                    </button>
+                            <LinkEditor
+                              noun="task"
+                              code={code}
+                              busy={busy}
+                              links={links.map((link) => ({
+                                id: link.id,
+                                targetId: link.task?.id ?? "",
+                                label: link.task?.title ?? "",
+                                done: link.task?.status.category === "done",
+                              }))}
+                              options={taskOptions.map((task) => ({
+                                id: task.id,
+                                label: task.title,
+                              }))}
+                              empty={
+                                isUncovered(requirement) ? (
+                                  <span className="text-red-700">
+                                    No delivery task — this approved requirement
+                                    is uncovered.
                                   </span>
-                                ))
-                              )}
+                                ) : (
+                                  "No linked task yet."
+                                )
+                              }
+                              onLink={(targetId) =>
+                                link(requirement, "task", targetId)
+                              }
+                              onUnlink={(linkId) => unlink(requirement, linkId)}
+                            />
+                          </Field>
 
-                              {linkingId === requirement.id ? (
-                                <Select
-                                  aria-label={`Link a task to ${code}`}
-                                  className="h-7 py-0 text-xs"
-                                  defaultValue=""
-                                  disabled={busy}
-                                  onChange={(event) =>
-                                    void linkTask(requirement, event.target.value)
-                                  }
-                                >
-                                  <option value="">Select a task…</option>
-                                  {taskOptions
-                                    .filter(
-                                      (task) =>
-                                        !links.some(
-                                          (link) => link.task?.id === task.id,
-                                        ),
-                                    )
-                                    .map((task) => (
-                                      <option key={task.id} value={task.id}>
-                                        {task.title}
-                                      </option>
-                                    ))}
-                                </Select>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
-                                  disabled={busy || taskOptions.length === 0}
-                                  onClick={() => setLinkingId(requirement.id)}
-                                >
-                                  + Link task
-                                </button>
-                              )}
-                            </div>
+                          <Field name="Milestones">
+                            <LinkEditor
+                              noun="milestone"
+                              code={code}
+                              busy={busy}
+                              links={requirement.links
+                                .filter((item) => item.milestone)
+                                .map((item) => ({
+                                  id: item.id,
+                                  targetId: item.milestone!.id,
+                                  label: item.milestone!.title,
+                                  done: item.milestone!.status === "completed",
+                                }))}
+                              options={milestoneOptions}
+                              empty="None"
+                              onLink={(targetId) =>
+                                link(requirement, "milestone", targetId)
+                              }
+                              onUnlink={(linkId) => unlink(requirement, linkId)}
+                            />
+                          </Field>
+
+                          <Field name="Risks">
+                            <LinkEditor
+                              noun="risk"
+                              code={code}
+                              busy={busy}
+                              links={requirement.links
+                                .filter((item) => item.risk)
+                                .map((item) => ({
+                                  id: item.id,
+                                  targetId: item.risk!.id,
+                                  label: item.risk!.description,
+                                  done: false,
+                                }))}
+                              options={riskOptions}
+                              empty="None"
+                              onLink={(targetId) =>
+                                link(requirement, "risk", targetId)
+                              }
+                              onUnlink={(linkId) => unlink(requirement, linkId)}
+                            />
                           </Field>
 
                           {requirement.citations.length > 0 ? (
@@ -1502,6 +1704,8 @@ export function RequirementsPanel({
               })}
             </ul>
             </>
+          )}
+          </>
           )}
         </div>
       )}

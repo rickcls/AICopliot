@@ -72,8 +72,15 @@ export interface TaskCommentRow {
   author: { id: string; name: string | null; email: string } | null;
 }
 
+/** A requirement a task, milestone, or risk traces back to. */
+export interface TracedRequirementRow {
+  id: string;
+  requirement: { id: string; sequence: number; title: string; status: string };
+}
+
 export interface TaskRow {
   id: string;
+  projectId: string;
   title: string;
   description: string | null;
   statusId: string;
@@ -93,6 +100,7 @@ export interface TaskRow {
   dependencies: TaskDependencyRow[];
   citations: TaskCitationRow[];
   comments: TaskCommentRow[];
+  requirementLinks: TracedRequirementRow[];
 }
 
 export interface MemberOption {

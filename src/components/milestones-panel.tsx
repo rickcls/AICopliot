@@ -1,5 +1,6 @@
 "use client";
 
+import { type TracedRequirementRow } from "@/components/task-types";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import {
@@ -19,6 +20,7 @@ import {
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { cn, formatDay } from "@/lib/utils";
+import { TracedRequirements } from "@/components/traced-requirements";
 
 export type MilestoneStatus =
   | "not_started"
@@ -48,6 +50,7 @@ export interface MilestoneRow {
   status: MilestoneStatus;
   source: "manual" | "ai_suggested";
   citations: MilestoneCitationRow[];
+  requirementLinks: TracedRequirementRow[];
 }
 
 const STATUSES: Array<{ value: MilestoneStatus; label: string }> = [
@@ -421,6 +424,15 @@ export function MilestonesPanel({
                           <span className="text-slate-600">
                             {formatDay(milestone.completedAt)}
                           </span>
+                        </Field>
+                      ) : null}
+
+                      {milestone.requirementLinks.length > 0 ? (
+                        <Field name="Requirements">
+                          <TracedRequirements
+                            projectId={projectId}
+                            links={milestone.requirementLinks}
+                          />
                         </Field>
                       ) : null}
 

@@ -22,7 +22,11 @@ import {
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
-import type { MilestoneOption } from "@/components/task-types";
+import type {
+  MilestoneOption,
+  TracedRequirementRow,
+} from "@/components/task-types";
+import { TracedRequirements } from "@/components/traced-requirements";
 
 export type RiskLevel = "low" | "medium" | "high";
 export type RiskStatus = "open" | "monitoring" | "mitigated" | "accepted";
@@ -50,6 +54,7 @@ export interface RiskRow {
   status: RiskStatus;
   source: "manual" | "ai_suggested";
   citations: RiskCitationRow[];
+  requirementLinks: TracedRequirementRow[];
 }
 
 const LEVELS: RiskLevel[] = ["low", "medium", "high"];
@@ -600,6 +605,15 @@ export function RisksPanel({
                             <span className="text-slate-600">
                               {risk.milestone.title}
                             </span>
+                          </Field>
+                        ) : null}
+
+                        {risk.requirementLinks.length > 0 ? (
+                          <Field name="Requirements">
+                            <TracedRequirements
+                              projectId={projectId}
+                              links={risk.requirementLinks}
+                            />
                           </Field>
                         ) : null}
 

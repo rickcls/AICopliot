@@ -35,6 +35,7 @@ import {
   type TaskStatusOption,
 } from "@/components/task-types";
 import { cn } from "@/lib/utils";
+import { TracedRequirements } from "@/components/traced-requirements";
 
 /**
  * Slide-over for one task, and the place a task is edited.
@@ -458,6 +459,17 @@ export function TaskDetail({
 
           {/* Dependencies, citations, and comments are relationships rather than
               fields of this draft — each saves on its own. */}
+          <div>
+            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              Delivers
+            </h3>
+            <TracedRequirements
+              projectId={task.projectId}
+              links={task.requirementLinks}
+              empty="No requirement links this task. Link it from the Requirements tab."
+            />
+          </div>
+
           <div>
             <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
               Dependencies
