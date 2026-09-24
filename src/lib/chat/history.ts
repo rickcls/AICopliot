@@ -143,3 +143,37 @@ export async function loadConversation(
     }),
   };
 }
+
+/**
+ * Renames one of the caller's threads. `updateMany` with the full
+ * (id, workspace, user) triple rather than a lookup-then-update, so a thread id
+ * belonging to anyone else simply matches nothing — there is no window between
+ * the ownership check and the write. Returns whether a row was changed.
+ */
+export async function renameConversation(
+  workspaceId: string,
+  userId: string,
+  conversationId: string,
+  title: string,
+): Promise<boolean> {
+  const { count } = await prisma.chatConversation.updateMany({
+    where: { id: conversationId, workspaceId, userId },
+    data: { title },
+  });
+  return count > 0;
+}
+
+/**
+ * Deletes one of the caller's threads; its messages and their feedback cascade.
+ * Scoped by the same triple, for the same reason.
+ */
+export async function deleteConversation(
+  workspaceId: string,
+  userId: string,
+  conversationId: string,
+): Promise<boolean> {
+  const { count } = await prisma.chatConversation.deleteMany({
+    where: { id: conversationId, workspaceId, userId },
+  });
+  return count > 0;
+}

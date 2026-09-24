@@ -8,8 +8,9 @@ import { parseSseChunk } from "@/lib/chat/sse";
 import type { AnswerProgress } from "@/lib/rag/answer";
 import { citationSchema } from "@/lib/schemas";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
 import { Modal, ModalBody } from "@/components/modal";
-import { Button, EmptyState, ErrorState } from "@/components/ui";
+import { Button, EmptyState, ErrorState, LinkButton } from "@/components/ui";
 import { Composer } from "./composer";
 import { ThreadRail } from "./thread-rail";
 import { Transcript } from "./transcript";
@@ -54,6 +55,7 @@ export function ChatWorkspace({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const toast = useToast();
 
   // The page keys this component on the conversation id, so state starts from
   // the right thread on every navigation without an effect copying props.
@@ -212,6 +214,52 @@ export function ChatWorkspace({
     }
   }
 
+  async function renameThread(thread: ThreadSummary, title: string) {
+    try {
+      const response = await fetch(`/api/chat/conversations/${thread.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data.error ?? "Could not rename that thread.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      toast.error("Could not reach the server.");
+    }
+  }
+
+  async function deleteThread(thread: ThreadSummary) {
+    const confirmed = await confirm({
+      title: `Delete “${thread.title}”?`,
+      body: "Its questions, answers, and any feedback you gave on them are removed. This cannot be undone.",
+      confirmLabel: "Delete thread",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/chat/conversations/${thread.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data.error ?? "Could not delete that thread.");
+        return;
+      }
+      toast.success("Thread deleted");
+      setThreadsOpen(false);
+      // Leaving a deleted thread's URL, rather than refreshing it into a 404.
+      if (thread.id === conversationId) router.push("/chat");
+      else router.refresh();
+    } catch {
+      toast.error("Could not reach the server.");
+    }
+  }
+
   function appendAnswer(result: StreamResult) {
     // Citations cross the wire as JSON, so they are re-validated here for the
     // same reason a stored blob is: the renderer must never be handed a shape
@@ -235,19 +283,10 @@ export function ChatWorkspace({
     ]);
   }
 
-  if (!anyEvidenceAvailable && turns.length === 0) {
-    return (
-      <EmptyState
-        title="No supporting project evidence yet"
-        description="Index a document or add approved project records before asking questions."
-        action={
-          <Button onClick={() => router.push(projectId ? `/projects/${projectId}` : "/projects")}>
-            {projectId ? "Go to project" : "Go to projects"}
-          </Button>
-        }
-      />
-    );
-  }
+  // Without evidence there is nothing to ask against, but earlier threads are
+  // still worth reaching — so the rail and heading stay and only the composer
+  // gives way to the empty state.
+  const noEvidence = !anyEvidenceAvailable && turns.length === 0;
 
   return (
     <div className="flex gap-6">
@@ -255,6 +294,8 @@ export function ChatWorkspace({
         threads={threads}
         activeId={conversationId ?? null}
         nowIso={nowIso}
+        onRename={renameThread}
+        onDelete={deleteThread}
         className="sticky top-6 hidden max-h-[calc(100dvh-3rem)] w-60 shrink-0 overflow-y-auto lg:block"
       />
 
@@ -283,16 +324,22 @@ export function ChatWorkspace({
             </Button>
           </div>
 
-          {turns.length === 0 ? (
-            <div className="mb-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 px-6 py-10 text-center">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Ask a question to start
-              </h2>
-              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-                Every claim in an answer is cited back to the document passage or
-                live project record it came from. If nothing supports an answer,
-                you get a refusal rather than a guess.
-              </p>
+          {noEvidence ? (
+            <EmptyState
+              title="No supporting project evidence yet"
+              description="Index a document or add approved project records before asking questions."
+              action={
+                <LinkButton href={projectId ? `/projects/${projectId}` : "/projects"}>
+                  {projectId ? "Go to project" : "Go to projects"}
+                </LinkButton>
+              }
+            />
+          ) : turns.length === 0 ? (
+            <div className="mb-4">
+              <EmptyState
+                title="Ask a question to start"
+                description="Every claim in an answer is cited back to the document passage or live project record it came from. If nothing supports an answer, you get a refusal rather than a guess."
+              />
             </div>
           ) : (
             <Transcript
@@ -310,6 +357,7 @@ export function ChatWorkspace({
             </div>
           ) : null}
 
+          {noEvidence ? null : (
           <Composer
             value={question}
             projectId={projectId}
@@ -323,6 +371,7 @@ export function ChatWorkspace({
             // edge instead of letting text slide through the gutter beside it.
             className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-4 sm:-mx-6 sm:px-6"
           />
+          )}
         </div>
       </div>
 
@@ -338,6 +387,8 @@ export function ChatWorkspace({
               activeId={conversationId ?? null}
               nowIso={nowIso}
               onNavigate={() => setThreadsOpen(false)}
+              onRename={renameThread}
+              onDelete={deleteThread}
             />
           </ModalBody>
         </Modal>

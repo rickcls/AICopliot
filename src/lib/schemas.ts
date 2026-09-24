@@ -104,6 +104,10 @@ export const askQuestionSchema = z.object({
   projectId: z.string().min(1).nullable().optional(),
 });
 
+export const renameConversationSchema = z.object({
+  title: z.string().trim().min(1, "Give the thread a name").max(120),
+});
+
 export const createProjectSchema = z.object({
   name: z.string().trim().min(1, "Project name is required").max(120),
   description: z.string().trim().max(1000).optional(),
