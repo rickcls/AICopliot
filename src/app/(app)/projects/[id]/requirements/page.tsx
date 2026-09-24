@@ -8,6 +8,7 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getRequirementRuns } from "@/lib/generation/requirements-service";
 import { getScopedProject } from "@/lib/pm/project";
+import { parseRegisterFilter } from "@/lib/pm/filters";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { requirementSelect } from "@/lib/pm/select";
 
@@ -15,11 +16,14 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectRequirementsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ filter?: string | string[] }>;
 }) {
   const { workspaceId } = await requireWorkspace();
   const { id } = await params;
+  const { filter } = await searchParams;
 
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
@@ -71,6 +75,7 @@ export default async function ProjectRequirementsPage({
       readyDocuments={readyDocuments}
       taskOptions={tasks}
       activeRun={activeRun}
+      initialFilter={parseRegisterFilter(filter)}
     />
   );
 }

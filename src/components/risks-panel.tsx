@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesQuery, sortRisks, type RiskSort } from "@/lib/pm/filters";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import {
@@ -11,6 +12,8 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FilterChip,
+  SearchField,
   SectionHeader,
   Select,
   Spinner,
@@ -118,6 +121,9 @@ export function RisksPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<RiskStatus | "all">("all");
+  const [sort, setSort] = useState<RiskSort>("exposure");
+  const [query, setQuery] = useState("");
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -130,6 +136,16 @@ export function RisksPanel({
   }
 
   const openRisks = risks.filter((risk) => risk.status === "open").length;
+  // Exposure first by default: the list exists to find the risk to act on,
+  // and creation order says nothing about that.
+  const visibleRisks = sortRisks(
+    risks.filter(
+      (risk) =>
+        (statusFilter === "all" || risk.status === statusFilter) &&
+        matchesQuery(query, [risk.description, risk.mitigation]),
+    ),
+    sort,
+  );
 
   function upsert(risk: RiskRow) {
     setRisks((previous) =>
@@ -454,8 +470,56 @@ export function RisksPanel({
         />
       ) : (
         <Card className="overflow-hidden">
+          <div
+            role="search"
+            aria-label="Filter risks"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
+          >
+            <div className="flex flex-wrap items-center gap-1.5">
+              <FilterChip
+                pressed={statusFilter === "all"}
+                count={risks.length}
+                onClick={() => setStatusFilter("all")}
+              >
+                All
+              </FilterChip>
+              {STATUSES.map((status) => (
+                <FilterChip
+                  key={status.value}
+                  pressed={statusFilter === status.value}
+                  count={risks.filter((risk) => risk.status === status.value).length}
+                  onClick={() => setStatusFilter(status.value)}
+                >
+                  {status.label}
+                </FilterChip>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <SearchField
+                label="Search risks"
+                placeholder="Search risks"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="w-full sm:w-52"
+              />
+              <Select
+                aria-label="Sort risks"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as RiskSort)}
+                className="h-8 text-xs"
+              >
+                <option value="exposure">Highest exposure first</option>
+                <option value="recent">Newest first</option>
+              </Select>
+            </div>
+          </div>
+          {visibleRisks.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-slate-500">
+              No risks match this filter.
+            </p>
+          ) : null}
           <ul className="divide-y divide-slate-100">
-            {risks.map((risk) => {
+            {visibleRisks.map((risk) => {
               const open = expanded.has(risk.id);
               const busy = busyId === risk.id;
 

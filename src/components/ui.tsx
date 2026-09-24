@@ -141,6 +141,87 @@ export function Select({
 }
 
 /**
+ * A toggle chip in a filter bar. `aria-pressed` carries the state, so the
+ * inverted fill is never the only signal.
+ */
+export function FilterChip({
+  pressed,
+  count,
+  tone = "neutral",
+  className,
+  children,
+  ...props
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-pressed"> & {
+  pressed: boolean;
+  count?: number;
+  /** `danger` draws an unpressed chip in red while its count is non-zero. */
+  tone?: "neutral" | "danger";
+}) {
+  const alarming = tone === "danger" && (count ?? 0) > 0;
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      className={cn(
+        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
+        FOCUS_RING,
+        pressed
+          ? alarming
+            ? "border-red-700 bg-red-700 text-white"
+            : "border-slate-900 bg-slate-900 text-white"
+          : alarming
+            ? "border-red-200 bg-white text-red-700 hover:border-red-300"
+            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      {count !== undefined ? (
+        <span
+          className={cn(
+            "tabular-nums",
+            pressed ? "text-white/70" : "text-slate-400",
+          )}
+        >
+          {count}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+/** A search box with a leading glyph. The label is required, and read aloud. */
+export function SearchField({
+  label,
+  className,
+  ...props
+}: Omit<React.ComponentProps<"input">, "type"> & { label: string }) {
+  return (
+    <div className={cn("relative", className)}>
+      <svg
+        aria-hidden
+        viewBox="0 0 16 16"
+        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      >
+        <circle cx="7" cy="7" r="4.5" />
+        <path d="m10.5 10.5 3 3" />
+      </svg>
+      <Input
+        type="search"
+        aria-label={label}
+        className="h-8 pl-8 text-sm"
+        {...props}
+      />
+    </div>
+  );
+}
+
+/**
  * Metadata reads as quiet label/value rows rather than a grid of boxed inputs.
  *
  * Every control used to carry a permanent border and white fill, so a form with

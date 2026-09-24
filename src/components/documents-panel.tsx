@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesQuery } from "@/lib/pm/filters";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  SearchField,
   SectionHeader,
   Select,
   Spinner,
@@ -74,6 +76,7 @@ export function DocumentsPanel({
     fixedProject?.id ?? initialProjectFilter,
   );
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const confirm = useConfirm();
   const toast = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -191,6 +194,7 @@ export function DocumentsPanel({
   }
 
   const visibleDocuments = documents.filter((document) => {
+    if (!matchesQuery(query, [document.originalFilename])) return false;
     if (projectFilter === "all") return true;
     if (projectFilter === "unassigned") return document.projectId === null;
     return document.projectId === projectFilter;
@@ -285,6 +289,15 @@ export function DocumentsPanel({
             : `${documents.length} document${documents.length === 1 ? "" : "s"} across every project.`
         }
       >
+        {documents.length > 0 ? (
+          <SearchField
+            label="Search documents by filename"
+            placeholder="Search filenames"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="w-full sm:w-56"
+          />
+        ) : null}
         {!fixedProject ? (
           <div className="flex items-center gap-2">
             <label htmlFor="project-filter" className="text-xs text-slate-500">
@@ -325,10 +338,17 @@ export function DocumentsPanel({
           }
         />
       ) : visibleDocuments.length === 0 ? (
-        <EmptyState
-          title="No documents in this project"
-          description="Assign an existing document or upload a new one using the selected project."
-        />
+        query.trim() ? (
+          <EmptyState
+            title="No filenames match"
+            description={`Nothing here is named like “${query.trim()}”.`}
+          />
+        ) : (
+          <EmptyState
+            title="No documents in this project"
+            description="Assign an existing document or upload a new one using the selected project."
+          />
+        )
       ) : (
         <Card className="divide-y divide-slate-100">
           {visibleDocuments.map((doc) => (

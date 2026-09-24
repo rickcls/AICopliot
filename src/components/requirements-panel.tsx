@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  EMPTY_REQUIREMENT_FILTER,
+  type RegisterFilter,
+  type RequirementFilter,
+  requirementMatches,
+} from "@/lib/pm/filters";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -14,6 +20,7 @@ import {
   ErrorState,
   Field,
   Input,
+  SearchField,
   SectionHeader,
   Select,
   Spinner,
@@ -161,8 +168,7 @@ const PRIORITY_STYLE = {
   wont: "bg-slate-50 text-slate-400 line-through",
 } as const;
 
-/** "all" and "gaps" are views over the register, not stored states. */
-type RegisterFilter = "all" | "gaps" | RequirementStatus;
+
 
 interface Draft {
   title: string;
@@ -227,8 +233,10 @@ export function RequirementsPanel({
   readyDocuments,
   taskOptions,
   activeRun,
+  initialFilter = "all",
 }: {
   projectId: string;
+  initialFilter?: RegisterFilter;
   initialRequirements: RequirementRow[];
   readyDocuments: ReadyDocument[];
   taskOptions: TaskOption[];
@@ -236,7 +244,8 @@ export function RequirementsPanel({
 }) {
   const router = useRouter();
   const [requirements, setRequirements] = useState(initialRequirements);
-  const [filter, setFilter] = useState<RegisterFilter>("all");
+  const [filter, setFilter] = useState<RegisterFilter>(initialFilter);
+  const [refine, setRefine] = useState<RequirementFilter>(EMPTY_REQUIREMENT_FILTER);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -263,12 +272,21 @@ export function RequirementsPanel({
   const approvedCount = requirements.filter(
     (item) => item.status === "approved",
   ).length;
-  const visible =
+  // The status chips and the refine controls are separate axes: chips pick a
+  // lifecycle slice, refine narrows within it. Chip counts stay unrefined so
+  // they still describe the register rather than the current search.
+  const refineActive =
+    refine.query.trim() !== "" ||
+    refine.type !== null ||
+    refine.priority !== null ||
+    refine.confidence !== null;
+  const visible = (
     filter === "all"
       ? requirements
       : filter === "gaps"
         ? requirements.filter(isUncovered)
-        : requirements.filter((item) => item.status === filter);
+        : requirements.filter((item) => item.status === filter)
+  ).filter((item) => !refineActive || requirementMatches(item, refine));
   const visibleIds = visible.map((item) => item.id);
   const selectedVisible = visibleIds.filter((id) => selected.has(id));
   const allVisibleSelected =
@@ -1069,6 +1087,59 @@ export function RequirementsPanel({
             </button>
           </div>
 
+          <div
+            role="search"
+            aria-label="Search the requirement register"
+            className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2"
+          >
+            <SearchField
+              label="Search requirements"
+              placeholder="Search code, title, criteria, stakeholder"
+              value={refine.query}
+              onChange={(event) =>
+                setRefine((previous) => ({ ...previous, query: event.target.value }))
+              }
+              className="w-full sm:w-72"
+            />
+            {(
+              [
+                ["type", "Any type", TYPES],
+                ["priority", "Any priority", PRIORITIES],
+                ["confidence", "Any confidence", CONFIDENCES],
+              ] as const
+            ).map(([key, anyLabel, options]) => (
+              <Select
+                key={key}
+                aria-label={`Filter by ${key}`}
+                value={refine[key] ?? ""}
+                onChange={(event) =>
+                  setRefine((previous) => ({
+                    ...previous,
+                    [key]: event.target.value || null,
+                  }))
+                }
+                className="h-8 text-xs"
+              >
+                <option value="">{anyLabel}</option>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            ))}
+            {refineActive ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setRefine(EMPTY_REQUIREMENT_FILTER)}
+              >
+                Clear
+              </Button>
+            ) : null}
+          </div>
+
           {/* Reviewing a whole extraction is the point of this page, so the
               batch path is first-class rather than 19 individual dropdowns. */}
           {selectedVisible.length > 0 ? (
@@ -1120,9 +1191,11 @@ export function RequirementsPanel({
 
           {visible.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-500">
-              {filter === "gaps"
-                ? "Every approved requirement has at least one delivery task."
-                : `No ${label(filter)} requirements.`}
+              {refineActive
+                ? "No requirements match this search."
+                : filter === "gaps"
+                  ? "Every approved requirement has at least one delivery task."
+                  : `No ${label(filter)} requirements.`}
             </div>
           ) : (
             <>
@@ -1148,7 +1221,9 @@ export function RequirementsPanel({
                 {selectedVisible.length > 0
                   ? `${selectedVisible.length} of ${visible.length} selected`
                   : `${visible.length} shown${
-                      filter === "all" ? "" : ` of ${requirements.length}`
+                      filter === "all" && !refineActive
+                        ? ""
+                        : ` of ${requirements.length}`
                     }`}
               </span>
             </div>

@@ -8,6 +8,7 @@ import {
   getProjectMilestoneOptions,
   getScopedProject,
 } from "@/lib/pm/project";
+import { parseTaskQuickFilter } from "@/lib/pm/filters";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { taskSelect, taskStatusSelect } from "@/lib/pm/select";
 
@@ -18,11 +19,14 @@ export default async function ProjectTasksPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ task?: string | string[] }>;
+  searchParams: Promise<{
+    task?: string | string[];
+    filter?: string | string[];
+  }>;
 }) {
   const { workspaceId, user } = await requireWorkspace();
   const { id } = await params;
-  const { task: taskParam } = await searchParams;
+  const { task: taskParam, filter: filterParam } = await searchParams;
   const requestedTaskId = Array.isArray(taskParam) ? taskParam[0] : taskParam;
 
   const project = await getScopedProject(workspaceId, id);
@@ -65,6 +69,8 @@ export default async function ProjectTasksPage({
       milestones={milestones}
       currentUserId={user.id}
       initialOpenTaskId={requestedTaskId ?? null}
+      initialQuickFilter={parseTaskQuickFilter(filterParam)}
+      nowIso={new Date().toISOString()}
     />
   );
 }
