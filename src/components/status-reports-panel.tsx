@@ -18,6 +18,7 @@ import {
   type StatusReportItem,
 } from "@/lib/reports/status-report";
 import { formatDate } from "@/lib/utils";
+import { Download } from "lucide-react";
 
 interface ReportRun {
   id: string;
@@ -86,6 +87,18 @@ function ReportView({ run }: { run: ReportRun }) {
   if (!run.report) return null;
   const report = run.report;
 
+  function downloadMarkdown() {
+    const blob = new Blob([statusReportToMarkdown(report)], {
+      type: "text/markdown;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `status-report-${report.period.start}-to-${report.period.end}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function copyMarkdown() {
     try {
       await navigator.clipboard.writeText(statusReportToMarkdown(report));
@@ -129,9 +142,20 @@ function ReportView({ run }: { run: ReportRun }) {
             </div>
             <h2 className="mt-3 text-lg font-semibold">Executive summary</h2>
           </div>
-          <Button type="button" variant="secondary" size="sm" onClick={copyMarkdown}>
-            {copied ? "Copied" : "Copy as Markdown"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={copyMarkdown}>
+              <span aria-live="polite">{copied ? "Copied" : "Copy as Markdown"}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={downloadMarkdown}
+            >
+              <Download className="size-3.5" aria-hidden />
+              Download .md
+            </Button>
+          </div>
         </div>
         <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-pretty text-slate-700">
           {report.narrative}

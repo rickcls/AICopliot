@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import {
   Check,
   ChevronRight,
+  Download,
   FileText,
   Grid3x3,
   ListChecks,
@@ -21,6 +22,7 @@ import { TraceabilityMatrix } from "@/components/traceability-matrix";
 import {
   Badge,
   Button,
+  buttonClasses,
   Card,
   CHECKBOX,
   DescriptionList,
@@ -925,6 +927,33 @@ export function RequirementsPanel({
         >
           New requirement
         </Button>
+        {requirements.length > 0 ? (
+          // Plain anchors: the route answers with Content-Disposition, so the
+          // browser downloads without any client-side state.
+          <div className="flex items-center gap-1" role="group" aria-label="Export">
+            <Download className="size-3.5 text-slate-400" aria-hidden />
+            {(
+              [
+                ["csv", "CSV"],
+                ["md", "Markdown"],
+              ] as const
+            ).map(([format, text]) => (
+              <a
+                key={format}
+                href={`/api/projects/${projectId}/requirements/export?format=${format}`}
+                download
+                className={buttonClasses({
+                  variant: "ghost",
+                  size: "sm",
+                  className: "px-2",
+                })}
+                aria-label={`Export requirements as ${text}`}
+              >
+                {text}
+              </a>
+            ))}
+          </div>
+        ) : null}
       </SectionHeader>
 
       {draft ? (
