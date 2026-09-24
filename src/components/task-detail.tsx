@@ -9,6 +9,7 @@ import {
   ErrorState,
   Input,
   QUIET_CONTROL,
+  ROW_ICON,
   ROW_LABEL,
   Select,
   Spinner,
@@ -22,9 +23,7 @@ import {
 } from "@/components/task-form";
 import {
   PRIORITY_FLAG,
-  PRIORITY_SOFT,
   STATUS_DOT,
-  STATUS_SOFT,
   TASK_PRIORITIES,
   isTaskOverdue,
   statusColorToken,
@@ -227,19 +226,21 @@ export function TaskDetail({
 
           {/* A narrower label column than the create modal's: the panel is
               448px wide, and 6rem of label left the two date inputs wrapping
-              onto separate lines with the arrow orphaned between them. */}
-          <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5">
+              onto separate lines with the arrow orphaned between them. Same
+              icon gutter as the create form so the controls share one edge. */}
+          <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
             <label htmlFor="detail-status" className={ROW_LABEL}>
               Status
             </label>
             <div className="flex min-w-0 items-center gap-2">
-              <span
-                aria-hidden
-                className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[statusTone])}
-              />
+              <span aria-hidden className={ROW_ICON}>
+                <span
+                  className={cn("size-2 rounded-full", STATUS_DOT[statusTone])}
+                />
+              </span>
               <Select
                 id="detail-status"
-                className={cn(QUIET_CONTROL, "font-medium", STATUS_SOFT[statusTone])}
+                className={cn(QUIET_CONTROL, "font-medium")}
                 value={draft.statusId}
                 disabled={disabled}
                 onChange={(event) =>
@@ -261,10 +262,7 @@ export function TaskDetail({
               {assignee ? (
                 <Avatar name={assignee.name} email={assignee.email} />
               ) : (
-                <span
-                  aria-hidden
-                  className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-400"
-                >
+                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-slate-100")}>
                   <UserRound className="size-3.5" />
                 </span>
               )}
@@ -288,18 +286,15 @@ export function TaskDetail({
               Priority
             </label>
             <div className="flex min-w-0 items-center gap-2">
-              <Flag
-                aria-hidden
-                fill="currentColor"
-                className={cn("size-3.5 shrink-0", PRIORITY_FLAG[draft.priority])}
-              />
+              <span aria-hidden className={ROW_ICON}>
+                <Flag
+                  fill="currentColor"
+                  className={cn("size-3.5", PRIORITY_FLAG[draft.priority])}
+                />
+              </span>
               <Select
                 id="detail-priority"
-                className={cn(
-                  QUIET_CONTROL,
-                  "capitalize",
-                  PRIORITY_SOFT[draft.priority],
-                )}
+                className={cn(QUIET_CONTROL, "capitalize")}
                 value={draft.priority}
                 disabled={disabled}
                 onChange={(event) =>
@@ -317,7 +312,8 @@ export function TaskDetail({
             <label htmlFor="detail-milestone" className={ROW_LABEL}>
               Milestone
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <span aria-hidden className={ROW_ICON} />
               <Select
                 id="detail-milestone"
                 className={QUIET_CONTROL}
@@ -337,11 +333,12 @@ export function TaskDetail({
             <label htmlFor="detail-start" className={ROW_LABEL}>
               Dates
             </label>
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
+              <span aria-hidden className={ROW_ICON} />
               <Input
                 id="detail-start"
                 type="date"
-                className={cn(QUIET_CONTROL, "w-auto max-w-none px-2")}
+                className={cn(QUIET_CONTROL, "max-w-none px-2")}
                 value={draft.startDate}
                 disabled={disabled}
                 aria-label="Start date"
@@ -363,7 +360,7 @@ export function TaskDetail({
                 type="date"
                 className={cn(
                   QUIET_CONTROL,
-                  "w-auto max-w-none px-2",
+                  "max-w-none px-2",
                   isTaskOverdue(task) &&
                     "bg-red-50 text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
                 )}
@@ -389,6 +386,7 @@ export function TaskDetail({
               Estimate
             </label>
             <div className="flex items-center gap-1.5">
+              <span aria-hidden className={ROW_ICON} />
               <Input
                 id="detail-estimate"
                 type="number"
@@ -412,7 +410,8 @@ export function TaskDetail({
             </div>
 
             <span className={ROW_LABEL}>Origin</span>
-            <div>
+            <div className="flex items-center gap-2">
+              <span aria-hidden className={ROW_ICON} />
               <Badge tone={task.source === "manual" ? "neutral" : "info"}>
                 {task.source === "manual" ? "Manual" : "AI suggested"}
               </Badge>

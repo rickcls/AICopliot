@@ -4,6 +4,9 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { runIngestion } from "@/lib/ingest/pipeline";
 
+/** Hobby plan ceiling. A large PDF needs Pro’s longer limit; the UI already polls and retries. */
+export const maxDuration = 60;
+
 interface Params {
   params: Promise<{ id: string }>;
 }

@@ -2,20 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  CalendarClock,
   ChevronRight,
   Columns3,
-  Flag,
-  GitBranch,
-  GripVertical,
   LayoutGrid,
   List,
   Plus,
-  Timer,
   Trash2,
 } from "lucide-react";
 import {
-  Avatar,
   Button,
   EmptyState,
   ErrorState,
@@ -29,10 +23,10 @@ import { useToast } from "@/components/toast";
 import { TaskCard } from "@/components/task-card";
 import { TaskDetail } from "@/components/task-detail";
 import { TaskForm, type TaskDraft, emptyDraft } from "@/components/task-form";
+import { TaskListRow } from "@/components/task-list-row";
 import {
   STATUS_DOT,
   STATUS_PILL,
-  isTaskOverdue,
   statusColorToken,
   type MemberOption,
   type MilestoneOption,
@@ -40,7 +34,7 @@ import {
   type TaskStatusCategory,
   type TaskStatusOption,
 } from "@/components/task-types";
-import { cn, formatDay } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export type { TaskRow } from "@/components/task-types";
 
@@ -61,20 +55,6 @@ const BOARD_GRID: Record<number, string> = {
   7: "xl:grid-cols-7",
   8: "xl:grid-cols-8",
 };
-
-const PRIORITY_FLAG = {
-  low: "text-slate-300",
-  medium: "text-blue-500",
-  high: "text-amber-500",
-  urgent: "text-red-500",
-} as const;
-
-const PRIORITY_TEXT = {
-  low: "text-slate-400",
-  medium: "text-slate-600",
-  high: "text-amber-700",
-  urgent: "font-semibold text-red-700",
-} as const;
 
 const CATEGORY_LABEL: Record<TaskStatusCategory, string> = {
   open: "Open",
@@ -100,6 +80,7 @@ export function TaskBoard({
   members,
   milestones,
   currentUserId,
+  initialOpenTaskId = null,
 }: {
   projectId: string;
   initialTasks: TaskRow[];
@@ -107,16 +88,24 @@ export function TaskBoard({
   members: MemberOption[];
   milestones: MilestoneOption[];
   currentUserId: string;
+  initialOpenTaskId?: string | null;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [statuses, setStatuses] = useState(initialStatuses);
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  // A dashboard link arrives as ?task=. Ignore an id this project does not
+  // have so a stale link does not open an empty panel.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(() =>
+    initialOpenTaskId && initialTasks.some((task) => task.id === initialOpenTaskId)
+      ? initialOpenTaskId
+      : null,
+  );
   const [saving, setSaving] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
+  const [draggingIds, setDraggingIds] = useState<string[]>([]);
   const [dragOverStatusId, setDragOverStatusId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [view, setView] = useState<TaskView>("board");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
@@ -130,6 +119,8 @@ export function TaskBoard({
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const statusesMenuRef = useRef<HTMLDivElement>(null);
+  const lastSelectedIdRef = useRef<string | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -233,91 +224,166 @@ export function TaskBoard({
   }
 
   async function changeStatus(task: TaskRow, statusId: string) {
-    if (task.statusId === statusId) return;
+    await moveTasks([task.id], statusId);
+  }
+
+  async function moveTasks(taskIds: string[], statusId: string) {
     const nextStatus = statuses.find((status) => status.id === statusId);
     if (!nextStatus) return;
-    const previous = task;
+
+    const movers = tasks.filter(
+      (task) => taskIds.includes(task.id) && task.statusId !== statusId,
+    );
+    if (movers.length === 0) return;
+
+    const previousById = new Map(movers.map((task) => [task.id, task]));
+    const moverIds = new Set(movers.map((task) => task.id));
 
     setTasks((current) =>
       current.map((item) =>
-        item.id === task.id
+        moverIds.has(item.id)
           ? { ...item, statusId, status: nextStatus }
           : item,
       ),
     );
-    setBusyId(task.id);
+    setBusyIds(moverIds);
     setError(null);
 
-    try {
-      const response = await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statusId }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setTasks((current) =>
-          current.map((item) => (item.id === task.id ? previous : item)),
-        );
-        setError(data.error ?? "Could not move that task.");
-        return;
-      }
-      upsert(data.task);
-    } catch {
+    const failures: string[] = [];
+    const succeeded: TaskRow[] = [];
+    await Promise.all(
+      movers.map(async (task) => {
+        try {
+          const response = await fetch(`/api/tasks/${task.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ statusId }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.task) {
+            failures.push(task.id);
+            return;
+          }
+          succeeded.push(data.task);
+        } catch {
+          failures.push(task.id);
+        }
+      }),
+    );
+
+    if (succeeded.length > 0) {
+      const byId = new Map(succeeded.map((task) => [task.id, task]));
       setTasks((current) =>
-        current.map((item) => (item.id === task.id ? previous : item)),
+        current.map((item) => byId.get(item.id) ?? item),
       );
-      setError("Could not reach the server.");
-    } finally {
-      setBusyId(null);
     }
+
+    if (failures.length > 0) {
+      setTasks((current) =>
+        current.map((item) =>
+          failures.includes(item.id)
+            ? (previousById.get(item.id) ?? item)
+            : item,
+        ),
+      );
+      setError(
+        failures.length === movers.length
+          ? "Could not move the selected tasks."
+          : `Could not move ${failures.length} of ${movers.length} tasks.`,
+      );
+    }
+
+    setBusyIds(new Set());
   }
 
   async function deleteTask(task: TaskRow) {
+    await deleteTasks([task.id]);
+  }
+
+  async function deleteTasks(taskIds: string[]) {
+    const targets = tasks.filter((task) => taskIds.includes(task.id));
+    if (targets.length === 0) return;
+
     const blocks = tasks.filter((item) =>
-      item.dependencies.some((d) => d.dependsOnTaskId === task.id),
+      item.dependencies.some((d) => taskIds.includes(d.dependsOnTaskId)),
     ).length;
+
     const confirmed = await confirm({
-      title: `Delete “${task.title}”?`,
+      title:
+        targets.length === 1
+          ? `Delete “${targets[0].title}”?`
+          : `Delete ${targets.length} tasks?`,
       body: blocks ? (
         <p>
           <span className="font-medium text-red-700">
             {blocks} task{blocks === 1 ? "" : "s"}
           </span>{" "}
-          depend on it and will lose that dependency.
+          depend on {targets.length === 1 ? "it" : "a selected task"} and will
+          lose that dependency.
         </p>
       ) : undefined,
-      confirmLabel: "Delete task",
+      confirmLabel: targets.length === 1 ? "Delete task" : "Delete tasks",
       tone: "danger",
     });
     if (!confirmed) return;
 
-    setBusyId(task.id);
+    const targetIds = new Set(targets.map((task) => task.id));
+    setBusyIds(targetIds);
     setError(null);
-    try {
-      const response = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setError(data.error ?? "Could not delete the task.");
-        return;
-      }
+
+    const deleted: string[] = [];
+    const failures: string[] = [];
+    await Promise.all(
+      targets.map(async (task) => {
+        try {
+          const response = await fetch(`/api/tasks/${task.id}`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            failures.push(task.id);
+            return;
+          }
+          deleted.push(task.id);
+        } catch {
+          failures.push(task.id);
+        }
+      }),
+    );
+
+    if (deleted.length > 0) {
+      const deletedSet = new Set(deleted);
       setTasks((previous) =>
         previous
-          .filter((item) => item.id !== task.id)
+          .filter((item) => !deletedSet.has(item.id))
           .map((item) => ({
             ...item,
             dependencies: item.dependencies.filter(
-              (d) => d.dependsOnTaskId !== task.id,
+              (d) => !deletedSet.has(d.dependsOnTaskId),
             ),
           })),
       );
-      setOpenTaskId(null);
-      toast.success(`Deleted “${task.title}”`);
-    } catch {
-      setError("Could not reach the server.");
-    } finally {
-      setBusyId(null);
+      setSelectedIds((previous) => {
+        const next = new Set(previous);
+        for (const id of deleted) next.delete(id);
+        return next;
+      });
+      if (openTaskId && deletedSet.has(openTaskId)) setOpenTaskId(null);
+      toast.success(
+        deleted.length === 1
+          ? `Deleted “${targets.find((task) => task.id === deleted[0])?.title}”`
+          : `Deleted ${deleted.length} tasks`,
+      );
     }
+
+    if (failures.length > 0) {
+      setError(
+        failures.length === targets.length
+          ? "Could not delete the selected tasks."
+          : `Could not delete ${failures.length} of ${targets.length} tasks.`,
+      );
+    }
+
+    setBusyIds(new Set());
   }
 
   async function createStatus() {
@@ -397,10 +463,13 @@ export function TaskBoard({
 
   function handleDrop(statusId: string, transferred: string) {
     setDragOverStatusId(null);
-    const id = transferred || draggingId;
-    const task = tasks.find((item) => item.id === id);
-    setDraggingId(null);
-    if (task) void changeStatus(task, statusId);
+    const fromTransfer = transferred
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const ids = fromTransfer.length > 0 ? fromTransfer : draggingIds;
+    setDraggingIds([]);
+    if (ids.length > 0) void moveTasks(ids, statusId);
   }
 
   function groupDropHandlers(statusId: string) {
@@ -422,6 +491,59 @@ export function TaskBoard({
     };
   }
 
+  const visibleTaskIds = taskGroups.flatMap((group) =>
+    group.tasks.map((task) => task.id),
+  );
+  const allVisibleSelected =
+    visibleTaskIds.length > 0 &&
+    visibleTaskIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleTaskIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    selectAllRef.current.indeterminate =
+      someVisibleSelected && !allVisibleSelected;
+  }, [someVisibleSelected, allVisibleSelected]);
+
+  function toggleSelect(taskId: string, shiftKey: boolean) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (shiftKey && lastSelectedIdRef.current) {
+        const start = visibleTaskIds.indexOf(lastSelectedIdRef.current);
+        const end = visibleTaskIds.indexOf(taskId);
+        if (start >= 0 && end >= 0) {
+          const [from, to] = start < end ? [start, end] : [end, start];
+          for (let index = from; index <= to; index += 1) {
+            next.add(visibleTaskIds[index]);
+          }
+          return next;
+        }
+      }
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+    lastSelectedIdRef.current = taskId;
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((previous) => {
+      if (allVisibleSelected) {
+        const next = new Set(previous);
+        for (const id of visibleTaskIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(previous);
+      for (const id of visibleTaskIds) next.add(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    lastSelectedIdRef.current = null;
+  }
+
   function openCreate(statusId: string = defaultStatusId) {
     if (!statusId) return;
     setEditingId(null);
@@ -437,58 +559,73 @@ export function TaskBoard({
             {tasks.length} task{tasks.length === 1 ? "" : "s"}
             {view === "board"
               ? " · drag a card between columns to change its status"
-              : " · drag a row between groups to change its status"}
+              : " · double-click a value to edit · open icon for details"}
           </>
         }
       >
         <div className="flex items-center gap-2">
-          <div
-            className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
-            aria-label="Task view"
-            role="group"
-          >
-            <button
-              type="button"
-              aria-pressed={view === "board"}
-              onClick={() => setView("board")}
-              className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                view === "board"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900",
-              )}
-            >
-              <LayoutGrid className="size-3.5" aria-hidden />
-              Board
-            </button>
-            <button
-              type="button"
-              aria-pressed={view === "list"}
-              onClick={() => setView("list")}
-              className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                view === "list"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900",
-              )}
-            >
-              <List className="size-3.5" aria-hidden />
-              List
-            </button>
-          </div>
-
+          {/* One segmented control for view + status columns. Statuses used to
+              be a separate bordered Button beside List, which read as a second
+              view toggle competing with Board/List rather than a column
+              manager for the same statuses the board already shows. */}
           <div ref={statusesMenuRef} className="relative">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              aria-expanded={statusesOpen}
-              aria-haspopup="dialog"
-              onClick={() => setStatusesOpen((open) => !open)}
+            <div
+              className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+              aria-label="Task view"
+              role="group"
             >
-              <Columns3 className="size-3.5" aria-hidden />
-              Statuses
-            </Button>
+              <button
+                type="button"
+                aria-pressed={view === "board"}
+                onClick={() => {
+                  setView("board");
+                  setStatusesOpen(false);
+                  clearSelection();
+                }}
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+                  view === "board" && !statusesOpen
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900",
+                )}
+              >
+                <LayoutGrid className="size-3.5" aria-hidden />
+                Board
+              </button>
+              <button
+                type="button"
+                aria-pressed={view === "list"}
+                onClick={() => {
+                  setView("list");
+                  setStatusesOpen(false);
+                }}
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+                  view === "list" && !statusesOpen
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900",
+                )}
+              >
+                <List className="size-3.5" aria-hidden />
+                List
+              </button>
+              <button
+                type="button"
+                aria-expanded={statusesOpen}
+                aria-haspopup="dialog"
+                aria-pressed={statusesOpen}
+                onClick={() => setStatusesOpen((open) => !open)}
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+                  statusesOpen
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900",
+                )}
+              >
+                <Columns3 className="size-3.5" aria-hidden />
+                Statuses
+              </button>
+            </div>
             {statusesOpen ? (
               <div
                 role="dialog"
@@ -648,12 +785,12 @@ export function TaskBoard({
                     <TaskCard
                       key={task.id}
                       task={task}
-                      dragging={draggingId === task.id}
-                      busy={busyId === task.id}
+                      dragging={draggingIds.includes(task.id)}
+                      busy={busyIds.has(task.id)}
                       onOpen={() => setOpenTaskId(task.id)}
-                      onDragStart={() => setDraggingId(task.id)}
+                      onDragStart={() => setDraggingIds([task.id])}
                       onDragEnd={() => {
-                        setDraggingId(null);
+                        setDraggingIds([]);
                         setDragOverStatusId(null);
                       }}
                     />
@@ -738,6 +875,52 @@ export function TaskBoard({
             })}
           </div>
 
+          {selectedIds.size > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-100 px-3 py-2">
+              <span className="text-xs font-medium text-slate-700">
+                {selectedIds.size} selected
+              </span>
+              <Select
+                aria-label="Move selected tasks to status"
+                className="h-8 text-xs"
+                defaultValue=""
+                disabled={busyIds.size > 0}
+                onChange={(event) => {
+                  const statusId = event.target.value;
+                  event.target.value = "";
+                  if (!statusId) return;
+                  void moveTasks([...selectedIds], statusId);
+                }}
+              >
+                <option value="" disabled>
+                  Move to…
+                </option>
+                {statuses.map((status) => (
+                  <option key={status.id} value={status.id}>
+                    {status.label}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                type="button"
+                size="sm"
+                variant="danger"
+                disabled={busyIds.size > 0}
+                onClick={() => void deleteTasks([...selectedIds])}
+              >
+                Delete
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={clearSelection}
+              >
+                Clear
+              </Button>
+            </div>
+          ) : null}
+
           {taskGroups.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="text-sm font-medium text-slate-900">No statuses yet</p>
@@ -747,10 +930,21 @@ export function TaskBoard({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] table-fixed border-collapse text-left text-sm">
+              <table className="w-full min-w-[800px] table-fixed border-collapse text-left text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
                   <tr>
-                    <th scope="col" className="w-8 px-2 py-2.5">
+                    <th scope="col" className="w-10 px-2 py-2.5">
+                      <span className="sr-only">Select</span>
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAll}
+                        aria-label="Select all visible tasks"
+                        className="size-3.5 rounded border-slate-300 text-slate-900 focus-visible:ring-slate-900"
+                      />
+                    </th>
+                    <th scope="col" className="w-8 px-1 py-2.5">
                       <span className="sr-only">Drag</span>
                     </th>
                     <th scope="col" className="px-2 py-2.5 font-medium">
@@ -792,7 +986,7 @@ export function TaskBoard({
                       <tr className="bg-slate-50/70">
                         <th
                           scope="colgroup"
-                          colSpan={6}
+                          colSpan={7}
                           className="px-2.5 py-1.5 text-left font-normal"
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -841,180 +1035,46 @@ export function TaskBoard({
 
                       {collapsed
                         ? null
-                        : group.tasks.map((task) => {
-                            const overdue = isTaskOverdue(task);
-                            const dragging = draggingId === task.id;
-                            const rowTone = statusColorToken(task.status);
-
-                            return (
-                              <tr
-                                key={task.id}
-                                tabIndex={busyId === task.id ? -1 : 0}
-                                aria-label={`Open ${task.title} details`}
-                                title="Open task details"
-                                onClick={() => setOpenTaskId(task.id)}
-                                onKeyDown={(event) => {
-                                  if (
-                                    event.key === "Enter" ||
-                                    event.key === " "
-                                  ) {
-                                    event.preventDefault();
-                                    setOpenTaskId(task.id);
-                                  }
-                                }}
-                                className={cn(
-                                  "group cursor-pointer transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-400",
-                                  busyId === task.id &&
-                                    "pointer-events-none opacity-60",
-                                  dragging && "opacity-40",
-                                )}
-                              >
-                                <td className="px-1 py-2.5">
-                                  <button
-                                    type="button"
-                                    draggable={busyId !== task.id}
-                                    aria-label={`Drag ${task.title} to another status`}
-                                    title="Drag to another status"
-                                    onClick={(event) => event.stopPropagation()}
-                                    onDragStart={(event) => {
-                                      event.stopPropagation();
-                                      event.dataTransfer.effectAllowed = "move";
-                                      event.dataTransfer.setData(
-                                        "text/plain",
-                                        task.id,
-                                      );
-                                      setDraggingId(task.id);
-                                    }}
-                                    onDragEnd={() => {
-                                      setDraggingId(null);
-                                      setDragOverStatusId(null);
-                                    }}
-                                    className={cn(
-                                      "inline-flex size-7 cursor-grab items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500 active:cursor-grabbing",
-                                      FOCUS_RING,
-                                    )}
-                                  >
-                                    <GripVertical
-                                      className="size-3.5"
-                                      aria-hidden
-                                    />
-                                  </button>
-                                </td>
-                                <th
-                                  scope="row"
-                                  className="px-2 py-2.5 text-left font-normal"
-                                >
-                                  <span className="flex items-center gap-2.5">
-                                    <span
-                                      aria-hidden
-                                      className={cn(
-                                        "size-2 shrink-0 rounded-full",
-                                        STATUS_DOT[rowTone],
-                                      )}
-                                    />
-                                    <span className="min-w-0 flex-1">
-                                      <span
-                                        title={task.title}
-                                        className="block truncate font-medium text-slate-900 group-hover:underline"
-                                      >
-                                        {task.title}
-                                      </span>
-                                      {task.description ? (
-                                        <span className="mt-0.5 block truncate text-xs text-slate-500">
-                                          {task.description}
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    {task.dependencies.length > 0 ? (
-                                      <span
-                                        title={`Depends on ${task.dependencies.length} task(s)`}
-                                        className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 tabular-nums"
-                                      >
-                                        <GitBranch
-                                          className="size-3"
-                                          aria-hidden
-                                        />
-                                        {task.dependencies.length}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                </th>
-                                <td className="px-3 py-2.5">
-                                  {task.assignee ? (
-                                    <span className="flex items-center gap-2">
-                                      <Avatar
-                                        name={task.assignee.name}
-                                        email={task.assignee.email}
-                                        className="size-5"
-                                      />
-                                      <span className="min-w-0 truncate text-xs text-slate-600">
-                                        {task.assignee.name ??
-                                          task.assignee.email}
-                                      </span>
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-slate-400">
-                                      Unassigned
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2.5">
-                                  <span
-                                    className={cn(
-                                      "inline-flex items-center gap-1.5 text-xs capitalize",
-                                      PRIORITY_TEXT[task.priority],
-                                    )}
-                                  >
-                                    <Flag
-                                      aria-hidden
-                                      fill="currentColor"
-                                      className={cn(
-                                        "size-3.5 shrink-0",
-                                        PRIORITY_FLAG[task.priority],
-                                      )}
-                                    />
-                                    {task.priority}
-                                  </span>
-                                </td>
-                                <td
-                                  className={cn(
-                                    "px-3 py-2.5 text-xs whitespace-nowrap",
-                                    overdue
-                                      ? "font-medium text-red-700"
-                                      : "text-slate-600",
-                                  )}
-                                >
-                                  {task.dueDate ? (
-                                    <span className="inline-flex items-center gap-1.5">
-                                      <CalendarClock
-                                        className="size-3.5 shrink-0"
-                                        aria-hidden
-                                      />
-                                      {formatDay(task.dueDate)}
-                                      {overdue ? " · overdue" : ""}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-300">—</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2.5 text-right text-xs whitespace-nowrap text-slate-600 tabular-nums">
-                                  {task.estimatedHours === null ? (
-                                    <span className="text-slate-300">—</span>
-                                  ) : (
-                                    <span className="inline-flex items-center justify-end gap-1.5">
-                                      <Timer className="size-3.5" aria-hidden />
-                                      {task.estimatedHours}h
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
+                        : group.tasks.map((task) => (
+                            <TaskListRow
+                              key={task.id}
+                              task={task}
+                              members={members}
+                              selected={selectedIds.has(task.id)}
+                              selectedCount={selectedIds.size}
+                              dragging={draggingIds.includes(task.id)}
+                              busy={busyIds.has(task.id)}
+                              onToggleSelect={(shiftKey) =>
+                                toggleSelect(task.id, shiftKey)
+                              }
+                              onOpen={() => setOpenTaskId(task.id)}
+                              onTaskChange={upsert}
+                              onError={setError}
+                              onDragStart={(event) => {
+                                event.stopPropagation();
+                                const ids =
+                                  selectedIds.has(task.id) &&
+                                  selectedIds.size > 1
+                                    ? [...selectedIds]
+                                    : [task.id];
+                                event.dataTransfer.effectAllowed = "move";
+                                event.dataTransfer.setData(
+                                  "text/plain",
+                                  ids.join(","),
+                                );
+                                setDraggingIds(ids);
+                              }}
+                              onDragEnd={() => {
+                                setDraggingIds([]);
+                                setDragOverStatusId(null);
+                              }}
+                            />
+                          ))}
 
                       {!collapsed && group.tasks.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="px-4 py-6 text-center text-xs text-slate-400"
                           >
                             Drop a task here, or add one.
@@ -1056,7 +1116,7 @@ export function TaskBoard({
           members={members}
           milestones={milestones}
           currentUserId={currentUserId}
-          busy={busyId === openTask.id}
+          busy={busyIds.has(openTask.id)}
           onClose={() => setOpenTaskId(null)}
           onExpand={(nextDraft) => {
             setEditingId(openTask.id);

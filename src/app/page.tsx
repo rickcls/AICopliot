@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth-guard";
 
 const FEATURES = [
@@ -22,6 +23,7 @@ const FEATURES = [
 
 export default async function LandingPage() {
   const user = await getSessionUser();
+  if (user) redirect("/dashboard");
 
   return (
     <main className="flex-1">
@@ -30,21 +32,12 @@ export default async function LandingPage() {
           ScopePilot
         </span>
         <nav className="flex items-center gap-3 text-sm">
-          {user ? (
-            <Link
-              href="/dashboard"
-              className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700"
-            >
-              Open workspace
-            </Link>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700"
-            >
-              Sign in
-            </Link>
-          )}
+          <Link
+            href="/login"
+            className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700"
+          >
+            Sign in
+          </Link>
         </nav>
       </header>
 
@@ -62,13 +55,13 @@ export default async function LandingPage() {
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
-            href={user ? "/dashboard" : "/login"}
+            href="/login"
             className="w-full rounded-lg bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-700 sm:w-auto"
           >
-            {user ? "Go to dashboard" : "Get started"}
+            Get started
           </Link>
           <Link
-            href={user ? "/chat" : "/login"}
+            href="/login"
             className="w-full rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-medium hover:bg-slate-50 sm:w-auto"
           >
             Try the assistant

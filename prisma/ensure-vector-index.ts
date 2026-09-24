@@ -34,7 +34,10 @@ const ENSURE_SQL = `
 `;
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL;
+  // Same host as prisma.config.ts: the direct connection when DIRECT_URL is
+  // set, so CREATE INDEX does not run through Neon’s pooler.
+  const connectionString =
+    process.env.DIRECT_URL?.trim() || process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set. Copy .env.example to .env.");
   }

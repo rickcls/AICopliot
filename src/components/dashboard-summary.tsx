@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { getDashboardSummary } from "@/lib/pm/summary";
+import {
+  getDashboardSummary,
+  type DashboardTaskRef,
+} from "@/lib/pm/summary";
 import { formatDay } from "@/lib/utils";
 
 /**
@@ -41,6 +44,54 @@ function StatCard({
   );
 }
 
+function WorkList({
+  title,
+  tasks,
+  dateTone,
+}: {
+  title: string;
+  tasks: DashboardTaskRef[];
+  dateTone?: "danger";
+}) {
+  if (tasks.length === 0) return null;
+
+  return (
+    <Card className="p-5">
+      <h2 className="text-sm font-semibold">{title}</h2>
+      <ul className="mt-3 space-y-2">
+        {tasks.map((task) => (
+          <li
+            key={task.id}
+            className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+          >
+            <Link
+              href={`/projects/${task.project.id}/tasks?task=${task.id}`}
+              className="min-w-0 truncate hover:underline"
+            >
+              {task.title}
+            </Link>
+            <span className="shrink-0 text-xs text-slate-500">
+              {task.project.name}
+              {task.dueDate ? (
+                <>
+                  {" · "}
+                  <span
+                    className={
+                      dateTone === "danger" ? "text-red-700" : undefined
+                    }
+                  >
+                    {formatDay(task.dueDate)}
+                  </span>
+                </>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export async function DashboardSummary({ workspaceId }: { workspaceId: string }) {
   const summary = await getDashboardSummary(workspaceId);
 
@@ -74,61 +125,45 @@ export async function DashboardSummary({ workspaceId }: { workspaceId: string })
       </div>
 
       {summary.overdueTaskList.length > 0 ||
-      summary.upcomingMilestoneList.length > 0 ? (
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          {summary.overdueTaskList.length > 0 ? (
-            <Card className="p-5">
-              <h2 className="text-sm font-semibold">Overdue right now</h2>
-              <ul className="mt-3 space-y-2">
-                {summary.overdueTaskList.map((task) => (
-                  <li
-                    key={task.id}
-                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
-                  >
-                    <Link
-                      href={`/projects/${task.project.id}/tasks`}
-                      className="min-w-0 truncate hover:underline"
-                    >
-                      {task.title}
-                    </Link>
-                    <span className="shrink-0 text-xs text-slate-500">
-                      {task.project.name} ·{" "}
-                      <span className="text-red-700">
-                        {task.dueDate ? formatDay(task.dueDate) : ""}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
+      summary.dueSoonTaskList.length > 0 ||
+      summary.blockedTaskList.length > 0 ? (
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <WorkList
+            title="Overdue right now"
+            tasks={summary.overdueTaskList}
+            dateTone="danger"
+          />
+          <WorkList title="Due in 7 days" tasks={summary.dueSoonTaskList} />
+          <WorkList title="Blocked" tasks={summary.blockedTaskList} />
+        </div>
+      ) : null}
 
-          {summary.upcomingMilestoneList.length > 0 ? (
-            <Card className="p-5">
-              <h2 className="text-sm font-semibold">Next milestones</h2>
-              <ul className="mt-3 space-y-2">
-                {summary.upcomingMilestoneList.map((milestone) => (
-                  <li
-                    key={milestone.id}
-                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+      {summary.upcomingMilestoneList.length > 0 ? (
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <Card className="p-5">
+            <h2 className="text-sm font-semibold">Next milestones</h2>
+            <ul className="mt-3 space-y-2">
+              {summary.upcomingMilestoneList.map((milestone) => (
+                <li
+                  key={milestone.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                >
+                  <Link
+                    href={`/projects/${milestone.project.id}/timeline`}
+                    className="min-w-0 truncate hover:underline"
                   >
-                    <Link
-                      href={`/projects/${milestone.project.id}/timeline`}
-                      className="min-w-0 truncate hover:underline"
-                    >
-                      {milestone.title}
-                    </Link>
-                    <span className="shrink-0 text-xs text-slate-500">
-                      {milestone.project.name} ·{" "}
-                      {milestone.targetDate
-                        ? formatDay(milestone.targetDate)
-                        : "No date"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
+                    {milestone.title}
+                  </Link>
+                  <span className="shrink-0 text-xs text-slate-500">
+                    {milestone.project.name} ·{" "}
+                    {milestone.targetDate
+                      ? formatDay(milestone.targetDate)
+                      : "No date"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
         </div>
       ) : null}
     </section>

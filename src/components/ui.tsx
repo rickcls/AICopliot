@@ -52,7 +52,7 @@ export function Button({
 export function Input({
   className,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+}: React.ComponentProps<"input">) {
   return (
     <input
       className={cn(
@@ -89,7 +89,7 @@ export function Textarea({
 export function Select({
   className,
   ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+}: React.ComponentProps<"select">) {
   return (
     <select
       className={cn(
@@ -118,7 +118,16 @@ export function Select({
  * unrelated form component is the same drift `SectionHeader` was extracted to fix.
  */
 export const QUIET_CONTROL =
-  "w-full max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
+  // `w-auto`, not `w-full`: empty space belongs *beside* a short value, not
+  // between the text and the chevron inside the control. Stretching every
+  // select to `max-w-sm` made Assignee look like a wide empty bar while
+  // Status/Priority (coloured) hug their labels — the jagged edge that made
+  // the task form look broken.
+  "w-auto max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
+
+/** Fixed gutter for the leading icon on a quiet metadata row. */
+export const ROW_ICON =
+  "grid size-6 shrink-0 place-items-center text-slate-400";
 
 export const ROW_LABEL = "text-xs font-medium text-slate-500";
 

@@ -4,14 +4,12 @@ import {
   activeProjectWhere,
   baselinedRequirementWhere,
   blockedTaskWhere,
+  dueSoonTaskWhere,
   overdueTaskWhere,
   uncoveredRequirementWhere,
   unvalidatedRequirementWhere,
   upcomingMilestoneWhere,
-  startOfUtcDay,
-  DUE_SOON_DAYS,
   OPEN_REQUIREMENT_STATUSES,
-  OPEN_TASK_CATEGORIES,
   DONE_TASK_CATEGORY,
   officialRecordWhere,
 } from "./rules";
@@ -26,17 +24,28 @@ import {
 
 const LIST_LIMIT = 5;
 
+export interface DashboardTaskRef {
+  id: string;
+  title: string;
+  dueDate: Date | null;
+  project: { id: string; name: string };
+}
+
+const dashboardTaskSelect = {
+  id: true,
+  title: true,
+  dueDate: true,
+  project: { select: { id: true, name: true } },
+} as const;
+
 export interface DashboardSummary {
   activeProjects: number;
   overdueTasks: number;
   blockedTasks: number;
   upcomingMilestones: number;
-  overdueTaskList: Array<{
-    id: string;
-    title: string;
-    dueDate: Date | null;
-    project: { id: string; name: string };
-  }>;
+  overdueTaskList: DashboardTaskRef[];
+  dueSoonTaskList: DashboardTaskRef[];
+  blockedTaskList: DashboardTaskRef[];
   upcomingMilestoneList: Array<{
     id: string;
     title: string;
@@ -55,6 +64,8 @@ export async function getDashboardSummary(
     blockedTasks,
     upcomingMilestones,
     overdueTaskList,
+    dueSoonTaskList,
+    blockedTaskList,
     upcomingMilestoneList,
   ] = await Promise.all([
     prisma.project.count({ where: activeProjectWhere(workspaceId) }),
@@ -65,12 +76,19 @@ export async function getDashboardSummary(
       where: overdueTaskWhere(workspaceId, now),
       orderBy: { dueDate: "asc" },
       take: LIST_LIMIT,
-      select: {
-        id: true,
-        title: true,
-        dueDate: true,
-        project: { select: { id: true, name: true } },
-      },
+      select: dashboardTaskSelect,
+    }),
+    prisma.task.findMany({
+      where: dueSoonTaskWhere(workspaceId, now),
+      orderBy: { dueDate: "asc" },
+      take: LIST_LIMIT,
+      select: dashboardTaskSelect,
+    }),
+    prisma.task.findMany({
+      where: blockedTaskWhere(workspaceId),
+      orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
+      take: LIST_LIMIT,
+      select: dashboardTaskSelect,
     }),
     prisma.milestone.findMany({
       where: upcomingMilestoneWhere(workspaceId, now),
@@ -91,6 +109,8 @@ export async function getDashboardSummary(
     blockedTasks,
     upcomingMilestones,
     overdueTaskList,
+    dueSoonTaskList,
+    blockedTaskList,
     upcomingMilestoneList,
   };
 }
@@ -117,9 +137,6 @@ export async function getProjectSummary(
   projectId: string,
   now: Date = new Date(),
 ): Promise<ProjectSummary> {
-  const dueSoonCutoff = new Date(now);
-  dueSoonCutoff.setUTCDate(dueSoonCutoff.getUTCDate() + DUE_SOON_DAYS);
-
   const [
     openTasks,
     doneTasks,
@@ -153,12 +170,7 @@ export async function getProjectSummary(
     prisma.task.count({ where: overdueTaskWhere(workspaceId, now, projectId) }),
     prisma.task.count({ where: blockedTaskWhere(workspaceId, projectId) }),
     prisma.task.count({
-      where: officialRecordWhere({
-        workspaceId,
-        projectId,
-        status: { category: { in: [...OPEN_TASK_CATEGORIES] } },
-        dueDate: { gte: startOfUtcDay(now), lte: dueSoonCutoff },
-      }),
+      where: dueSoonTaskWhere(workspaceId, now, projectId),
     }),
     prisma.projectRisk.count({
       where: officialRecordWhere({

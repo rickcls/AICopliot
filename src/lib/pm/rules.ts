@@ -337,6 +337,29 @@ export function overdueTaskWhere(
   });
 }
 
+/**
+ * Open work due today through the next `DUE_SOON_DAYS`, inclusive.
+ *
+ * The lower bound is the UTC day, matching `overdueTaskWhere`, so a task due
+ * today is due-soon and not overdue. The upper bound is `now` plus that many
+ * UTC days, which still includes a date-only due date (UTC midnight) on the
+ * last day.
+ */
+export function dueSoonTaskWhere(
+  workspaceId: string,
+  now: Date,
+  projectId?: string,
+) {
+  const dueSoonCutoff = new Date(now);
+  dueSoonCutoff.setUTCDate(dueSoonCutoff.getUTCDate() + DUE_SOON_DAYS);
+  return officialRecordWhere({
+    workspaceId,
+    ...(projectId ? { projectId } : {}),
+    status: { category: { in: [...OPEN_TASK_CATEGORIES] } },
+    dueDate: { gte: startOfUtcDay(now), lte: dueSoonCutoff },
+  });
+}
+
 export function blockedTaskWhere(workspaceId: string, projectId?: string) {
   return officialRecordWhere({
     workspaceId,

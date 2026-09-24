@@ -35,9 +35,9 @@ async function postJson<T>(
       body: JSON.stringify(body),
     });
   } catch (cause) {
-    throw new ProviderError(
-      `Could not reach the model provider: ${(cause as Error).message}`,
-    );
+    const err = cause as Error & { cause?: { code?: string } };
+    const detail = err.cause?.code ? `${err.message} (${err.cause.code})` : err.message;
+    throw new ProviderError(`Could not reach the model provider: ${detail}`);
   }
 
   if (!response.ok) {
@@ -74,7 +74,12 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
       const json = await postJson<EmbeddingsResponse>(
         `${this.config.baseUrl}/embeddings`,
         this.config.apiKey,
-        { model: this.config.model, input: batch },
+        {
+          model: this.config.model,
+          input: batch,
+          // Gemini Embedding 2 defaults to 3072; the DB column is fixed-width.
+          dimensions: this.dimensions,
+        },
       );
 
       if (!Array.isArray(json.data) || json.data.length !== batch.length) {

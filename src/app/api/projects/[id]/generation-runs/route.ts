@@ -8,6 +8,9 @@ import {
 } from "@/lib/generation/service";
 import { createGenerationRunSchema } from "@/lib/generation/schemas";
 
+/** Hobby plan ceiling. Plan generation waits on a model call. */
+export const maxDuration = 60;
+
 interface Params {
   params: Promise<{ id: string }>;
 }

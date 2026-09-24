@@ -6,6 +6,7 @@ import {
   Button,
   Input,
   QUIET_CONTROL,
+  ROW_ICON,
   ROW_LABEL,
   Select,
   Spinner,
@@ -15,9 +16,7 @@ import { Modal, ModalBody, ModalFooter } from "@/components/modal";
 import { cn } from "@/lib/utils";
 import {
   PRIORITY_FLAG,
-  PRIORITY_SOFT,
   STATUS_DOT,
-  STATUS_SOFT,
   TASK_PRIORITIES,
   statusColorToken,
   toDateInput,
@@ -184,14 +183,19 @@ export function TaskForm({
             // The focus ring is deliberately *not* removed with the border: it
             // is the app's one focus treatment, and a borderless field with no
             // ring gives a keyboard user nothing to locate.
-            className="h-auto border-transparent bg-transparent px-0 py-1 text-xl font-semibold text-slate-900 placeholder:text-slate-300 focus-visible:border-transparent disabled:bg-transparent"
+            className="h-auto border-transparent bg-transparent px-0 py-1 text-2xl font-semibold tracking-tight text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus-visible:border-transparent disabled:bg-transparent"
           />
 
           {/* A plain grid, not the `<dl>` the record lists use: these are form
               controls, and wrapping them in a description list makes a screen
               reader announce a six-item list around fields whose own labels
-              already say everything. */}
-          <div className="mt-3 grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5">
+              already say everything. Every value cell starts with the same
+              `ROW_ICON` gutter so the controls share one left edge — without
+              it the status dot, priority flag, and assignee avatar each pushed
+              the text to a different x. Colour lives on those icons, not on
+              soft fills behind the selects: two coloured pills next to each
+              other compete for one glance. */}
+          <div className="mt-3 grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
             <label htmlFor="task-assignee" className={ROW_LABEL}>
               Assignee
             </label>
@@ -199,10 +203,7 @@ export function TaskForm({
               {assignee ? (
                 <Avatar name={assignee.name} email={assignee.email} />
               ) : (
-                <span
-                  aria-hidden
-                  className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-400"
-                >
+                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-slate-100")}>
                   <UserRound className="size-3.5" />
                 </span>
               )}
@@ -228,13 +229,14 @@ export function TaskForm({
               Status
             </label>
             <div className="flex min-w-0 items-center gap-2">
-              <span
-                aria-hidden
-                className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[statusTone])}
-              />
+              <span aria-hidden className={ROW_ICON}>
+                <span
+                  className={cn("size-2 rounded-full", STATUS_DOT[statusTone])}
+                />
+              </span>
               <Select
                 id="task-status"
-                className={cn(QUIET_CONTROL, "font-medium", STATUS_SOFT[statusTone])}
+                className={cn(QUIET_CONTROL, "font-medium")}
                 value={draft.statusId}
                 onChange={(event) =>
                   onChange({ ...draft, statusId: event.target.value })
@@ -253,18 +255,15 @@ export function TaskForm({
               Priority
             </label>
             <div className="flex min-w-0 items-center gap-2">
-              <Flag
-                aria-hidden
-                fill="currentColor"
-                className={cn("size-3.5 shrink-0", PRIORITY_FLAG[draft.priority])}
-              />
+              <span aria-hidden className={ROW_ICON}>
+                <Flag
+                  fill="currentColor"
+                  className={cn("size-3.5", PRIORITY_FLAG[draft.priority])}
+                />
+              </span>
               <Select
                 id="task-priority"
-                className={cn(
-                  QUIET_CONTROL,
-                  "capitalize",
-                  PRIORITY_SOFT[draft.priority],
-                )}
+                className={cn(QUIET_CONTROL, "capitalize")}
                 value={draft.priority}
                 onChange={(event) =>
                   onChange({
@@ -285,7 +284,8 @@ export function TaskForm({
             <label htmlFor="task-milestone" className={ROW_LABEL}>
               Milestone
             </label>
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
+              <span aria-hidden className={ROW_ICON} />
               <Select
                 id="task-milestone"
                 className={QUIET_CONTROL}
@@ -309,11 +309,12 @@ export function TaskForm({
             <label htmlFor="task-start" className={ROW_LABEL}>
               Dates
             </label>
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
+              <span aria-hidden className={ROW_ICON} />
               <Input
                 id="task-start"
                 type="date"
-                className={cn(QUIET_CONTROL, "w-auto max-w-none")}
+                className={cn(QUIET_CONTROL, "max-w-none")}
                 value={draft.startDate}
                 onChange={(event) =>
                   onChange({ ...draft, startDate: event.target.value })
@@ -329,7 +330,7 @@ export function TaskForm({
               <Input
                 id="task-due"
                 type="date"
-                className={cn(QUIET_CONTROL, "w-auto max-w-none")}
+                className={cn(QUIET_CONTROL, "max-w-none")}
                 value={draft.dueDate}
                 onChange={(event) =>
                   onChange({ ...draft, dueDate: event.target.value })
@@ -345,6 +346,7 @@ export function TaskForm({
               Estimate
             </label>
             <div className="flex items-center gap-1.5">
+              <span aria-hidden className={ROW_ICON} />
               <Input
                 id="task-estimate"
                 type="number"

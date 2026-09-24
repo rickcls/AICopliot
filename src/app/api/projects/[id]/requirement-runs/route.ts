@@ -8,6 +8,9 @@ import {
 import { createRequirementRunSchema } from "@/lib/generation/schemas";
 import { GenerationRequestError } from "@/lib/generation/service";
 
+/** Hobby plan ceiling. Requirement extraction waits on a model call. */
+export const maxDuration = 60;
+
 interface Params {
   params: Promise<{ id: string }>;
 }

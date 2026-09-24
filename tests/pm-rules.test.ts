@@ -10,6 +10,7 @@ import {
   isMilestoneOpen,
   isOverdue,
   isTaskOpen,
+  dueSoonTaskWhere,
   overdueTaskWhere,
   officialRecordWhere,
   startOfUtcDay,
@@ -185,6 +186,7 @@ describe("timeline bucketing", () => {
 describe("scoped query filters", () => {
   it("every filter constrains on workspaceId", () => {
     expect(overdueTaskWhere("ws-1", NOW)).toMatchObject({ workspaceId: "ws-1" });
+    expect(dueSoonTaskWhere("ws-1", NOW)).toMatchObject({ workspaceId: "ws-1" });
     expect(blockedTaskWhere("ws-1")).toMatchObject({ workspaceId: "ws-1" });
     expect(upcomingMilestoneWhere("ws-1", NOW)).toMatchObject({
       workspaceId: "ws-1",
@@ -200,14 +202,19 @@ describe("scoped query filters", () => {
 
     expect(officialRecordWhere({ workspaceId: "ws-1" }).OR).toEqual(expected);
     expect(overdueTaskWhere("ws-1", NOW).OR).toEqual(expected);
+    expect(dueSoonTaskWhere("ws-1", NOW).OR).toEqual(expected);
     expect(blockedTaskWhere("ws-1").OR).toEqual(expected);
     expect(upcomingMilestoneWhere("ws-1", NOW).OR).toEqual(expected);
   });
 
   it("adds projectId only when a project scope is supplied", () => {
     expect(overdueTaskWhere("ws-1", NOW)).not.toHaveProperty("projectId");
+    expect(dueSoonTaskWhere("ws-1", NOW)).not.toHaveProperty("projectId");
     expect(overdueTaskWhere("ws-1", NOW, "p-1")).toMatchObject({
       workspaceId: "ws-1",
+      projectId: "p-1",
+    });
+    expect(dueSoonTaskWhere("ws-1", NOW, "p-1")).toMatchObject({
       projectId: "p-1",
     });
     expect(blockedTaskWhere("ws-1", "p-1")).toMatchObject({ projectId: "p-1" });
@@ -220,6 +227,15 @@ describe("scoped query filters", () => {
     const where = overdueTaskWhere("ws-1", NOW);
     expect(where.status.category.in).not.toContain("done");
     expect(where.dueDate.lt).toEqual(startOfUtcDay(NOW));
+  });
+
+  it("due soon runs from today through seven days and excludes done work", () => {
+    const where = dueSoonTaskWhere("ws-1", NOW);
+    const cutoff = new Date(NOW);
+    cutoff.setUTCDate(cutoff.getUTCDate() + DUE_SOON_DAYS);
+    expect(where.status.category.in).not.toContain("done");
+    expect(where.dueDate.gte).toEqual(startOfUtcDay(NOW));
+    expect(where.dueDate.lte).toEqual(cutoff);
   });
 
   it("upcoming milestones exclude completed ones and past dates", () => {

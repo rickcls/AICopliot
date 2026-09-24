@@ -7,6 +7,9 @@ import {
   StatusReportRequestError,
 } from "@/lib/reports/service";
 
+/** Hobby plan ceiling. A weekly report waits on a model call. */
+export const maxDuration = 60;
+
 interface Params {
   params: Promise<{ id: string }>;
 }

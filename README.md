@@ -128,20 +128,56 @@ All are server-side only. None are exposed to the browser.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | — | Postgres connection string; matches `docker-compose.yml` |
+| `DATABASE_URL` | — | Postgres connection string. Local Docker, or Neon’s **pooled** host on Vercel |
+| `DIRECT_URL` | `DATABASE_URL` | Non-pooled Neon host for `npm run db:migrate`. Leave unset locally |
 | `AUTH_SECRET` | — | Session signing key (`openssl rand -base64 32`) |
-| `AUTH_URL` | `http://localhost:3000` | Base URL for auth callbacks |
+| `AUTH_URL` | `http://localhost:3000` | Base URL for auth callbacks. On Vercel, the deployment URL |
 | `OPENROUTER_API_KEY` | — | **The only real secret required** |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Provider endpoint |
 | `OPENROUTER_CHAT_MODEL` | `anthropic/claude-haiku-4.5` | Answer generation |
 | `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Embeddings |
 | `EMBEDDING_DIMENSIONS` | `1536` | **Must match the `vector(N)` column** |
-| `STORAGE_DIR` | `./storage` | Where uploaded files are written |
+| `STORAGE_DIR` | `./storage` | Local upload directory. Unused when `BLOB_READ_WRITE_TOKEN` is set |
+| `BLOB_READ_WRITE_TOKEN` | — | Vercel Blob token. Unset keeps files on local disk |
 | `MAX_UPLOAD_BYTES` | `10485760` | 10 MB upload cap |
 | `RAG_TOP_K` | `8` | Hybrid-ranked chunks retrieved per question |
 | `RAG_MIN_SCORE` | `0.25` | Minimum semantic similarity; exact full-text matches are also valid evidence |
 
 `.env.example` contains placeholder names only — never commit real keys.
+
+## Deploy on Vercel
+
+The app runs on Vercel against Neon (Postgres with pgvector) and Vercel Blob.
+Local `npm run dev` stays on Docker and disk; nothing below is required for that.
+
+1. Create a Neon project and confirm the `vector` extension is available (Neon
+   supports it). Copy both connection strings.
+
+2. Create a Vercel project from this repo and set:
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | Neon **pooled** connection string |
+   | `DIRECT_URL` | Neon **direct** connection string |
+   | `AUTH_SECRET` | `openssl rand -base64 32` |
+   | `AUTH_URL` | The deployment URL, including `https://` |
+   | `OPENROUTER_API_KEY` | Your OpenRouter key |
+   | `BLOB_READ_WRITE_TOKEN` | From the project’s Blob store (Vercel injects this when the store is connected) |
+
+3. From your machine, point `.env` at those Neon URLs and apply the schema once:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+   That runs `prisma migrate deploy` and the pgvector index check against
+   `DIRECT_URL`, so the index is not created through the pooler. Then deploy.
+   `npm run build` generates the Prisma client, which is not committed.
+
+Chat, document processing, plan generation, requirement extraction, and weekly
+reports each allow 60 seconds, which is the Hobby plan ceiling. A large PDF
+needs a higher limit on Pro. A processing timeout still leaves the document
+`failed`, and the upload screen can retry it.
 
 ### Changing the embedding model
 

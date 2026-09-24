@@ -15,11 +15,15 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectTasksPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ task?: string | string[] }>;
 }) {
   const { workspaceId, user } = await requireWorkspace();
   const { id } = await params;
+  const { task: taskParam } = await searchParams;
+  const requestedTaskId = Array.isArray(taskParam) ? taskParam[0] : taskParam;
 
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
@@ -60,6 +64,7 @@ export default async function ProjectTasksPage({
       members={members}
       milestones={milestones}
       currentUserId={user.id}
+      initialOpenTaskId={requestedTaskId ?? null}
     />
   );
 }

@@ -14,7 +14,13 @@ function createClient(): PrismaClient {
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set. Copy .env.example to .env.");
   }
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  // A serverless instance serves one request at a time. The driver's default
+  // pool would open several connections per instance and exhaust Neon.
+  const pool =
+    process.env.NODE_ENV === "production"
+      ? { connectionString, max: 1 }
+      : { connectionString };
+  return new PrismaClient({ adapter: new PrismaPg(pool) });
 }
 
 const globalForPrisma = globalThis as unknown as {

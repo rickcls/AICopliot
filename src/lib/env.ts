@@ -23,6 +23,14 @@ const envSchema = z.object({
   EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
 
   STORAGE_DIR: z.string().default("./storage"),
+  // Blank is the same as unset: local disk. A value selects Vercel Blob.
+  BLOB_READ_WRITE_TOKEN: z
+    .string()
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : undefined;
+    }),
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(10_485_760),
 
   RAG_TOP_K: z.coerce.number().int().positive().max(50).default(8),

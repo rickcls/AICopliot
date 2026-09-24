@@ -21,6 +21,9 @@ import { askQuestionSchema } from "@/lib/schemas";
  * invisible to a client checking `response.ok`.
  */
 
+/** Hobby plan ceiling. A large document or a slow model needs Pro’s longer limit. */
+export const maxDuration = 60;
+
 /** Upper bound on turns loaded for context; the RAG layer trims further. */
 const MAX_HISTORY_MESSAGES = 12;
 
