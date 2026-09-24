@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { DashboardSummary } from "@/components/dashboard-summary";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, LinkButton } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 
@@ -30,22 +29,17 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <DashboardSummary workspaceId={workspaceId} />
-
+      {/* With no projects, four zero cards above an empty state say the same
+          thing five times; the empty state alone says it once. */}
       {projectCount === 0 ? (
         <EmptyState
           title="Nothing here yet"
           description="Create a project to hold its documents, tasks, milestones, and risks. Everything on this page is a summary of work across your projects."
-          action={
-            <Link
-              href="/projects"
-              className="inline-flex h-10 items-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              Create a project
-            </Link>
-          }
+          action={<LinkButton href="/projects">Create a project</LinkButton>}
         />
-      ) : null}
+      ) : (
+        <DashboardSummary workspaceId={workspaceId} />
+      )}
     </div>
   );
 }

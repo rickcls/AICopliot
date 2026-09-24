@@ -234,6 +234,16 @@ export function riskExposure(risk: {
   return LEVEL_SCORE[risk.impact] * LEVEL_SCORE[risk.likelihood];
 }
 
+/** The worse of the two axes — the rule the risk chip is coloured by. */
+export function worstRiskLevel(risk: {
+  impact: RiskLevel;
+  likelihood: RiskLevel;
+}): RiskLevel {
+  return LEVEL_SCORE[risk.impact] >= LEVEL_SCORE[risk.likelihood]
+    ? risk.impact
+    : risk.likelihood;
+}
+
 export type RiskSort = "recent" | "exposure";
 
 /**

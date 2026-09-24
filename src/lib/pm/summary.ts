@@ -9,7 +9,10 @@ import {
   uncoveredRequirementWhere,
   unvalidatedRequirementWhere,
   upcomingMilestoneWhere,
+  undecidedRequirementWhere,
+  pendingPlanRunWhere,
   OPEN_REQUIREMENT_STATUSES,
+  OPEN_TASK_CATEGORIES,
   DONE_TASK_CATEGORY,
   officialRecordWhere,
 } from "./rules";
@@ -130,6 +133,8 @@ export interface ProjectSummary {
   approvedRequirements: number;
   uncoveredRequirements: number;
   unvalidatedRequirements: number;
+  undecidedRequirements: number;
+  pendingPlanRuns: number;
 }
 
 export async function getProjectSummary(
@@ -152,6 +157,8 @@ export async function getProjectSummary(
     approvedRequirements,
     uncoveredRequirements,
     unvalidatedRequirements,
+    undecidedRequirements,
+    pendingPlanRuns,
   ] = await Promise.all([
     prisma.task.count({
       where: officialRecordWhere({
@@ -207,6 +214,12 @@ export async function getProjectSummary(
     prisma.requirement.count({
       where: unvalidatedRequirementWhere(workspaceId, projectId),
     }),
+    prisma.requirement.count({
+      where: undecidedRequirementWhere(workspaceId, projectId),
+    }),
+    prisma.generationRun.count({
+      where: pendingPlanRunWhere(workspaceId, projectId),
+    }),
   ]);
 
   return {
@@ -224,5 +237,96 @@ export async function getProjectSummary(
     approvedRequirements,
     uncoveredRequirements,
     unvalidatedRequirements,
+    undecidedRequirements,
+    pendingPlanRuns,
   };
+}
+
+export interface ProjectHealthRow {
+  id: string;
+  name: string;
+  openTasks: number;
+  doneTasks: number;
+  overdueTasks: number;
+  blockedTasks: number;
+  uncoveredRequirements: number;
+  pendingPlanRuns: number;
+}
+
+/**
+ * One row per project for the dashboard, built from grouped counts so the cost
+ * is a fixed handful of queries however many projects there are. Each count
+ * uses the same predicate as the project's own Overview, so the two pages
+ * cannot disagree about a project.
+ */
+export async function getProjectHealthRows(
+  workspaceId: string,
+  now: Date = new Date(),
+): Promise<ProjectHealthRow[]> {
+  const [projects, open, done, overdue, blocked, uncovered, pending] =
+    await Promise.all([
+      prisma.project.findMany({
+        where: { workspaceId },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, name: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: officialRecordWhere({
+          workspaceId,
+          status: { category: { in: [...OPEN_TASK_CATEGORIES] } },
+        }),
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: officialRecordWhere({
+          workspaceId,
+          status: { category: DONE_TASK_CATEGORY },
+        }),
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: overdueTaskWhere(workspaceId, now),
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: blockedTaskWhere(workspaceId),
+        _count: { _all: true },
+      }),
+      prisma.requirement.groupBy({
+        by: ["projectId"],
+        where: uncoveredRequirementWhere(workspaceId),
+        _count: { _all: true },
+      }),
+      prisma.generationRun.groupBy({
+        by: ["projectId"],
+        where: pendingPlanRunWhere(workspaceId),
+        _count: { _all: true },
+      }),
+    ]);
+
+  const byProject = (groups: Array<{ projectId: string; _count: { _all: number } }>) =>
+    new Map(groups.map((group) => [group.projectId, group._count._all]));
+  const counts = {
+    open: byProject(open),
+    done: byProject(done),
+    overdue: byProject(overdue),
+    blocked: byProject(blocked),
+    uncovered: byProject(uncovered),
+    pending: byProject(pending),
+  };
+
+  return projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    openTasks: counts.open.get(project.id) ?? 0,
+    doneTasks: counts.done.get(project.id) ?? 0,
+    overdueTasks: counts.overdue.get(project.id) ?? 0,
+    blockedTasks: counts.blocked.get(project.id) ?? 0,
+    uncoveredRequirements: counts.uncovered.get(project.id) ?? 0,
+    pendingPlanRuns: counts.pending.get(project.id) ?? 0,
+  }));
 }

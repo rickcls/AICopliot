@@ -390,6 +390,37 @@ export function DescriptionList({
 }
 
 /**
+ * A thin completion bar. The percentage is supplied rather than computed so
+ * callers use `percentOf`, which never rounds onto an endpoint it has not
+ * reached.
+ */
+export function ProgressBar({
+  percent,
+  label,
+  className,
+}: {
+  percent: number;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+      className={cn("h-1.5 overflow-hidden rounded-full bg-slate-100", className)}
+    >
+      <div
+        className="h-full rounded-full bg-emerald-500 transition-[width]"
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
+}
+
+/**
  * One headline number. A zero renders in the neutral colour whatever its tone —
  * "0 overdue" in red is an alarm for good news.
  */
@@ -425,7 +456,7 @@ export function StatCard({
       >
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+      {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
     </Card>
   );
 
