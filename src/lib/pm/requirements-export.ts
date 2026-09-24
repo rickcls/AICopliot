@@ -1,3 +1,4 @@
+import { requirementStatusLabel } from "./labels";
 import { formatRequirementCode } from "./rules";
 import {
   deliveryState,
@@ -121,7 +122,7 @@ export function requirementsToCsv(requirements: ExportableRequirement[]): string
       requirement.title,
       words(requirement.type),
       requirement.priority,
-      words(requirement.status),
+      requirementStatusLabel(requirement.status),
       requirement.confidence,
       requirement.stakeholder,
       requirement.description,
@@ -158,7 +159,7 @@ export function requirementsToMarkdown(
   const lines = [
     `# ${inline(projectName)} — Requirements`,
     "",
-    `Exported ${exportedAt.toISOString().slice(0, 10)} · ${requirements.length} requirement${requirements.length === 1 ? "" : "s"} · ${approved.length} approved`,
+    `Exported ${exportedAt.toISOString().slice(0, 10)} · ${requirements.length} requirement${requirements.length === 1 ? "" : "s"} · ${approved.length} agreed`,
     "",
   ];
 
@@ -167,7 +168,7 @@ export function requirementsToMarkdown(
     lines.push(
       `## ${formatRequirementCode(requirement.sequence)} ${inline(requirement.title)}`,
       "",
-      `**${requirement.priority.toUpperCase()}** · ${words(requirement.type)} · ${words(requirement.status)} · confidence ${requirement.confidence}` +
+      `**${requirement.priority.toUpperCase()}** · ${words(requirement.type)} · ${requirementStatusLabel(requirement.status)} · confidence ${requirement.confidence}` +
         (requirement.stakeholder ? ` · owner ${inline(requirement.stakeholder)}` : ""),
       "",
     );

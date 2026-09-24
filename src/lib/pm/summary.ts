@@ -1,4 +1,5 @@
 import "server-only";
+import type { RequirementStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import {
   activeProjectWhere,
@@ -135,6 +136,8 @@ export interface ProjectSummary {
   unvalidatedRequirements: number;
   undecidedRequirements: number;
   pendingPlanRuns: number;
+  /** Register rows by lifecycle status, drafts included (invariant 14). */
+  requirementsByStatus: Record<RequirementStatus, number>;
 }
 
 export async function getProjectSummary(
@@ -159,6 +162,7 @@ export async function getProjectSummary(
     unvalidatedRequirements,
     undecidedRequirements,
     pendingPlanRuns,
+    statusGroups,
   ] = await Promise.all([
     prisma.task.count({
       where: officialRecordWhere({
@@ -220,7 +224,23 @@ export async function getProjectSummary(
     prisma.generationRun.count({
       where: pendingPlanRunWhere(workspaceId, projectId),
     }),
+    prisma.requirement.groupBy({
+      by: ["status"],
+      where: { workspaceId, projectId },
+      _count: { _all: true },
+    }),
   ]);
+
+  const requirementsByStatus: Record<RequirementStatus, number> = {
+    draft: 0,
+    needs_clarification: 0,
+    validated: 0,
+    approved: 0,
+    rejected: 0,
+  };
+  for (const group of statusGroups) {
+    requirementsByStatus[group.status] = group._count._all;
+  }
 
   return {
     openTasks,
@@ -239,6 +259,7 @@ export async function getProjectSummary(
     unvalidatedRequirements,
     undecidedRequirements,
     pendingPlanRuns,
+    requirementsByStatus,
   };
 }
 

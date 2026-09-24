@@ -1,5 +1,6 @@
 "use client";
 
+import { REQUIREMENT_STATUS_HINT, REQUIREMENT_STATUS_LABEL, requirementStatusLabel } from "@/lib/pm/labels";
 import {
   EMPTY_REQUIREMENT_FILTER,
   type RegisterFilter,
@@ -137,13 +138,11 @@ const PRIORITIES: Array<{ value: RequirementPriority; label: string }> = [
   { value: "wont", label: "Won't" },
 ];
 
-const STATUSES: Array<{ value: RequirementStatus; label: string }> = [
-  { value: "draft", label: "Draft" },
-  { value: "needs_clarification", label: "Needs clarification" },
-  { value: "validated", label: "Validated" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-];
+// Labels come from labels.ts so the register, matrix, exports, and overview
+// all call a status the same thing.
+const STATUSES: Array<{ value: RequirementStatus; label: string }> = (
+  ["draft", "needs_clarification", "validated", "approved", "rejected"] as const
+).map((value) => ({ value, label: REQUIREMENT_STATUS_LABEL[value] }));
 
 const CONFIDENCES: Array<{ value: RequirementConfidence; label: string }> = [
   { value: "high", label: "High" },
@@ -870,14 +869,14 @@ export function RequirementsPanel({
             {/* "Every approved requirement is covered" reads as reassurance, so
                 it must not be shown when nothing has been approved at all. */}
             {approvedCount === 0 ? (
-              "none approved yet — nothing here is agreed scope"
+              "nothing agreed with the client yet"
             ) : !deliveryEnabled ? (
-              `${approvedCount} approved`
+              `${approvedCount} agreed`
             ) : uncoveredCount === 0 ? (
-              `all ${approvedCount} approved have a delivery task`
+              `all ${approvedCount} agreed have a delivery task`
             ) : (
               <span className="font-medium text-red-700">
-                {uncoveredCount} of {approvedCount} approved have no delivery task
+                {uncoveredCount} of {approvedCount} agreed have no delivery task
               </span>
             )}
           </>
@@ -1397,13 +1396,13 @@ export function RequirementsPanel({
               <span aria-hidden className="mx-1 h-4 w-px bg-white/20" />
               {(
                 [
-                  ["approved", "Approve"],
+                  ["approved", "Mark agreed"],
                   ["validated", "Validate"],
-                  ["needs_clarification", "Needs clarification"],
+                  ["needs_clarification", "Ask client"],
                   ["rejected", "Reject"],
                   // Without a way back, one mis-aimed batch approval could only
                   // be undone a row at a time. Undo belongs wherever bulk does.
-                  ["draft", "Back to draft"],
+                  ["draft", "Back to review"],
                 ] as Array<[RequirementStatus, string]>
               ).map(([status, text]) => (
                 <button
@@ -1433,7 +1432,7 @@ export function RequirementsPanel({
                 ? "No requirements match this search."
                 : filter === "gaps"
                   ? "Every approved requirement has at least one delivery task."
-                  : `No ${label(filter)} requirements.`}
+                  : `Nothing is “${requirementStatusLabel(filter)}”.`}
             </div>
           ) : (
             <>
@@ -1534,7 +1533,9 @@ export function RequirementsPanel({
                           {requirement.priority}
                         </span>
                         <Badge tone={STATUS_TONE[requirement.status]}>
-                          {label(requirement.status)}
+                          <span title={REQUIREMENT_STATUS_HINT[requirement.status]}>
+                            {REQUIREMENT_STATUS_LABEL[requirement.status]}
+                          </span>
                         </Badge>
                       </div>
                     </div>

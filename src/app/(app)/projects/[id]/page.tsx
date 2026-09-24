@@ -1,12 +1,15 @@
+import { nextDiscoveryStep, type DiscoveryCounts, type DiscoveryStep } from "@/lib/pm/discovery";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
+import { DeliveryToggle } from "@/components/delivery-toggle";
 import {
   Badge,
   Card,
-  EmptyState,
+  FOCUS_RING,
   LinkButton,
   ProgressBar,
+  SectionHeader,
   StatCard,
 } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
@@ -63,6 +66,128 @@ function OverviewCard({
       <div className="mt-3 flex-1">{children}</div>
     </Card>
   );
+}
+
+/** One stage of the discovery strip. Done stages carry a check, not a colour alone. */
+function DiscoveryStage({
+  index,
+  label,
+  value,
+  hint,
+  done,
+  href,
+}: {
+  index: number;
+  label: string;
+  value: string;
+  hint?: string;
+  done: boolean;
+  href: string;
+}) {
+  return (
+    <li>
+      <Link
+        href={href}
+        className={cn(
+          "flex h-full items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50",
+          FOCUS_RING,
+          done ? "border-emerald-200" : "border-slate-200",
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold",
+            done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {done ? <Check className="size-3.5" /> : index}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-xs font-medium text-slate-500">
+            {label}
+            {done ? <span className="sr-only"> (done)</span> : null}
+          </span>
+          <span className="block text-sm font-semibold text-slate-900 tabular-nums">
+            {value}
+          </span>
+          {hint ? (
+            <span className="mt-0.5 block text-xs text-amber-700">{hint}</span>
+          ) : null}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * The words for each step. Kept beside the page rather than in discovery.ts,
+ * which decides *which* step applies and stays free of copy and routes.
+ */
+function nextStepCopy(
+  step: DiscoveryStep,
+  counts: DiscoveryCounts,
+  base: string,
+): { title: string; description: string; cta: string; href: string } {
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  switch (step) {
+    case "upload":
+      return {
+        title: "Upload the client’s documents",
+        description:
+          "Briefs, statements of work, meeting notes, or emails saved as PDF, Word, Markdown, or text. Every requirement ScopePilot drafts will cite them.",
+        cta: "Upload documents",
+        href: `${base}/documents`,
+      };
+    case "wait_indexing":
+      return {
+        title: "Your documents are being indexed",
+        description:
+          "This usually takes under a minute. Extraction opens as soon as one document is ready.",
+        cta: "View documents",
+        href: `${base}/documents`,
+      };
+    case "extract":
+      return {
+        title: "Extract the requirements",
+        description:
+          "ScopePilot reads the indexed documents and drafts cited requirements for you to check. Nothing counts as agreed until you say so.",
+        cta: "Extract requirements",
+        href: `${base}/requirements`,
+      };
+    case "review":
+      return {
+        title: `Review ${plural(counts.toReview, "draft requirement")}`,
+        description:
+          "Check each one against its source, then mark it Validated, Agreed, or Ask client — or reject it.",
+        cta: "Start reviewing",
+        href: `${base}/requirements?filter=draft`,
+      };
+    case "clarify":
+      return {
+        title: `${plural(counts.askClient, "question")} for the client`,
+        description:
+          "Take these back to the client. Update each requirement once it is answered.",
+        cta: "Open questions",
+        href: `${base}/requirements?filter=needs_clarification`,
+      };
+    case "agree":
+      return {
+        title: `${plural(counts.validated, "requirement")} waiting for client agreement`,
+        description:
+          "You have checked these. Mark them Agreed once the client confirms.",
+        cta: "Open validated",
+        href: `${base}/requirements?filter=validated`,
+      };
+    case "sign_off":
+      return {
+        title: `${plural(counts.agreed, "requirement")} agreed`,
+        description:
+          "The scope is agreed. Share it with the client for sign-off, or add new documents as the project evolves — new extractions are checked against this register.",
+        cta: "View agreed scope",
+        href: `${base}/requirements?filter=approved`,
+      };
+  }
 }
 
 function Quiet({ children }: { children: React.ReactNode }) {
@@ -138,15 +263,100 @@ export default async function ProjectOverviewPage({
   const coverage = percentOf(coveredRequirements, summary.approvedRequirements);
   const report = latestReport?.report ?? null;
 
-  const nothingYet =
-    summary.openTasks === 0 &&
-    summary.doneTasks === 0 &&
-    summary.openMilestones === 0 &&
-    summary.openRisks === 0 &&
-    summary.totalRequirements === 0;
+  const byStatus = summary.requirementsByStatus;
+  const discovery: DiscoveryCounts = {
+    documents: summary.totalDocuments,
+    readyDocuments: summary.readyDocuments,
+    toReview: byStatus.draft,
+    askClient: byStatus.needs_clarification,
+    validated: byStatus.validated,
+    agreed: byStatus.approved,
+    rejected: byStatus.rejected,
+  };
+  const step = nextDiscoveryStep(discovery);
+  const next = nextStepCopy(step, discovery, base);
+  const live =
+    byStatus.draft +
+    byStatus.needs_clarification +
+    byStatus.validated +
+    byStatus.approved;
 
   return (
     <div className="space-y-6">
+      <Card className="flex flex-wrap items-center justify-between gap-4 border-slate-300 p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+            Next step
+          </p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">
+            {next.title}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-pretty text-slate-600">
+            {next.description}
+          </p>
+        </div>
+        <LinkButton href={next.href}>
+          {next.cta}
+          <ArrowRight className="size-4" aria-hidden />
+        </LinkButton>
+      </Card>
+
+      <ol
+        aria-label="Discovery progress"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <DiscoveryStage
+          index={1}
+          label="Documents"
+          value={`${summary.readyDocuments} indexed`}
+          hint={
+            summary.totalDocuments > summary.readyDocuments
+              ? `${summary.totalDocuments - summary.readyDocuments} still processing`
+              : undefined
+          }
+          done={summary.readyDocuments > 0}
+          href={`${base}/documents`}
+        />
+        <DiscoveryStage
+          index={2}
+          label="Extracted"
+          value={`${live} requirement${live === 1 ? "" : "s"}`}
+          done={live > 0}
+          href={`${base}/requirements`}
+        />
+        <DiscoveryStage
+          index={3}
+          label="Reviewed"
+          value={`${live - byStatus.draft} of ${live}`}
+          hint={
+            byStatus.needs_clarification > 0
+              ? `${byStatus.needs_clarification} waiting on the client`
+              : undefined
+          }
+          done={live > 0 && byStatus.draft === 0}
+          href={`${base}/requirements?filter=draft`}
+        />
+        <DiscoveryStage
+          index={4}
+          label="Agreed"
+          value={`${byStatus.approved} of ${live}`}
+          done={live > 0 && byStatus.approved === live}
+          href={`${base}/requirements?filter=approved`}
+        />
+      </ol>
+
+      {project.deliveryEnabled ? (
+        <section aria-label="Delivery" className="space-y-4">
+          <SectionHeader
+            title="Delivery"
+            description="Tasks, milestones, and risks for this project."
+          >
+            <DeliveryToggle
+              projectId={project.id}
+              enabled
+              variant="ghost"
+            />
+          </SectionHeader>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Scope coverage"
@@ -154,15 +364,15 @@ export default async function ProjectOverviewPage({
           href={`${base}/requirements?filter=approved`}
           hint={
             summary.approvedRequirements === 0 ? (
-              "No requirement approved yet"
+              "Nothing agreed yet"
             ) : (
               <>
                 <ProgressBar
                   percent={coverage}
-                  label="Approved requirements with a delivery task"
+                  label="Agreed requirements with a delivery task"
                   className="mb-1.5"
                 />
-                {coveredRequirements} of {summary.approvedRequirements} approved
+                {coveredRequirements} of {summary.approvedRequirements} agreed
                 have a task
               </>
             )
@@ -173,7 +383,7 @@ export default async function ProjectOverviewPage({
           value={summary.uncoveredRequirements}
           tone="danger"
           href={`${base}/requirements?filter=gaps`}
-          hint="Approved scope with no delivery task"
+          hint="Agreed scope with no delivery task"
         />
         <StatCard
           label="Task completion"
@@ -219,46 +429,6 @@ export default async function ProjectOverviewPage({
           hint={highRisks > 0 ? `${highRisks} rated high` : undefined}
         />
       </div>
-
-      {summary.pendingPlanRuns > 0 || summary.undecidedRequirements > 0 ? (
-        <Card className="flex flex-wrap items-center gap-x-6 gap-y-2 border-amber-200 bg-amber-50/60 px-5 py-3">
-          <p className="text-sm font-semibold text-amber-900">
-            Waiting on a decision
-          </p>
-          {summary.undecidedRequirements > 0 ? (
-            <Link
-              href={`${base}/requirements`}
-              className="text-sm text-amber-900 underline-offset-2 hover:underline"
-            >
-              {summary.undecidedRequirements} requirement
-              {summary.undecidedRequirements === 1 ? "" : "s"} in draft or
-              needing clarification
-            </Link>
-          ) : null}
-          {summary.pendingPlanRuns > 0 ? (
-            <Link
-              href={`${base}/review`}
-              className="text-sm text-amber-900 underline-offset-2 hover:underline"
-            >
-              {summary.pendingPlanRuns} generated plan
-              {summary.pendingPlanRuns === 1 ? "" : "s"} to review
-            </Link>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {nothingYet ? (
-        <EmptyState
-          title="This project has no scope yet"
-          description="Start with the requirements — extract drafts from a document or record them by hand — then create the tasks, milestones, and risks that deliver them."
-          action={
-            <LinkButton href={`${base}/requirements`}>
-              Open Requirements
-            </LinkButton>
-          }
-        />
-      ) : null}
-
       <div className="grid gap-4 lg:grid-cols-2">
         <OverviewCard
           title="Overdue tasks"
@@ -390,22 +560,24 @@ export default async function ProjectOverviewPage({
             <Quiet>No weekly report yet. Generate one from the Reports tab.</Quiet>
           )}
         </OverviewCard>
-
-        <OverviewCard
-          title="Knowledge"
-          href={`${base}/documents`}
-          linkLabel="Manage documents"
-        >
-          <p className="text-sm text-slate-700">
-            {summary.totalDocuments} document
-            {summary.totalDocuments === 1 ? "" : "s"} · {summary.readyDocuments}{" "}
-            indexed
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Only indexed documents are used when asking questions in this project.
-          </p>
-        </OverviewCard>
       </div>
+        </section>
+      ) : (
+        <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Delivery tools are off
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-pretty text-slate-600">
+              This project is set up for requirements discovery. Turn delivery
+              tools on to plan tasks, a timeline, risks, and weekly reports
+              here — or export the agreed requirements to the tool your team
+              already uses.
+            </p>
+          </div>
+          <DeliveryToggle projectId={project.id} enabled={false} />
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { requirementStatusLabel } from "@/lib/pm/labels";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import type { RequirementRow } from "@/components/requirements-panel";
@@ -67,12 +68,12 @@ export function TraceabilityMatrix({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
         {approved.length === 0 ? (
           <span>
-            Nothing here is approved yet, so no delivery state is claimed.
+            Nothing here is agreed yet, so no delivery state is claimed.
           </span>
         ) : (
           <>
             <span className="font-medium text-slate-700">
-              {approved.length} approved:
+              {approved.length} agreed:
             </span>
             {DELIVERY_STATES.map((state) => (
               <span key={state} className="tabular-nums">
@@ -140,7 +141,7 @@ export function TraceabilityMatrix({
                     </button>
                     {!isApproved ? (
                       <span className="mt-0.5 block pl-14 text-xs text-amber-700">
-                        {row.status.replaceAll("_", " ")}
+                        {requirementStatusLabel(row.status)}
                       </span>
                     ) : null}
                   </Cell>

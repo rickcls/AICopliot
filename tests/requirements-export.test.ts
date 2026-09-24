@@ -96,7 +96,7 @@ describe("requirementsToMarkdown", () => {
       new Date("2026-09-24T10:00:00Z"),
     );
     expect(markdown).toContain("# Acme Portal — Requirements");
-    expect(markdown).toContain("Exported 2026-09-24 · 1 requirement · 1 approved");
+    expect(markdown).toContain("Exported 2026-09-24 · 1 requirement · 1 agreed");
     expect(markdown).toContain("## REQ-003 Single sign-on");
     expect(markdown).toContain("**Delivery:** No task");
     // Duplicate citations of one page collapse to one evidence line.

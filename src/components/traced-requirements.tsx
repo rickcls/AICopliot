@@ -1,3 +1,4 @@
+import { requirementStatusLabel } from "@/lib/pm/labels";
 import Link from "next/link";
 import type { TracedRequirementRow } from "@/components/task-types";
 import { FOCUS_RING } from "@/components/ui";
@@ -40,7 +41,7 @@ export function TracedRequirements({
             <span className="min-w-0 truncate">{link.requirement.title}</span>
             {link.requirement.status !== "approved" ? (
               <span className="shrink-0 text-[11px] text-amber-700">
-                {link.requirement.status.replaceAll("_", " ")}
+                {requirementStatusLabel(link.requirement.status)}
               </span>
             ) : null}
           </Link>
