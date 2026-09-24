@@ -28,6 +28,14 @@ describe("database url resolution", () => {
     expect(pooledDatabaseUrl(env)).toBe("postgres://explicit/db");
   });
 
+  it("prefers the Neon integration URL when DATABASE_URL is localhost", () => {
+    const env = {
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/ai_ops_copilot",
+      Storage_DATABASE_URL: "postgres://pooler/db",
+    };
+    expect(pooledDatabaseUrl(env)).toBe("postgres://pooler/db");
+  });
+
   it("treats a blank value as unset", () => {
     const env = {
       DATABASE_URL: "  ",

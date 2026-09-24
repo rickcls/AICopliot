@@ -31,11 +31,29 @@ const DIRECT_KEYS = [
   "POSTGRES_URL_NON_POOLING",
 ] as const;
 
-/** Pooled host. This is what a request on Vercel should use. */
+function isLocalDatabase(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pooled host. This is what a request on Vercel should use.
+ *
+ * A local `.env` copied into a deploy must not hide the Neon URL. When
+ * DATABASE_URL points at localhost and an integration URL is also present,
+ * the integration URL is the one that can actually be reached.
+ */
 export function pooledDatabaseUrl(
   env: EnvSource = process.env,
 ): string | undefined {
-  return firstSet(env, POOLED_KEYS);
+  const explicit = firstSet(env, ["DATABASE_URL"]);
+  const hosted = firstSet(env, POOLED_KEYS.slice(1));
+  if (explicit && hosted && isLocalDatabase(explicit)) return hosted;
+  return explicit ?? hosted;
 }
 
 /**
