@@ -194,12 +194,185 @@ export function requirementsToMarkdown(
   return lines.join("\n");
 }
 
+// --- Client packs ----------------------------------------------------------
+//
+// The two documents a consultant actually sends: the open questions to take
+// back to the client, and the agreed scope to sign. Each pack is built once as
+// data and rendered twice — Markdown here, HTML on the print page — so the PDF
+// and the download can never say different things.
+
+export type PackKind = "questions" | "signoff";
+
+export function parsePackKind(value: unknown): PackKind | null {
+  return value === "questions" || value === "signoff" ? value : null;
+}
+
+export const PACK_TITLE: Record<PackKind, string> = {
+  questions: "Open questions",
+  signoff: "Requirements for sign-off",
+};
+
+export interface PackItem {
+  code: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  type: string;
+  acceptanceCriteria: string | null;
+  /** What the client needs to answer. Questions pack only. */
+  question: string | null;
+  evidence: string[];
+}
+
+export interface PackGroup {
+  /** Stakeholder heading; null collects the rest. */
+  heading: string | null;
+  items: PackItem[];
+}
+
+const PRIORITY_ORDER: Record<string, number> = { must: 0, should: 1, could: 2, wont: 3 };
+
+function byPriorityThenSequence(a: ExportableRequirement, b: ExportableRequirement) {
+  return (
+    (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9) ||
+    a.sequence - b.sequence
+  );
+}
+
+function packItem(requirement: ExportableRequirement, question: string | null): PackItem {
+  return {
+    code: formatRequirementCode(requirement.sequence),
+    title: requirement.title,
+    description: requirement.description,
+    priority: requirement.priority,
+    type: words(requirement.type),
+    acceptanceCriteria: requirement.acceptanceCriteria,
+    question,
+    evidence: evidence(requirement),
+  };
+}
+
+/**
+ * Why the client is being asked. Recorded assumptions are the concrete open
+ * point; without them, the status or a low extraction confidence says what
+ * kind of answer is needed. Never invents a specific — the same rule the
+ * extraction prompt follows.
+ */
+function questionFor(requirement: ExportableRequirement): string {
+  if (requirement.assumptions) return requirement.assumptions.trim();
+  if (requirement.status === "needs_clarification") {
+    return "Please confirm this requirement and the detail it needs.";
+  }
+  return "The source states this only in general terms. Please confirm the specifics you expect.";
+}
+
+/**
+ * Items marked Ask client, plus undecided items extracted at low confidence —
+ * the vague ones that will otherwise surface as a dispute later. Agreed and
+ * rejected rows are settled, so they never appear. Grouped by stakeholder, so
+ * each person gets the questions that are theirs.
+ */
+export function questionsPack(rows: ExportableRequirement[]): PackGroup[] {
+  const open = rows
+    .filter(
+      (row) =>
+        row.status === "needs_clarification" ||
+        (row.confidence === "low" &&
+          (row.status === "draft" || row.status === "validated")),
+    )
+    .sort(byPriorityThenSequence);
+
+  const groups = new Map<string | null, PackItem[]>();
+  for (const row of open) {
+    const heading = row.stakeholder?.trim() || null;
+    const items = groups.get(heading) ?? [];
+    items.push(packItem(row, questionFor(row)));
+    groups.set(heading, items);
+  }
+  // Named stakeholders first, alphabetically; the unassigned group last.
+  return [...groups.entries()]
+    .sort(([a], [b]) =>
+      a === null ? 1 : b === null ? -1 : a.localeCompare(b),
+    )
+    .map(([heading, items]) => ({ heading, items }));
+}
+
+/** Agreed scope only, Must first — the order a client reads a contract in. */
+export function signOffPack(rows: ExportableRequirement[]): PackGroup[] {
+  const agreed = rows
+    .filter((row) => row.status === "approved")
+    .sort(byPriorityThenSequence)
+    .map((row) => packItem(row, null));
+  return agreed.length === 0 ? [] : [{ heading: null, items: agreed }];
+}
+
+export function buildPack(kind: PackKind, rows: ExportableRequirement[]) {
+  return kind === "questions" ? questionsPack(rows) : signOffPack(rows);
+}
+
+export function packToMarkdown(
+  kind: PackKind,
+  projectName: string,
+  groups: PackGroup[],
+  exportedAt: Date,
+): string {
+  const count = groups.reduce((total, group) => total + group.items.length, 0);
+  const lines = [
+    `# ${inline(projectName)} — ${PACK_TITLE[kind]}`,
+    "",
+    `${exportedAt.toISOString().slice(0, 10)} · ${count} item${count === 1 ? "" : "s"}`,
+    "",
+    kind === "questions"
+      ? "Each item below is something we understood from your documents but could not confirm. Please answer the point under each one."
+      : "The requirements below are the agreed scope. Please review and sign below to confirm.",
+    "",
+  ];
+
+  for (const group of groups) {
+    if (group.heading) lines.push(`## For ${inline(group.heading)}`, "");
+    for (const item of group.items) {
+      lines.push(
+        `### ${item.code} ${inline(item.title)}`,
+        "",
+        `${item.priority.toUpperCase()} · ${item.type}`,
+        "",
+      );
+      if (item.description) lines.push(item.description.trim(), "");
+      if (item.question) lines.push(`**To confirm:** ${inline(item.question)}`, "");
+      if (item.acceptanceCriteria) {
+        lines.push(`**Acceptance:** ${inline(item.acceptanceCriteria)}`, "");
+      }
+      if (item.evidence.length > 0) {
+        lines.push(`_Source: ${item.evidence.map(inline).join("; ")}_`, "");
+      }
+    }
+  }
+
+  if (kind === "signoff") {
+    lines.push(
+      "---",
+      "",
+      "Approved by: ______________________________",
+      "",
+      "Role: ______________________________",
+      "",
+      "Date: ______________________________",
+      "",
+    );
+  }
+  return lines.join("\n");
+}
+
 /** A filename-safe slug; falls back so an all-symbol name still downloads. */
-export function exportFilename(projectName: string, extension: "csv" | "md"): string {
+export function exportFilename(
+  projectName: string,
+  extension: "csv" | "md",
+  suffix = "requirements",
+): string {
   const slug = projectName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
-  return `${slug || "project"}-requirements.${extension}`;
+  return `${slug || "project"}-${suffix}.${extension}`;
 }

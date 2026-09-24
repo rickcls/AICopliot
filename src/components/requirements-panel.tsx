@@ -942,30 +942,40 @@ export function RequirementsPanel({
           New requirement
         </Button>
         {requirements.length > 0 ? (
-          // Plain anchors: the route answers with Content-Disposition, so the
-          // browser downloads without any client-side state.
-          <div className="flex items-center gap-1" role="group" aria-label="Export">
+          // The two packs are what goes to the client; they open as printable
+          // pages (Save as PDF) with a Markdown download there too. The CSV is
+          // the whole register for a spreadsheet. Plain anchors throughout:
+          // the export route answers with Content-Disposition.
+          <div
+            className="flex flex-wrap items-center gap-1"
+            role="group"
+            aria-label="Share with the client"
+          >
             <Download className="size-3.5 text-slate-400" aria-hidden />
-            {(
-              [
-                ["csv", "CSV"],
-                ["md", "Markdown"],
-              ] as const
-            ).map(([format, text]) => (
-              <a
-                key={format}
-                href={`/api/projects/${projectId}/requirements/export?format=${format}`}
-                download
-                className={buttonClasses({
-                  variant: "ghost",
-                  size: "sm",
-                  className: "px-2",
-                })}
-                aria-label={`Export requirements as ${text}`}
-              >
-                {text}
-              </a>
-            ))}
+            <a
+              href={`/print/requirements/${projectId}?pack=questions`}
+              target="_blank"
+              rel="noopener"
+              className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
+            >
+              Client questions
+            </a>
+            <a
+              href={`/print/requirements/${projectId}?pack=signoff`}
+              target="_blank"
+              rel="noopener"
+              className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
+            >
+              Sign-off document
+            </a>
+            <a
+              href={`/api/projects/${projectId}/requirements/export?format=csv`}
+              download
+              aria-label="Download the whole register as CSV"
+              className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
+            >
+              CSV
+            </a>
           </div>
         ) : null}
       </SectionHeader>

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildPack,
   csvCell,
   exportFilename,
+  packToMarkdown,
+  parsePackKind,
+  questionsPack,
+  signOffPack,
   requirementsToCsv,
   requirementsToMarkdown,
   type ExportableRequirement,
@@ -119,5 +124,96 @@ describe("exportFilename", () => {
       "acme-portal-phase-2-requirements.csv",
     );
     expect(exportFilename("???", "md")).toBe("project-requirements.md");
+  });
+});
+
+describe("questionsPack", () => {
+  it("collects Ask client items and undecided low-confidence ones only", () => {
+    const groups = questionsPack([
+      requirement({ sequence: 1, status: "needs_clarification", stakeholder: null }),
+      requirement({ sequence: 2, status: "draft", confidence: "low", stakeholder: null }),
+      requirement({ sequence: 3, status: "draft", confidence: "high", stakeholder: null }),
+      requirement({ sequence: 4, status: "approved", confidence: "low", stakeholder: null }),
+      requirement({ sequence: 5, status: "rejected", confidence: "low", stakeholder: null }),
+    ]);
+    expect(groups.flatMap((group) => group.items.map((item) => item.code))).toEqual([
+      "REQ-001",
+      "REQ-002",
+    ]);
+  });
+
+  it("asks the recorded assumption rather than inventing a question", () => {
+    const [group] = questionsPack([
+      requirement({
+        status: "needs_clarification",
+        assumptions: "Which identity provider — Azure AD or Okta?",
+      }),
+    ]);
+    expect(group.items[0].question).toBe("Which identity provider — Azure AD or Okta?");
+  });
+
+  it("groups by stakeholder, named first and unassigned last", () => {
+    const groups = questionsPack([
+      requirement({ sequence: 1, status: "needs_clarification", stakeholder: null }),
+      requirement({ sequence: 2, status: "needs_clarification", stakeholder: "Operations" }),
+      requirement({ sequence: 3, status: "needs_clarification", stakeholder: "Finance" }),
+    ]);
+    expect(groups.map((group) => group.heading)).toEqual(["Finance", "Operations", null]);
+  });
+});
+
+describe("signOffPack", () => {
+  it("includes agreed scope only, Must first", () => {
+    const [group] = signOffPack([
+      requirement({ sequence: 1, status: "approved", priority: "could" }),
+      requirement({ sequence: 2, status: "validated", priority: "must" }),
+      requirement({ sequence: 3, status: "approved", priority: "must" }),
+    ]);
+    expect(group.items.map((item) => item.code)).toEqual(["REQ-003", "REQ-001"]);
+    expect(group.items[0].question).toBeNull();
+  });
+
+  it("is empty when nothing is agreed", () => {
+    expect(signOffPack([requirement({ status: "draft" })])).toEqual([]);
+  });
+});
+
+describe("packToMarkdown", () => {
+  it("renders the question under each item", () => {
+    const markdown = packToMarkdown(
+      "questions",
+      "Acme",
+      buildPack("questions", [
+        requirement({ status: "needs_clarification", assumptions: "Retention period?" }),
+      ]),
+      new Date("2026-09-24T00:00:00Z"),
+    );
+    expect(markdown).toContain("# Acme — Open questions");
+    expect(markdown).toContain("**To confirm:** Retention period?");
+    expect(markdown).not.toContain("Approved by:");
+  });
+
+  it("ends a sign-off document with a signature block", () => {
+    const markdown = packToMarkdown(
+      "signoff",
+      "Acme",
+      buildPack("signoff", [requirement()]),
+      new Date("2026-09-24T00:00:00Z"),
+    );
+    expect(markdown).toContain("# Acme — Requirements for sign-off");
+    expect(markdown).toContain("Approved by:");
+  });
+});
+
+describe("parsePackKind", () => {
+  it("accepts only the two packs", () => {
+    expect(parsePackKind("questions")).toBe("questions");
+    expect(parsePackKind("signoff")).toBe("signoff");
+    expect(parsePackKind("all")).toBeNull();
+    expect(parsePackKind(["questions"])).toBeNull();
+  });
+
+  it("names pack downloads distinctly", () => {
+    expect(exportFilename("Acme", "md", "sign-off")).toBe("acme-sign-off.md");
   });
 });

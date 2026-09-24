@@ -127,8 +127,9 @@ function DiscoveryStage({
 function nextStepCopy(
   step: DiscoveryStep,
   counts: DiscoveryCounts,
-  base: string,
+  projectId: string,
 ): { title: string; description: string; cta: string; href: string } {
+  const base = `/projects/${projectId}`;
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   switch (step) {
     case "upload":
@@ -167,9 +168,9 @@ function nextStepCopy(
       return {
         title: `${plural(counts.askClient, "question")} for the client`,
         description:
-          "Take these back to the client. Update each requirement once it is answered.",
-        cta: "Open questions",
-        href: `${base}/requirements?filter=needs_clarification`,
+          "Send the client the question list, then update each requirement once it is answered.",
+        cta: "Open the question list",
+        href: `/print/requirements/${projectId}?pack=questions`,
       };
     case "agree":
       return {
@@ -184,8 +185,8 @@ function nextStepCopy(
         title: `${plural(counts.agreed, "requirement")} agreed`,
         description:
           "The scope is agreed. Share it with the client for sign-off, or add new documents as the project evolves — new extractions are checked against this register.",
-        cta: "View agreed scope",
-        href: `${base}/requirements?filter=approved`,
+        cta: "Open the sign-off document",
+        href: `/print/requirements/${projectId}?pack=signoff`,
       };
   }
 }
@@ -274,7 +275,7 @@ export default async function ProjectOverviewPage({
     rejected: byStatus.rejected,
   };
   const step = nextDiscoveryStep(discovery);
-  const next = nextStepCopy(step, discovery, base);
+  const next = nextStepCopy(step, discovery, project.id);
   const live =
     byStatus.draft +
     byStatus.needs_clarification +
