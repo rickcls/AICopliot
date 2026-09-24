@@ -8,16 +8,22 @@ import {
   Button,
   Card,
   CHECKBOX,
+  DescriptionList,
   EmptyState,
   ErrorState,
+  Field,
+  FOCUS_RING,
   Input,
+  LinkButton,
   SectionHeader,
   Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
+import { Check, ChevronRight, X } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { formatDate } from "@/lib/utils";
+import { worstRiskLevel } from "@/lib/pm/filters";
+import { cn, formatDate, formatDay } from "@/lib/utils";
 
 type GenerationStatus = "draft" | "approved" | "rejected" | "not_applicable";
 type ItemKind = "milestone" | "task" | "risk" | "dependency";
@@ -253,13 +259,110 @@ function SummarySection({
   );
 }
 
-function ProposalCard({
+const LEVEL_TONE = { low: "neutral", medium: "warning", high: "danger" } as const;
+
+const TASK_STATUSES = ["backlog", "todo", "in_progress", "blocked", "done"];
+const TASK_PRIORITY_VALUES = ["low", "medium", "high", "urgent"];
+const MILESTONE_STATUSES = [
+  "not_started",
+  "on_track",
+  "at_risk",
+  "blocked",
+  "completed",
+];
+const RISK_STATUSES = ["open", "monitoring", "mitigated", "accepted"];
+const RISK_LEVELS = ["low", "medium", "high"];
+
+function words(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function initialValues(proposal: Proposal): Record<string, string> {
+  if (proposal.kind === "milestone") {
+    return {
+      title: proposal.title,
+      description: proposal.description ?? "",
+      targetDate: day(proposal.targetDate),
+      status: proposal.status,
+    };
+  }
+  if (proposal.kind === "task") {
+    return {
+      title: proposal.title,
+      description: proposal.description ?? "",
+      startDate: day(proposal.startDate),
+      dueDate: day(proposal.dueDate),
+      status: proposal.status,
+      priority: proposal.priority,
+      milestoneId: proposal.milestone?.id ?? "",
+    };
+  }
+  if (proposal.kind === "risk") {
+    return {
+      description: proposal.description,
+      mitigation: proposal.mitigation ?? "",
+      impact: proposal.impact,
+      likelihood: proposal.likelihood,
+      status: proposal.status,
+      milestoneId: proposal.milestone?.id ?? "",
+    };
+  }
+  return {
+    taskId: proposal.taskId,
+    dependsOnTaskId: proposal.dependsOnTaskId,
+  };
+}
+
+/** The one line a collapsed row shows: what the proposal *is*. */
+function headline(proposal: Proposal): string {
+  if (proposal.kind === "risk") return proposal.description;
+  if (proposal.kind === "dependency") {
+    return `${proposal.task.title} → after ${proposal.dependsOnTask.title}`;
+  }
+  return proposal.title;
+}
+
+/**
+ * Label + control on one row. Plain `div`s rather than the record lists'
+ * `<dl>`: these are form controls with their own labels (see task-form.tsx).
+ */
+function EditRow({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-1 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center sm:gap-x-6">
+      <label htmlFor={htmlFor} className="text-xs font-medium text-slate-500">
+        {label}
+      </label>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * One proposal as one line, expanded on demand.
+ *
+ * This was a card per proposal with every field rendered as a live input, so a
+ * 30-item plan was a wall of identical boxes and the thing a reviewer needs —
+ * what is being proposed, and on what evidence — was the smallest text on
+ * screen. Collapsed, a row carries only the title and the facts that decide
+ * approval; the editor and the sources live in the expansion. Decided rows
+ * expand into read-only values, not disabled inputs.
+ */
+function ProposalRow({
   proposal,
   tasks,
   milestones,
   selected,
   disabled,
   onToggle,
+  onApprove,
   onSave,
   onReject,
 }: {
@@ -269,45 +372,18 @@ function ProposalCard({
   selected: boolean;
   disabled: boolean;
   onToggle: () => void;
+  onApprove: () => Promise<void>;
   onSave: (changes: Record<string, unknown>) => Promise<void>;
   onReject: () => Promise<void>;
 }) {
   const editable = proposal.generationStatus === "draft";
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    if (proposal.kind === "milestone") {
-      return {
-        title: proposal.title,
-        description: proposal.description ?? "",
-        targetDate: day(proposal.targetDate),
-        status: proposal.status,
-      } as Record<string, string>;
-    }
-    if (proposal.kind === "task") {
-      return {
-        title: proposal.title,
-        description: proposal.description ?? "",
-        startDate: day(proposal.startDate),
-        dueDate: day(proposal.dueDate),
-        status: proposal.status,
-        priority: proposal.priority,
-        milestoneId: proposal.milestone?.id ?? "",
-      } as Record<string, string>;
-    }
-    if (proposal.kind === "risk") {
-      return {
-        description: proposal.description,
-        mitigation: proposal.mitigation ?? "",
-        impact: proposal.impact,
-        likelihood: proposal.likelihood,
-        status: proposal.status,
-        milestoneId: proposal.milestone?.id ?? "",
-      } as Record<string, string>;
-    }
-    return {
-      taskId: proposal.taskId,
-      dependsOnTaskId: proposal.dependsOnTaskId,
-    } as Record<string, string>;
-  });
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    initialValues(proposal),
+  );
+  const baseline = useMemo(() => initialValues(proposal), [proposal]);
+  const dirty = Object.keys(values).some((key) => values[key] !== baseline[key]);
+  const idPrefix = `proposal-${proposal.kind}-${proposal.id}`;
 
   function set(name: string, value: string) {
     setValues((previous) => ({ ...previous, [name]: value }));
@@ -367,259 +443,356 @@ function ProposalCard({
     }
   }
 
+  const dateText =
+    proposal.kind === "task"
+      ? proposal.dueDate
+        ? `due ${formatDay(proposal.dueDate)}`
+        : null
+      : proposal.kind === "milestone"
+        ? proposal.targetDate
+          ? formatDay(proposal.targetDate)
+          : "no date"
+        : null;
+
+  function select(
+    name: string,
+    label: string,
+    options: string[],
+    format: (value: string) => string = words,
+  ) {
+    return (
+      <EditRow label={label} htmlFor={`${idPrefix}-${name}`}>
+        <Select
+          id={`${idPrefix}-${name}`}
+          value={values[name]}
+          onChange={(event) => set(name, event.target.value)}
+          disabled={disabled}
+          className="h-9 w-full max-w-sm capitalize"
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {format(option)}
+            </option>
+          ))}
+        </Select>
+      </EditRow>
+    );
+  }
+
+  function milestoneSelect() {
+    return (
+      <EditRow label="Milestone" htmlFor={`${idPrefix}-milestone`}>
+        <Select
+          id={`${idPrefix}-milestone`}
+          value={values.milestoneId}
+          onChange={(event) => set("milestoneId", event.target.value)}
+          disabled={disabled}
+          className="h-9 w-full max-w-sm"
+        >
+          <option value="">No milestone</option>
+          {milestoneOptions.map((milestone) => (
+            <option key={milestone.id} value={milestone.id}>
+              {milestone.title}
+            </option>
+          ))}
+        </Select>
+      </EditRow>
+    );
+  }
+
   return (
-    <Card className="p-4">
-      <div className="flex items-start gap-3">
+    <li className={cn(disabled && "opacity-70")}>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 transition-colors",
+          open ? "bg-slate-50" : "hover:bg-slate-50/70",
+        )}
+      >
         {editable ? (
           <input
             type="checkbox"
             checked={selected}
             onChange={onToggle}
             disabled={disabled}
-            aria-label="Select proposal"
-            className={`mt-1 ${CHECKBOX}`}
+            aria-label={`Select “${headline(proposal)}”`}
+            className={CHECKBOX}
           />
         ) : null}
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={editable ? "info" : proposal.generationStatus === "approved" ? "success" : "neutral"}>
-              {proposal.generationStatus.replace("_", " ")}
-            </Badge>
-            {proposal.reviewedAt ? (
-              <span className="text-xs text-slate-400">
-                reviewed {formatDate(proposal.reviewedAt)}
-              </span>
-            ) : null}
-            {(proposal.kind === "task" || proposal.kind === "risk") &&
-            proposal.milestone ? (
-              <span className="text-xs text-slate-500">
-                Milestone: {proposal.milestone.title}
-              </span>
-            ) : null}
-          </div>
-
-          {proposal.kind === "milestone" || proposal.kind === "task" ? (
-            <Input
-              aria-label={`${proposal.kind} title`}
-              value={values.title}
-              onChange={(event) => set("title", event.target.value)}
-              disabled={!editable || disabled}
-              maxLength={200}
-            />
-          ) : null}
-
-          {proposal.kind !== "dependency" ? (
-            <Textarea
-              aria-label={proposal.kind === "risk" ? "Risk description" : "Description"}
-              value={values.description}
-              onChange={(event) => set("description", event.target.value)}
-              disabled={!editable || disabled}
-              rows={2}
-              maxLength={4000}
-            />
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-              <Select
-                aria-label="Dependent task"
-                value={values.taskId}
-                onChange={(event) => set("taskId", event.target.value)}
-                disabled={!editable || disabled}
-                className="w-full"
-              >
-                {taskOptions.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title}
-                  </option>
-                ))}
-              </Select>
-              <span className="text-center text-xs text-slate-500">depends on</span>
-              <Select
-                aria-label="Prerequisite task"
-                value={values.dependsOnTaskId}
-                onChange={(event) => set("dependsOnTaskId", event.target.value)}
-                disabled={!editable || disabled}
-                className="w-full"
-              >
-                {taskOptions.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title}
-                  </option>
-                ))}
-              </Select>
-            </div>
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className={cn(
+            "flex min-w-0 flex-1 basis-60 items-center gap-2 rounded-md py-0.5 text-left",
+            FOCUS_RING,
           )}
+        >
+          <ChevronRight
+            aria-hidden
+            className={cn(
+              "size-4 shrink-0 text-slate-400 transition-transform",
+              open && "rotate-90",
+            )}
+          />
+          <span className="min-w-0 truncate text-sm text-slate-900">
+            {headline(proposal)}
+          </span>
+        </button>
 
-          {proposal.kind === "milestone" ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Input
-                type="date"
-                aria-label="Target date"
-                value={values.targetDate}
-                onChange={(event) => set("targetDate", event.target.value)}
-                disabled={!editable || disabled}
-              />
-              <Select
-                aria-label="Milestone status"
-                value={values.status}
-                onChange={(event) => set("status", event.target.value)}
-                disabled={!editable || disabled}
-              >
-                {[
-                  "not_started",
-                  "on_track",
-                  "at_risk",
-                  "blocked",
-                  "completed",
-                ].map((status) => (
-                  <option key={status} value={status}>
-                    {status.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          ) : null}
-
-          {proposal.kind === "task" ? (
-            <div className="grid gap-2 sm:grid-cols-5">
-              <Input
-                type="date"
-                aria-label="Start date"
-                value={values.startDate}
-                onChange={(event) => set("startDate", event.target.value)}
-                disabled={!editable || disabled}
-              />
-              <Input
-                type="date"
-                aria-label="Due date"
-                value={values.dueDate}
-                onChange={(event) => set("dueDate", event.target.value)}
-                disabled={!editable || disabled}
-              />
-              <Select
-                aria-label="Task status"
-                value={values.status}
-                onChange={(event) => set("status", event.target.value)}
-                disabled={!editable || disabled}
-              >
-                {["backlog", "todo", "in_progress", "blocked", "done"].map(
-                  (status) => (
-                    <option key={status} value={status}>
-                      {status.replaceAll("_", " ")}
-                    </option>
-                  ),
-                )}
-              </Select>
-              <Select
-                aria-label="Task priority"
-                value={values.priority}
-                onChange={(event) => set("priority", event.target.value)}
-                disabled={!editable || disabled}
-              >
-                {["low", "medium", "high", "urgent"].map((priority) => (
-                  <option key={priority} value={priority}>
-                    {priority}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                aria-label="Task milestone"
-                value={values.milestoneId}
-                onChange={(event) => set("milestoneId", event.target.value)}
-                disabled={!editable || disabled}
-              >
-                <option value="">No milestone</option>
-                {milestoneOptions.map((milestone) => (
-                  <option key={milestone.id} value={milestone.id}>
-                    {milestone.title}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          ) : null}
-
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-6 sm:pl-0">
           {proposal.kind === "risk" ? (
+            <Badge tone={LEVEL_TONE[worstRiskLevel(proposal)]}>
+              {proposal.impact} · {proposal.likelihood}
+            </Badge>
+          ) : null}
+          {proposal.kind === "task" && proposal.priority === "urgent" ? (
+            <Badge tone="danger">urgent</Badge>
+          ) : null}
+          {dateText ? (
+            <span className="text-xs text-slate-500 tabular-nums">{dateText}</span>
+          ) : null}
+          {/* A proposal with no evidence cannot exist (validation drops it),
+              so the count is information, never a warning. */}
+          <span className="text-xs text-slate-400">
+            {proposal.citations.length} source
+            {proposal.citations.length === 1 ? "" : "s"}
+          </span>
+          {!editable ? (
+            <Badge
+              tone={proposal.generationStatus === "approved" ? "success" : "neutral"}
+            >
+              {words(proposal.generationStatus)}
+            </Badge>
+          ) : (
             <>
-              <Textarea
-                aria-label="Risk mitigation"
-                value={values.mitigation}
-                onChange={(event) => set("mitigation", event.target.value)}
-                disabled={!editable || disabled}
-                placeholder="Mitigation"
-                rows={2}
-                maxLength={4000}
-              />
-              <div className="grid gap-2 sm:grid-cols-4">
-                {(["impact", "likelihood"] as const).map((field) => (
-                  <Select
-                    key={field}
-                    aria-label={field}
-                    value={values[field]}
-                    onChange={(event) => set(field, event.target.value)}
-                    disabled={!editable || disabled}
-                  >
-                    {["low", "medium", "high"].map((level) => (
-                      <option key={level} value={level}>
-                        {field}: {level}
-                      </option>
-                    ))}
-                  </Select>
-                ))}
-                <Select
-                  aria-label="Risk status"
-                  value={values.status}
-                  onChange={(event) => set("status", event.target.value)}
-                  disabled={!editable || disabled}
-                >
-                  {["open", "monitoring", "mitigated", "accepted"].map(
-                    (status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ),
-                  )}
-                </Select>
-                <Select
-                  aria-label="Risk milestone"
-                  value={values.milestoneId}
-                  onChange={(event) => set("milestoneId", event.target.value)}
-                  disabled={!editable || disabled}
-                >
-                  <option value="">No milestone</option>
-                  {milestoneOptions.map((milestone) => (
-                    <option key={milestone.id} value={milestone.id}>
-                      {milestone.title}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </>
-          ) : null}
-
-          {editable ? (
-            <div className="flex justify-end gap-2">
               <Button
                 type="button"
-                size="sm"
-                variant="secondary"
+                size="icon"
+                variant="ghost"
+                disabled={disabled}
+                aria-label={`Approve “${headline(proposal)}”`}
+                title="Approve"
+                onClick={() => void onApprove()}
+                className="text-emerald-700 hover:bg-emerald-50"
+              >
+                <Check className="size-4" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={disabled}
+                aria-label={`Reject “${headline(proposal)}”`}
+                title="Reject"
                 onClick={() => void onReject()}
-                disabled={disabled}
+                className="text-slate-500 hover:bg-red-50 hover:text-red-700"
               >
-                Reject
+                <X className="size-4" aria-hidden />
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void save()}
-                disabled={disabled}
-              >
-                Save edit
-              </Button>
-            </div>
-          ) : null}
-          <CitationList citations={proposal.citations} />
+            </>
+          )}
         </div>
       </div>
-    </Card>
+
+      {open ? (
+        <div className="space-y-3 border-t border-slate-100 bg-slate-50/40 px-4 py-4 sm:pl-12">
+          {editable ? (
+            <div className="space-y-2.5">
+              {proposal.kind === "milestone" || proposal.kind === "task" ? (
+                <EditRow label="Title" htmlFor={`${idPrefix}-title`}>
+                  <Input
+                    id={`${idPrefix}-title`}
+                    value={values.title}
+                    onChange={(event) => set("title", event.target.value)}
+                    disabled={disabled}
+                    maxLength={200}
+                    className="h-9"
+                  />
+                </EditRow>
+              ) : null}
+
+              {proposal.kind === "dependency" ? (
+                <>
+                  <EditRow label="Task" htmlFor={`${idPrefix}-task`}>
+                    <Select
+                      id={`${idPrefix}-task`}
+                      value={values.taskId}
+                      onChange={(event) => set("taskId", event.target.value)}
+                      disabled={disabled}
+                      className="h-9 w-full"
+                    >
+                      {taskOptions.map((task) => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}
+                        </option>
+                      ))}
+                    </Select>
+                  </EditRow>
+                  <EditRow label="Depends on" htmlFor={`${idPrefix}-prereq`}>
+                    <Select
+                      id={`${idPrefix}-prereq`}
+                      value={values.dependsOnTaskId}
+                      onChange={(event) =>
+                        set("dependsOnTaskId", event.target.value)
+                      }
+                      disabled={disabled}
+                      className="h-9 w-full"
+                    >
+                      {taskOptions.map((task) => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}
+                        </option>
+                      ))}
+                    </Select>
+                  </EditRow>
+                </>
+              ) : (
+                <EditRow
+                  label={proposal.kind === "risk" ? "Risk" : "Description"}
+                  htmlFor={`${idPrefix}-description`}
+                >
+                  <Textarea
+                    id={`${idPrefix}-description`}
+                    value={values.description}
+                    onChange={(event) => set("description", event.target.value)}
+                    disabled={disabled}
+                    rows={2}
+                    maxLength={4000}
+                  />
+                </EditRow>
+              )}
+
+              {proposal.kind === "milestone" ? (
+                <>
+                  <EditRow label="Target date" htmlFor={`${idPrefix}-target`}>
+                    <Input
+                      id={`${idPrefix}-target`}
+                      type="date"
+                      value={values.targetDate}
+                      onChange={(event) => set("targetDate", event.target.value)}
+                      disabled={disabled}
+                      className="h-9 w-auto"
+                    />
+                  </EditRow>
+                  {select("status", "Status", MILESTONE_STATUSES)}
+                </>
+              ) : null}
+
+              {proposal.kind === "task" ? (
+                <>
+                  <EditRow label="Dates" htmlFor={`${idPrefix}-start`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        id={`${idPrefix}-start`}
+                        type="date"
+                        aria-label="Start date"
+                        value={values.startDate}
+                        onChange={(event) => set("startDate", event.target.value)}
+                        disabled={disabled}
+                        className="h-9 w-auto"
+                      />
+                      <span aria-hidden className="text-slate-400">
+                        →
+                      </span>
+                      <Input
+                        type="date"
+                        aria-label="Due date"
+                        value={values.dueDate}
+                        onChange={(event) => set("dueDate", event.target.value)}
+                        disabled={disabled}
+                        className="h-9 w-auto"
+                      />
+                    </div>
+                  </EditRow>
+                  {select("status", "Status", TASK_STATUSES)}
+                  {select("priority", "Priority", TASK_PRIORITY_VALUES)}
+                  {milestoneSelect()}
+                </>
+              ) : null}
+
+              {proposal.kind === "risk" ? (
+                <>
+                  <EditRow label="Mitigation" htmlFor={`${idPrefix}-mitigation`}>
+                    <Textarea
+                      id={`${idPrefix}-mitigation`}
+                      value={values.mitigation}
+                      onChange={(event) => set("mitigation", event.target.value)}
+                      disabled={disabled}
+                      placeholder="How this will be reduced or handled"
+                      rows={2}
+                      maxLength={4000}
+                    />
+                  </EditRow>
+                  {select("impact", "Impact", RISK_LEVELS)}
+                  {select("likelihood", "Likelihood", RISK_LEVELS)}
+                  {select("status", "Status", RISK_STATUSES)}
+                  {milestoneSelect()}
+                </>
+              ) : null}
+
+              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                {dirty ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={disabled}
+                    onClick={() => setValues(baseline)}
+                  >
+                    Discard changes
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void save()}
+                  disabled={disabled || !dirty}
+                >
+                  Save edit
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <DescriptionList>
+              {proposal.kind === "task" || proposal.kind === "milestone" ? (
+                <Field name="Description">
+                  {proposal.description || (
+                    <span className="text-slate-400">None</span>
+                  )}
+                </Field>
+              ) : null}
+              {proposal.kind === "task" ? (
+                <>
+                  <Field name="Dates">
+                    {proposal.startDate ? formatDay(proposal.startDate) : "—"} →{" "}
+                    {proposal.dueDate ? formatDay(proposal.dueDate) : "—"}
+                  </Field>
+                  <Field name="Priority">
+                    <span className="capitalize">{proposal.priority}</span>
+                  </Field>
+                </>
+              ) : null}
+              {proposal.kind === "risk" ? (
+                <Field name="Mitigation">
+                  {proposal.mitigation || (
+                    <span className="text-slate-400">None</span>
+                  )}
+                </Field>
+              ) : null}
+              {(proposal.kind === "task" || proposal.kind === "risk") &&
+              proposal.milestone ? (
+                <Field name="Milestone">{proposal.milestone.title}</Field>
+              ) : null}
+              {proposal.reviewedAt ? (
+                <Field name="Reviewed">{formatDate(proposal.reviewedAt)}</Field>
+              ) : null}
+            </DescriptionList>
+          )}
+          <CitationList citations={proposal.citations} />
+        </div>
+      ) : null}
+    </li>
   );
 }
 
@@ -770,9 +943,12 @@ export function ReviewPanel({
               title="No ready project documents"
               description="Upload and finish processing at least one document before generating a plan."
               action={
-                <Link className="text-sm font-medium text-blue-700 hover:underline" href={`/projects/${projectId}/documents`}>
+                <LinkButton
+                  href={`/projects/${projectId}/documents`}
+                  variant="secondary"
+                >
                   Open Documents
-                </Link>
+                </LinkButton>
               }
             />
           </div>
@@ -913,7 +1089,7 @@ export function ReviewPanel({
           ) : null}
 
           {run && proposals.length > 0 ? (
-            <div className="space-y-7">
+            <div className="space-y-5">
               {(
                 [
                   ["milestone", "Milestones"],
@@ -924,50 +1100,95 @@ export function ReviewPanel({
               ).map(([kind, title]) => {
                 const group = proposals.filter((proposal) => proposal.kind === kind);
                 if (group.length === 0) return null;
+                const draftKeys = group
+                  .filter((proposal) => proposal.generationStatus === "draft")
+                  .map(itemKey);
+                const selectedInGroup = draftKeys.filter((key) => selected.has(key));
+                const allSelected =
+                  draftKeys.length > 0 && selectedInGroup.length === draftKeys.length;
                 return (
-                  <section key={kind}>
-                    <h2 className="mb-2 text-sm font-semibold">{title} <span className="font-normal text-slate-400">{group.length}</span></h2>
-                    <div className="space-y-3">
-                      {group.map((proposal) => {
-                        const key = itemKey(proposal);
-                        return (
-                          <ProposalCard
-                            key={key}
-                            proposal={proposal}
-                            tasks={run.tasks}
-                            milestones={run.milestones}
-                            selected={selected.has(key)}
-                            disabled={busy}
-                            onToggle={() => {
+                  <section key={kind} aria-labelledby={`review-group-${kind}`}>
+                    <Card className="overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50/60 px-3 py-2">
+                        {draftKeys.length > 0 ? (
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={(node) => {
+                              if (node) {
+                                node.indeterminate =
+                                  selectedInGroup.length > 0 && !allSelected;
+                              }
+                            }}
+                            onChange={() => {
                               const next = new Set(selected);
-                              if (next.has(key)) next.delete(key);
-                              else next.add(key);
+                              for (const key of draftKeys) {
+                                if (allSelected) next.delete(key);
+                                else next.add(key);
+                              }
                               setSelected(next);
                             }}
-                            onSave={async (changes) => {
-                              await review({
-                                action: "edit",
-                                item: { kind: proposal.kind, id: proposal.id },
-                                changes,
-                              });
-                            }}
-                            onReject={async () => {
-                              const confirmed = await confirm({
-                                title: "Reject this suggestion?",
-                                body: "It stays in this run's history but will never become an official project record.",
-                                confirmLabel: "Reject",
-                                tone: "danger",
-                              });
-                              if (!confirmed) return;
-                              await review({
-                                action: "reject",
-                                items: [{ kind: proposal.kind, id: proposal.id }],
-                              });
-                            }}
+                            disabled={busy}
+                            aria-label={`Select all draft ${title.toLowerCase()}`}
+                            className={CHECKBOX}
                           />
-                        );
-                      })}
-                    </div>
+                        ) : null}
+                        <h2
+                          id={`review-group-${kind}`}
+                          className="text-sm font-semibold text-slate-900"
+                        >
+                          {title}
+                        </h2>
+                        <span className="text-xs text-slate-400 tabular-nums">
+                          {group.length}
+                          {draftKeys.length > 0 && draftKeys.length < group.length
+                            ? ` · ${draftKeys.length} awaiting review`
+                            : ""}
+                        </span>
+                      </div>
+                      <ul className="divide-y divide-slate-100">
+                        {group.map((proposal) => {
+                          const key = itemKey(proposal);
+                          return (
+                            <ProposalRow
+                              key={key}
+                              proposal={proposal}
+                              tasks={run.tasks}
+                              milestones={run.milestones}
+                              selected={selected.has(key)}
+                              disabled={busy}
+                              onToggle={() => {
+                                const next = new Set(selected);
+                                if (next.has(key)) next.delete(key);
+                                else next.add(key);
+                                setSelected(next);
+                              }}
+                              onApprove={() => approve([proposal])}
+                              onSave={async (changes) => {
+                                await review({
+                                  action: "edit",
+                                  item: { kind: proposal.kind, id: proposal.id },
+                                  changes,
+                                });
+                              }}
+                              onReject={async () => {
+                                const confirmed = await confirm({
+                                  title: "Reject this suggestion?",
+                                  body: "It stays in this run's history but will never become an official project record.",
+                                  confirmLabel: "Reject",
+                                  tone: "danger",
+                                });
+                                if (!confirmed) return;
+                                await review({
+                                  action: "reject",
+                                  items: [{ kind: proposal.kind, id: proposal.id }],
+                                });
+                              }}
+                            />
+                          );
+                        })}
+                      </ul>
+                    </Card>
                   </section>
                 );
               })}
