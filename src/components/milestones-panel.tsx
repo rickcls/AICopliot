@@ -6,9 +6,12 @@ import {
   Badge,
   Button,
   Card,
+  DescriptionList,
+  EmptyState,
   ErrorState,
   Field,
   Input,
+  SectionHeader,
   Select,
   Spinner,
   Textarea,
@@ -202,13 +205,10 @@ export function MilestonesPanel({
 
   return (
     <Card className="p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold">Milestones</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Dated checkpoints. These appear in the timeline above.
-          </p>
-        </div>
+      <SectionHeader
+        title="Milestones"
+        description="Dated checkpoints. These appear in the timeline above."
+      >
         <Button
           type="button"
           size="sm"
@@ -219,7 +219,7 @@ export function MilestonesPanel({
         >
           New milestone
         </Button>
-      </div>
+      </SectionHeader>
 
       {error ? (
         <div className="mt-3">
@@ -344,9 +344,12 @@ export function MilestonesPanel({
       ) : null}
 
       {milestones.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">
-          No milestones yet. Add one to mark a checkpoint in this project.
-        </p>
+        <div className="mt-4">
+          <EmptyState
+            title="No milestones yet"
+            description="Add one to mark a dated checkpoint. Milestones appear on the timeline and in weekly reports."
+          />
+        </div>
       ) : (
         <ul className="mt-3 -mx-1 divide-y divide-slate-100">
           {milestones.map((milestone) => {
@@ -402,7 +405,7 @@ export function MilestonesPanel({
 
                 {open ? (
                   <div className="border-t border-slate-100 bg-slate-50/50 px-1 py-3 pl-6">
-                    <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                    <DescriptionList>
                       <Field name="Description">
                         {milestone.description ? (
                           <p className="max-w-3xl text-pretty">
@@ -448,7 +451,7 @@ export function MilestonesPanel({
                           </ul>
                         </Field>
                       ) : null}
-                    </dl>
+                    </DescriptionList>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <Select

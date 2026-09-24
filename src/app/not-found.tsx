@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LinkButton } from "@/components/ui";
 
 /**
  * Unmatched URLs, which may well be reached by someone who is not signed in —
@@ -18,18 +18,10 @@ export default function NotFound() {
         Check the address, or head back and navigate from there.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <Link
-          href="/"
-          className="inline-flex h-10 items-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-700"
-        >
-          Back to home
-        </Link>
-        <Link
-          href="/dashboard"
-          className="inline-flex h-10 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50"
-        >
+        <LinkButton href="/">Back to home</LinkButton>
+        <LinkButton href="/dashboard" variant="secondary">
           Go to dashboard
-        </Link>
+        </LinkButton>
       </div>
     </main>
   );

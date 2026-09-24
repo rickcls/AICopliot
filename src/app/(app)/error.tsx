@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, LinkButton } from "@/components/ui";
 
 /**
  * Failure boundary for signed-in pages without a nearer one. Without it a
@@ -13,10 +12,10 @@ import { Button, Card } from "@/components/ui";
  */
 export default function AppError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <Card className="mx-auto max-w-lg p-6">
@@ -32,15 +31,12 @@ export default function AppError({
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" onClick={reset}>
+        <Button type="button" onClick={retry}>
           Try again
         </Button>
-        <Link
-          href="/dashboard"
-          className="inline-flex h-10 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"
-        >
+        <LinkButton href="/dashboard" variant="secondary">
           Back to dashboard
-        </Link>
+        </LinkButton>
       </div>
     </Card>
   );

@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Spinner } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  FOCUS_RING,
+  SectionHeader,
+  Spinner,
+} from "@/components/ui";
 import {
   statusReportToMarkdown,
   type SavedStatusReport,
@@ -42,7 +51,7 @@ function ReportSection({
         <span className="text-xs text-slate-400 tabular-nums">{items.length}</span>
       </div>
       {items.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-500">None.</p>
+        <p className="mt-2 text-sm text-slate-400">Nothing in this period.</p>
       ) : (
         <ul className="mt-3 divide-y divide-slate-100">
           {items.map((item) => (
@@ -235,13 +244,10 @@ export function StatusReportsPanel({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Weekly status reports</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Exact project sections with a concise, cited executive narrative.
-          </p>
-        </div>
+      <SectionHeader
+        title="Weekly status reports"
+        description="Exact project sections with a concise, cited executive narrative."
+      >
         <Button type="button" onClick={generate} disabled={pending}>
           {pending ? (
             <>
@@ -252,7 +258,7 @@ export function StatusReportsPanel({
             "Generate report"
           )}
         </Button>
-      </div>
+      </SectionHeader>
 
       {error ? <ErrorState message={error} /> : null}
 
@@ -267,8 +273,9 @@ export function StatusReportsPanel({
                 key={run.id}
                 type="button"
                 disabled={!run.report}
+                aria-pressed={selectedId === run.id}
                 onClick={() => setSelectedId(run.id)}
-                className={`min-w-48 rounded-lg border px-3 py-2 text-left text-xs transition-colors disabled:opacity-60 ${
+                className={`min-w-48 rounded-lg border px-3 py-2 text-left text-xs transition-colors disabled:opacity-60 ${FOCUS_RING} ${
                   selectedId === run.id
                     ? "border-slate-900 bg-slate-900 text-white"
                     : "border-slate-200 bg-white hover:bg-slate-50"

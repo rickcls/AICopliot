@@ -1,4 +1,5 @@
 import * as React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,33 +20,68 @@ import { cn } from "@/lib/utils";
 export const FOCUS_RING =
   "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonSize = "sm" | "md" | "icon";
+
+/**
+ * The class list behind `Button`, exported so a navigation that *looks* like a
+ * button (`LinkButton`) cannot drift from one that *is* one. Fourteen links had
+ * hand-copied these classes at three different heights.
+ */
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  className,
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  className?: string;
+} = {}) {
+  return cn(
+    "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors",
+    FOCUS_RING,
+    "disabled:pointer-events-none disabled:opacity-50",
+    size === "sm" && "h-8 px-3 text-sm",
+    size === "md" && "h-10 px-4 text-sm",
+    size === "icon" && "size-8 shrink-0 p-0",
+    variant === "primary" && "bg-slate-900 text-white hover:bg-slate-700",
+    variant === "secondary" &&
+      "border border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
+    variant === "ghost" && "text-slate-600 hover:bg-slate-100",
+    variant === "danger" && "bg-red-600 text-white hover:bg-red-700",
+    className,
+  );
+}
+
 export function Button({
   className,
   variant = "primary",
   size = "md",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-  size?: "sm" | "md" | "icon";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
 }) {
   return (
-    <button
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors",
-        FOCUS_RING,
-        "disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" && "h-8 px-3 text-sm",
-        size === "md" && "h-10 px-4 text-sm",
-        size === "icon" && "size-8 shrink-0 p-0",
-        variant === "primary" && "bg-slate-900 text-white hover:bg-slate-700",
-        variant === "secondary" &&
-          "border border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
-        variant === "ghost" && "text-slate-600 hover:bg-slate-100",
-        variant === "danger" && "bg-red-600 text-white hover:bg-red-700",
-        className,
-      )}
-      {...props}
-    />
+    <button className={buttonClasses({ variant, size, className })} {...props} />
+  );
+}
+
+/**
+ * A real link styled as a button. Navigation stays an `<a>` so it can be opened
+ * in a new tab and is announced as a link; only the paint is shared.
+ */
+export function LinkButton({
+  className,
+  variant = "primary",
+  size = "md",
+  ...props
+}: React.ComponentProps<typeof Link> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}) {
+  return (
+    <Link className={buttonClasses({ variant, size, className })} {...props} />
   );
 }
 
@@ -124,6 +160,13 @@ export const QUIET_CONTROL =
   // Status/Priority (coloured) hug their labels — the jagged edge that made
   // the task form look broken.
   "w-auto max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
+
+/**
+ * Native checkboxes keep their platform rendering (and so their forced-colors
+ * behaviour); this only aligns size, tint, and the focus ring with the rest of
+ * the controls.
+ */
+export const CHECKBOX = `size-4 shrink-0 rounded border-slate-300 accent-slate-900 ${FOCUS_RING}`;
 
 /** Fixed gutter for the leading icon on a quiet metadata row. */
 export const ROW_ICON =
@@ -234,6 +277,83 @@ export function Field({
       <dt className="text-xs font-medium text-slate-500">{name}</dt>
       <dd className="min-w-0 text-sm text-slate-700">{children}</dd>
     </>
+  );
+}
+
+/**
+ * The two-column grid that `Field` pairs sit in. The label column width is the
+ * only thing that varied between panels, so it is the only knob.
+ */
+export function DescriptionList({
+  labelWidth = "7rem",
+  className,
+  children,
+}: {
+  labelWidth?: "7rem" | "8rem";
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <dl
+      className={cn(
+        "grid grid-cols-1 gap-x-6 gap-y-2.5",
+        labelWidth === "7rem"
+          ? "sm:grid-cols-[7rem_minmax(0,1fr)]"
+          : "sm:grid-cols-[8rem_minmax(0,1fr)]",
+        className,
+      )}
+    >
+      {children}
+    </dl>
+  );
+}
+
+/**
+ * One headline number. A zero renders in the neutral colour whatever its tone —
+ * "0 overdue" in red is an alarm for good news.
+ */
+export function StatCard({
+  label,
+  value,
+  tone,
+  href,
+  hint,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "danger" | "warning" | "success";
+  href?: string;
+  hint?: React.ReactNode;
+}) {
+  const alarming = typeof value === "number" ? value > 0 : true;
+  const body = (
+    <Card
+      className={cn(
+        "h-full p-4",
+        href && "transition-colors group-hover:border-slate-300 group-hover:bg-slate-50",
+      )}
+    >
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p
+        className={cn(
+          "mt-1 text-2xl font-semibold tabular-nums text-slate-900",
+          alarming && tone === "danger" && "text-red-700",
+          alarming && tone === "warning" && "text-amber-700",
+          alarming && tone === "success" && "text-emerald-700",
+        )}
+      >
+        {value}
+      </p>
+      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+    </Card>
+  );
+
+  return href ? (
+    <Link href={href} className={cn("group block rounded-xl", FOCUS_RING)}>
+      {body}
+    </Link>
+  ) : (
+    body
   );
 }
 

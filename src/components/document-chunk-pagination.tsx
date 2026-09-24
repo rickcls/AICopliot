@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buttonClasses, LinkButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export function DocumentChunkPagination({
@@ -32,31 +33,33 @@ export function DocumentChunkPagination({
       {totalPages > 1 ? (
         <div className="flex items-center gap-2">
           {page > 1 ? (
-            <Link
-              href={href(page - 1)}
-              className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50"
-            >
+            <LinkButton href={href(page - 1)} variant="secondary" size="sm">
               Previous
-            </Link>
+            </LinkButton>
           ) : (
             <span
               aria-hidden
-              className="inline-flex h-8 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-300"
+              className={buttonClasses({
+                variant: "secondary",
+                size: "sm",
+                className: "pointer-events-none opacity-40",
+              })}
             >
               Previous
             </span>
           )}
           {page < totalPages ? (
-            <Link
-              href={href(page + 1)}
-              className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50"
-            >
+            <LinkButton href={href(page + 1)} variant="secondary" size="sm">
               Next
-            </Link>
+            </LinkButton>
           ) : (
             <span
               aria-hidden
-              className="inline-flex h-8 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-300"
+              className={buttonClasses({
+                variant: "secondary",
+                size: "sm",
+                className: "pointer-events-none opacity-40",
+              })}
             >
               Next
             </span>
@@ -89,10 +92,10 @@ export function DocumentChunkPageLinks({
               href={`/documents/${documentId}/chunks?page=${pageNumber}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex size-8 items-center justify-center rounded-lg text-sm font-medium transition-colors",
+                buttonClasses({ size: "icon", variant: "ghost" }),
                 active
                   ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                  : "hover:text-slate-900",
               )}
             >
               {pageNumber}

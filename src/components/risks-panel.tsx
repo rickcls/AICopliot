@@ -4,8 +4,10 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import {
   Badge,
+  type BadgeTone,
   Button,
   Card,
+  DescriptionList,
   EmptyState,
   ErrorState,
   Field,
@@ -13,7 +15,6 @@ import {
   Select,
   Spinner,
   Textarea,
-  type BadgeTone,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
@@ -505,7 +506,7 @@ export function RisksPanel({
                     <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-9">
                       {/* A two-column list gives the prose one wide measure
                           instead of stacking four narrow labelled blocks. */}
-                      <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
+                      <DescriptionList className="text-sm">
                         <Field name="Risk">
                           <p className="max-w-3xl text-pretty">
                             {risk.description}
@@ -570,7 +571,7 @@ export function RisksPanel({
                             </ul>
                           </Field>
                         ) : null}
-                      </dl>
+                      </DescriptionList>
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <Select

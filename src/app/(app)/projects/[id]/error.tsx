@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, LinkButton } from "@/components/ui";
 
 /**
  * Failure boundary for the project tabs. A missing or foreign project reaches
@@ -10,10 +9,10 @@ import { Button, Card } from "@/components/ui";
  */
 export default function ProjectTabError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <Card className="p-6">
@@ -30,15 +29,12 @@ export default function ProjectTabError({
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" onClick={reset}>
+        <Button type="button" onClick={retry}>
           Try again
         </Button>
-        <Link
-          href="/projects"
-          className="inline-flex h-10 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"
-        >
+        <LinkButton href="/projects" variant="secondary">
           Back to projects
-        </Link>
+        </LinkButton>
       </div>
     </Card>
   );

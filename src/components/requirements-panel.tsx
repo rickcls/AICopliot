@@ -8,10 +8,13 @@ import {
   Badge,
   Button,
   Card,
+  CHECKBOX,
+  DescriptionList,
   EmptyState,
   ErrorState,
   Field,
   Input,
+  SectionHeader,
   Select,
   Spinner,
   Textarea,
@@ -683,12 +686,10 @@ export function RequirementsPanel({
 
       {error ? <ErrorState message={error} /> : null}
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">
-            Requirement register
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+      <SectionHeader
+        title="Requirement register"
+        description={
+          <>
             {requirements.length} recorded ·{" "}
             {/* "Every approved requirement is covered" reads as reassurance, so
                 it must not be shown when nothing has been approved at all. */}
@@ -701,34 +702,33 @@ export function RequirementsPanel({
                 {uncoveredCount} of {approvedCount} approved have no delivery task
               </span>
             )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() =>
-              setExpanded((previous) =>
-                previous.size > 0 ? new Set() : new Set(visibleIds),
-              )
-            }
-          >
-            {expanded.size > 0 ? "Collapse all" : "Expand all"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              setEditingId(null);
-              setDraft({ ...EMPTY });
-            }}
-          >
-            New requirement
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      >
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            setExpanded((previous) =>
+              previous.size > 0 ? new Set() : new Set(visibleIds),
+            )
+          }
+        >
+          {expanded.size > 0 ? "Collapse all" : "Expand all"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setEditingId(null);
+            setDraft({ ...EMPTY });
+          }}
+        >
+          New requirement
+        </Button>
+      </SectionHeader>
 
       {draft ? (
         <Card className="p-4">
@@ -1176,7 +1176,7 @@ export function RequirementsPanel({
                         aria-label={`Select ${code}`}
                         checked={selected.has(requirement.id)}
                         onChange={() => toggleSelected(requirement.id)}
-                        className="size-4 shrink-0 rounded border-slate-300"
+                        className={CHECKBOX}
                       />
                       <button
                         type="button"
@@ -1224,7 +1224,7 @@ export function RequirementsPanel({
 
                     {open ? (
                       <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-12">
-                        <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                        <DescriptionList labelWidth="8rem">
                           <Field name="Description">
                             {requirement.description ? (
                               <p className="max-w-3xl text-pretty">
@@ -1380,7 +1380,7 @@ export function RequirementsPanel({
                               </ul>
                             </Field>
                           ) : null}
-                        </dl>
+                        </DescriptionList>
 
                         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
                           <Select

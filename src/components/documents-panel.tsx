@@ -334,7 +334,7 @@ export function DocumentsPanel({
           {visibleDocuments.map((doc) => (
             <div
               key={doc.id}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4"
+              className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3"
             >
               <div className="min-w-0 flex-1">
                 <Link
@@ -343,26 +343,31 @@ export function DocumentsPanel({
                 >
                   {doc.originalFilename}
                 </Link>
+                {/* The project is not repeated here: on a project tab every
+                    row would say the same thing, and in the library the
+                    assignment select beside the row already names it. */}
                 <p className="mt-0.5 text-xs text-slate-500">
                   {formatBytes(doc.sizeBytes)} · {formatDate(doc.createdAt)}
                   {doc.status === "ready"
                     ? ` · ${doc.chunkCount} chunks indexed`
                     : ""}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Project: {doc.project?.name ?? "Unassigned"}
-                </p>
                 {doc.status === "failed" && doc.errorMessage ? (
                   <p className="mt-1 text-xs text-red-700">{doc.errorMessage}</p>
                 ) : null}
               </div>
 
-              <Badge tone={STATUS_TONE[doc.status]}>
-                {doc.status === "processing" ? (
-                  <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-current" />
-                ) : null}
-                {STATUS_LABEL[doc.status]}
-              </Badge>
+              {/* Ready is the normal state, so only the exceptions are badged;
+                  the chunk count in the metadata line already says it is
+                  indexed. */}
+              {doc.status !== "ready" ? (
+                <Badge tone={STATUS_TONE[doc.status]}>
+                  {doc.status === "processing" ? (
+                    <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-current" />
+                  ) : null}
+                  {STATUS_LABEL[doc.status]}
+                </Badge>
+              ) : null}
 
               {doc.status === "failed" ? (
                 <Button

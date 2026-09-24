@@ -7,9 +7,11 @@ import {
   Badge,
   Button,
   Card,
+  CHECKBOX,
   EmptyState,
   ErrorState,
   Input,
+  SectionHeader,
   Select,
   Spinner,
   Textarea,
@@ -375,7 +377,7 @@ function ProposalCard({
             onChange={onToggle}
             disabled={disabled}
             aria-label="Select proposal"
-            className="mt-1 size-4 rounded border-slate-300"
+            className={`mt-1 ${CHECKBOX}`}
           />
         ) : null}
         <div className="min-w-0 flex-1 space-y-3">
@@ -736,14 +738,10 @@ export function ReviewPanel({
   return (
     <div className="space-y-6">
       <Card className="p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold">Generate a cited draft plan</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              ScopePilot proposes work only from selected ready documents. Nothing
-              enters Tasks, Timeline, or Risks until you approve it here.
-            </p>
-          </div>
+        <SectionHeader
+          title="Generate a cited draft plan"
+          description="ScopePilot proposes work only from selected ready documents. Nothing enters Tasks, Timeline, or Risks until you approve it here."
+        >
           <Button
             type="button"
             onClick={() => void generate()}
@@ -757,7 +755,7 @@ export function ReviewPanel({
             {busy ? <Spinner className="border-white/40 border-t-white" /> : null}
             Generate draft plan
           </Button>
-        </div>
+        </SectionHeader>
 
         {activeRun ? (
           <p className="mt-3 text-xs text-amber-700">
@@ -813,7 +811,7 @@ export function ReviewPanel({
                       else next.delete(document.id);
                       setDocumentIds(next);
                     }}
-                    className="mt-0.5 size-4 rounded border-slate-300"
+                    className={`mt-0.5 ${CHECKBOX}`}
                   />
                   <span className="min-w-0">
                     <span className="block truncate font-medium text-slate-800">
