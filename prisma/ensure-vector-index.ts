@@ -17,8 +17,18 @@
  * `docker compose exec`.
  */
 import "dotenv/config";
+import dns from "node:dns";
+import net from "node:net";
 import { Client } from "pg";
 import { migrationDatabaseUrl } from "../src/lib/database-url";
+
+// Same preference as src/instrumentation.ts. On networks that advertise IPv6
+// but cannot route it, pg's default lookup times out before it tries IPv4,
+// and the resulting AggregateError has an empty message.
+dns.setDefaultResultOrder("ipv4first");
+if (typeof net.setDefaultAutoSelectFamily === "function") {
+  net.setDefaultAutoSelectFamily(false);
+}
 
 const INDEX_NAME = "DocumentChunk_embedding_hnsw_idx";
 
@@ -84,6 +94,14 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`\npgvector index check FAILED:\n  ${(error as Error).message}\n`);
+  const err = error as Error & { errors?: Array<{ message?: string }> };
+  const detail =
+    err.message ||
+    err.errors
+      ?.map((item) => item.message)
+      .filter((message): message is string => Boolean(message))
+      .join("; ") ||
+    err.name;
+  console.error(`\npgvector index check FAILED:\n  ${detail}\n`);
   process.exit(1);
 });
