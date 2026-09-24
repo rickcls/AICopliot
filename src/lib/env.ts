@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { pooledDatabaseUrl } from "@/lib/database-url";
 
 /**
  * Server-only environment configuration.
@@ -41,10 +42,23 @@ export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | null = null;
 
+/**
+ * Neon’s Vercel integration stores the pooled URL under Storage_DATABASE_URL
+ * when the resource is named Storage. Copy it onto DATABASE_URL so the rest
+ * of this schema can keep a single required field.
+ */
+function withPooledDatabaseUrl(
+  source: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  if (source.DATABASE_URL?.trim()) return source;
+  const pooled = pooledDatabaseUrl(source);
+  return pooled ? { ...source, DATABASE_URL: pooled } : source;
+}
+
 export function getEnv(): Env {
   if (cached) return cached;
 
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchema.safeParse(withPooledDatabaseUrl(process.env));
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
@@ -60,5 +74,14 @@ export function getEnv(): Env {
 
 /** Test seam: lets unit tests inject config without touching process.env. */
 export function __setEnvForTesting(env: Partial<Env> | null): void {
-  cached = env ? ({ ...envSchema.parse({ ...process.env, ...env }) } as Env) : null;
+  cached = env
+    ? ({
+        ...envSchema.parse(
+          withPooledDatabaseUrl({
+            ...process.env,
+            ...(env as Record<string, string | undefined>),
+          }),
+        ),
+      } as Env)
+    : null;
 }

@@ -18,6 +18,7 @@
  */
 import "dotenv/config";
 import { Client } from "pg";
+import { migrationDatabaseUrl } from "../src/lib/database-url";
 
 const INDEX_NAME = "DocumentChunk_embedding_hnsw_idx";
 
@@ -34,10 +35,9 @@ const ENSURE_SQL = `
 `;
 
 async function main() {
-  // Same host as prisma.config.ts: the direct connection when DIRECT_URL is
-  // set, so CREATE INDEX does not run through Neon’s pooler.
-  const connectionString =
-    process.env.DIRECT_URL?.trim() || process.env.DATABASE_URL;
+  // Same host as prisma.config.ts, so CREATE INDEX does not run through
+  // Neon’s pooler when an unpooled URL is available.
+  const connectionString = migrationDatabaseUrl();
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set. Copy .env.example to .env.");
   }

@@ -128,8 +128,8 @@ All are server-side only. None are exposed to the browser.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | — | Postgres connection string. Local Docker, or Neon’s **pooled** host on Vercel |
-| `DIRECT_URL` | `DATABASE_URL` | Non-pooled Neon host for `npm run db:migrate`. Leave unset locally |
+| `DATABASE_URL` | — | Postgres connection string. Local Docker, or Neon’s **pooled** host on Vercel. `Storage_DATABASE_URL` from the Neon integration is accepted too |
+| `DIRECT_URL` | pooled URL | Non-pooled Neon host for `npm run db:migrate`. `Storage_DATABASE_URL_UNPOOLED` is accepted too. Leave unset locally |
 | `AUTH_SECRET` | — | Session signing key (`openssl rand -base64 32`) |
 | `AUTH_URL` | `http://localhost:3000` | Base URL for auth callbacks. On Vercel, the deployment URL |
 | `OPENROUTER_API_KEY` | — | **The only real secret required** |
@@ -157,8 +157,8 @@ Local `npm run dev` stays on Docker and disk; nothing below is required for that
 
    | Variable | Value |
    |---|---|
-   | `DATABASE_URL` | Neon **pooled** connection string |
-   | `DIRECT_URL` | Neon **direct** connection string |
+   | `DATABASE_URL` | Neon **pooled** connection string. Skip this if the Neon integration already added `Storage_DATABASE_URL` |
+   | `DIRECT_URL` | Neon **direct** connection string. Skip this if `Storage_DATABASE_URL_UNPOOLED` is already set |
    | `AUTH_SECRET` | `openssl rand -base64 32` |
    | `AUTH_URL` | The deployment URL, including `https://` |
    | `OPENROUTER_API_KEY` | Your OpenRouter key |

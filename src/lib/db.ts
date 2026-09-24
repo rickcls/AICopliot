@@ -1,6 +1,7 @@
 import "server-only";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { pooledDatabaseUrl } from "@/lib/database-url";
 
 /**
  * Prisma 7 requires a driver adapter (the Rust query engine is gone), so the
@@ -10,9 +11,11 @@ import { PrismaClient } from "@/generated/prisma/client";
  * connection pool on every edit.
  */
 function createClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = pooledDatabaseUrl();
   if (!connectionString) {
-    throw new Error("DATABASE_URL is not set. Copy .env.example to .env.");
+    throw new Error(
+      "DATABASE_URL is not set. On Vercel, the Neon integration’s Storage_DATABASE_URL is accepted too.",
+    );
   }
   // A serverless instance serves one request at a time. The driver's default
   // pool would open several connections per instance and exhaust Neon.
