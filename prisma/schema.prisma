@@ -112,6 +112,9 @@ model Project {
   workspaceId String
   name        String
   description String?
+  /// Shows the delivery tabs (tasks, timeline, risks, plan, reports). Gates
+  /// navigation only — never data access or grounding.
+  deliveryEnabled Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

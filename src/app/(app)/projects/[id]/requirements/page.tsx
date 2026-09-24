@@ -92,6 +92,7 @@ export default async function ProjectRequirementsPage({
       activeRun={activeRun}
       initialFilter={parseRegisterFilter(filter)}
       initialOpenId={typeof req === "string" ? req : null}
+      deliveryEnabled={project.deliveryEnabled}
       milestoneOptions={milestones.map((milestone) => ({
         id: milestone.id,
         label: milestone.title,

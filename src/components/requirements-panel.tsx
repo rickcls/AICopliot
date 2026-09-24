@@ -225,9 +225,14 @@ function isUncovered(requirement: RequirementRow) {
  * of them, which meant nothing stood out. These are the conditions a reviewer
  * has to act on; everything else lives in the expanded body.
  */
-function warningsFor(requirement: RequirementRow): string[] {
+function warningsFor(
+  requirement: RequirementRow,
+  deliveryEnabled: boolean,
+): string[] {
   const warnings: string[] = [];
-  if (isUncovered(requirement)) warnings.push("no task");
+  // "No task" is only a gap when this project tracks delivery here; otherwise
+  // it would badge every agreed requirement for work that lives elsewhere.
+  if (deliveryEnabled && isUncovered(requirement)) warnings.push("no task");
   if (requirement.status === "approved" && !requirement.acceptanceCriteria) {
     warnings.push("no criteria");
   }
@@ -360,8 +365,11 @@ export function RequirementsPanel({
   activeRun,
   initialFilter = "all",
   initialOpenId = null,
+  deliveryEnabled,
 }: {
   projectId: string;
+  /** Delivery tabs on: task/milestone/risk links, gaps, and the matrix show. */
+  deliveryEnabled: boolean;
   initialFilter?: RegisterFilter;
   milestoneOptions: LinkTargetOption[];
   riskOptions: LinkTargetOption[];
@@ -863,6 +871,8 @@ export function RequirementsPanel({
                 it must not be shown when nothing has been approved at all. */}
             {approvedCount === 0 ? (
               "none approved yet — nothing here is agreed scope"
+            ) : !deliveryEnabled ? (
+              `${approvedCount} approved`
             ) : uncoveredCount === 0 ? (
               `all ${approvedCount} approved have a delivery task`
             ) : (
@@ -873,6 +883,7 @@ export function RequirementsPanel({
           </>
         }
       >
+        {deliveryEnabled ? (
         <div
           role="group"
           aria-label="Requirements view"
@@ -902,6 +913,7 @@ export function RequirementsPanel({
             </button>
           ))}
         </div>
+        ) : null}
         {view === "register" ? (
         <Button
           type="button"
@@ -1270,6 +1282,7 @@ export function RequirementsPanel({
 
             {/* Gaps cuts across the lifecycle statuses rather than being one of
                 them, so it is a separate group. */}
+            {deliveryEnabled ? (
             <button
               type="button"
               aria-pressed={filter === "gaps"}
@@ -1293,6 +1306,7 @@ export function RequirementsPanel({
                 {uncoveredCount}
               </span>
             </button>
+            ) : null}
           </div>
 
           <div
@@ -1348,7 +1362,7 @@ export function RequirementsPanel({
             ) : null}
           </div>
 
-          {view === "matrix" ? (
+          {view === "matrix" && deliveryEnabled ? (
             <TraceabilityMatrix
               projectId={projectId}
               requirements={visible}
@@ -1456,7 +1470,7 @@ export function RequirementsPanel({
                 const links = taskLinks(requirement);
                 const busy = busyId === requirement.id;
                 const open = expanded.has(requirement.id);
-                const warnings = warningsFor(requirement);
+                const warnings = warningsFor(requirement, deliveryEnabled);
                 const code = formatRequirementCode(requirement.sequence);
 
                 return (
@@ -1582,6 +1596,8 @@ export function RequirementsPanel({
                             </span>
                           </Field>
 
+                          {deliveryEnabled ? (
+                          <>
                           <Field name="Delivery">
                             <LinkEditor
                               noun="task"
@@ -1657,6 +1673,9 @@ export function RequirementsPanel({
                               onUnlink={(linkId) => unlink(requirement, linkId)}
                             />
                           </Field>
+
+                          </>
+                          ) : null}
 
                           {requirement.citations.length > 0 ? (
                             <Field name="Evidence">

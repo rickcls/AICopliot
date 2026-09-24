@@ -3,6 +3,7 @@ import {
   askQuestionSchema,
   assignDocumentProjectSchema,
   createProjectSchema,
+  updateProjectSchema,
 } from "@/lib/schemas";
 
 describe("project inputs", () => {
@@ -35,5 +36,23 @@ describe("project inputs", () => {
     expect(
       askQuestionSchema.parse({ question: "How do I restart it?", projectId: "p1" }),
     ).toMatchObject({ projectId: "p1" });
+  });
+});
+
+describe("delivery tools setting", () => {
+  it("accepts deliveryEnabled on its own", () => {
+    expect(updateProjectSchema.safeParse({ deliveryEnabled: true }).success).toBe(
+      true,
+    );
+  });
+
+  it("rejects a non-boolean value", () => {
+    expect(
+      updateProjectSchema.safeParse({ deliveryEnabled: "yes" }).success,
+    ).toBe(false);
+  });
+
+  it("still rejects an empty update", () => {
+    expect(updateProjectSchema.safeParse({}).success).toBe(false);
   });
 });

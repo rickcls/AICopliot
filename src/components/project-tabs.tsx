@@ -13,6 +13,7 @@ import {
   Sparkles,
   SquareKanban,
 } from "lucide-react";
+import { DeliveryToggle } from "@/components/delivery-toggle";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,20 +32,37 @@ import { cn } from "@/lib/utils";
  * with `aria-current` instead.
  */
 
-// Requirements precedes Tasks because discovery precedes delivery: the register
-// is where a project's scope is established before work is created from it.
-const PROJECT_SECTIONS = [
+// The core tabs follow the discovery workflow in order: documents go in, the
+// register comes out. Delivery tabs are an optional layer per project
+// (`Project.deliveryEnabled`) — hidden, never deleted, and their routes still
+// resolve so an old link lands with a notice rather than a 404.
+const CORE_SECTIONS = [
   { path: "", label: "Overview", icon: LayoutDashboard },
+  { path: "/documents", label: "Documents", icon: FileText },
   { path: "/requirements", label: "Requirements", icon: ListChecks },
+] as const;
+
+const DELIVERY_SECTIONS = [
   { path: "/tasks", label: "Tasks", icon: SquareKanban },
   { path: "/timeline", label: "Timeline", icon: GanttChartSquare },
-  { path: "/documents", label: "Documents", icon: FileText },
   { path: "/risks", label: "Risks", icon: ShieldAlert },
-  { path: "/review", label: "Review", icon: Sparkles },
+  // The route stays /review; "Plan" says what the tab is for — generating a
+  // delivery plan — rather than one step of using it.
+  { path: "/review", label: "Plan", icon: Sparkles },
   { path: "/reports", label: "Reports", icon: FileBarChart },
 ] as const;
 
-export function ProjectTabs({ projectId }: { projectId: string }) {
+const DELIVERY_PATHS: readonly string[] = DELIVERY_SECTIONS.map(
+  (section) => section.path,
+);
+
+export function ProjectTabs({
+  projectId,
+  deliveryEnabled,
+}: {
+  projectId: string;
+  deliveryEnabled: boolean;
+}) {
   const pathname = usePathname();
 
   // Everything after the project id, so `/projects/abc/tasks` resolves to
@@ -75,7 +93,18 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
     });
   }, [activeSection]);
 
+  const sections = deliveryEnabled
+    ? [...CORE_SECTIONS, ...DELIVERY_SECTIONS]
+    : CORE_SECTIONS;
+  const onHiddenSection =
+    !deliveryEnabled &&
+    activeSection !== null &&
+    DELIVERY_PATHS.some(
+      (path) => activeSection === path || activeSection.startsWith(`${path}/`),
+    );
+
   return (
+    <>
     <nav
       aria-label="Project sections"
       // The strip scrolls sideways below `lg` rather than wrapping to a second
@@ -85,7 +114,7 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
       className="-mx-4 overflow-x-auto border-b border-slate-200 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
     >
       <ul className="flex w-max min-w-full items-center gap-1">
-        {PROJECT_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const active = activeSection === section.path;
           const Icon = section.icon;
 
@@ -119,5 +148,18 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
         })}
       </ul>
     </nav>
+    {onHiddenSection ? (
+      <div
+        role="status"
+        className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
+      >
+        <span>
+          Delivery tools are off for this project, so this page is hidden from
+          its tabs. Nothing here has been removed.
+        </span>
+        <DeliveryToggle projectId={projectId} enabled={false} />
+      </div>
+    ) : null}
+    </>
   );
 }

@@ -77,6 +77,8 @@ async function seedDemoProject(workspaceId: string, userId: string) {
       name: "Core Banking Failover Readiness",
       description:
         "Prove the failover runbook works end to end before the December freeze.",
+      // The demo seeds tasks, milestones, and risks, so it shows their tabs.
+      deliveryEnabled: true,
     },
   });
 

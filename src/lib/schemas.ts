@@ -113,10 +113,16 @@ export const createProjectSchema = z.object({
   description: z.string().trim().max(1000).optional(),
 });
 
-export const updateProjectSchema = createProjectSchema.partial().refine(
-  (value) => value.name !== undefined || value.description !== undefined,
-  "Provide a name or description",
-);
+export const updateProjectSchema = createProjectSchema
+  .partial()
+  .extend({ deliveryEnabled: z.boolean().optional() })
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.description !== undefined ||
+      value.deliveryEnabled !== undefined,
+    "Provide a name, description, or delivery setting",
+  );
 
 export const assignDocumentProjectSchema = z.object({
   projectId: z.string().min(1).nullable(),
