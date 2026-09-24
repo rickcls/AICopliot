@@ -134,3 +134,47 @@ describe("modelRequirementsSchema defaults", () => {
     expect(parsed.requirements[0]).not.toHaveProperty("dueDate");
   });
 });
+
+describe("validateRequirements against existing titles", () => {
+  it("ignores case, punctuation, and spacing when matching", async () => {
+    const { requirementTitleKey } = await import(
+      "@/lib/generation/requirements-validate"
+    );
+    expect(requirementTitleKey("  Managers   APPROVE leave!")).toBe(
+      requirementTitleKey("managers approve leave"),
+    );
+  });
+
+  it("does not treat a different wording as the same requirement", async () => {
+    const result = validateRequirements(
+      parse([proposal({ title: "Managers approve leave within 2 days" })]),
+      sourceMap,
+      ["Managers approve leave"],
+    );
+    expect(result.requirements).toHaveLength(1);
+  });
+
+  it("skips an existing title and says so", () => {
+    const result = validateRequirements(
+      parse([
+        proposal(),
+        proposal({
+          title: "Administrative access is secure",
+          citations: [{ sourceId: "S1", quote: "All administrative access must be secure." }],
+        }),
+      ]),
+      sourceMap,
+      ["managers approve leave."],
+    );
+    expect(result.requirements.map((item) => item.title)).toEqual([
+      "Administrative access is secure",
+    ]);
+    expect(result.warnings).toContain("Skipped 1 requirement already in the register");
+  });
+
+  it("explains a run with nothing new rather than calling it unsupported", () => {
+    expect(() =>
+      validateRequirements(parse([proposal()]), sourceMap, ["Managers approve leave"]),
+    ).toThrow(/already in the register/);
+  });
+});

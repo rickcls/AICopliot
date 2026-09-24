@@ -25,8 +25,18 @@ export interface ValidatedRequirements {
   droppedSourceIds: string[];
 }
 
-function normalizedText(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+/**
+ * The comparison key for "is this the same requirement?": case, punctuation,
+ * and spacing are ignored, wording is not. Deliberately strict — a looser
+ * similarity check would silently drop a genuinely new obligation that happens
+ * to share words with an old one, and a missed requirement is worse than a
+ * duplicate a reviewer can reject in one click.
+ */
+export function requirementTitleKey(value: string) {
+  return value
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 }
 
 /**
@@ -40,14 +50,26 @@ function normalizedText(value: string) {
 export function validateRequirements(
   model: ModelRequirements,
   sourceMap: GenerationSourceMap,
+  /**
+   * Titles already in the register. A proposal matching one is dropped: the
+   * prompt asks the model not to repeat them, and this is the deterministic
+   * backstop for when it does anyway.
+   */
+  existingTitles: readonly string[] = [],
 ): ValidatedRequirements {
   const warnings: string[] = [];
   const dropped = new Set<string>();
   const seen = new Set<string>();
+  const existing = new Set(existingTitles.map(requirementTitleKey));
   const requirements: ValidatedRequirement[] = [];
+  let alreadyRecorded = 0;
 
   for (const proposal of model.requirements) {
-    const key = normalizedText(proposal.title);
+    const key = requirementTitleKey(proposal.title);
+    if (existing.has(key)) {
+      alreadyRecorded += 1;
+      continue;
+    }
     if (seen.has(key)) {
       warnings.push(`Dropped duplicate requirement: ${proposal.title}`);
       continue;
@@ -74,9 +96,17 @@ export function validateRequirements(
     });
   }
 
+  if (alreadyRecorded > 0) {
+    warnings.push(
+      `Skipped ${alreadyRecorded} requirement${alreadyRecorded === 1 ? "" : "s"} already in the register`,
+    );
+  }
+
   if (requirements.length === 0) {
     throw new PlanValidationError(
-      "The model returned no requirements supported by the selected documents.",
+      alreadyRecorded > 0
+        ? "Nothing new: every requirement found in these documents is already in the register."
+        : "The model returned no requirements supported by the selected documents.",
     );
   }
 

@@ -776,6 +776,9 @@ export function RequirementsPanel({
               ScopePilot reads only the documents you select and cites every
               requirement it proposes. Extracted requirements arrive as drafts —
               nothing becomes agreed scope until you approve it here.
+              {requirements.length > 0
+                ? ` The ${requirements.length} already in the register are checked against, so a new meeting note adds only what is new.`
+                : null}
             </p>
 
             {readyDocuments.length === 0 ? (
