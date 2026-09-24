@@ -12,6 +12,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
  * Primary navigation. Always visible — never behind a toggle.
@@ -202,6 +203,7 @@ export function AppSidebar({
             {workspaceName}
           </p>
           <p className="truncate px-1 text-xs text-slate-500">{userEmail}</p>
+          <ThemeToggle className="mt-2" />
         </div>
         <button
           type="button"

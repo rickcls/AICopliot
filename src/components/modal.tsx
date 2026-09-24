@@ -67,7 +67,7 @@ export function Modal({
         // runs off the top where its header — and the close button — would be
         // unreachable.
         "max-h-[calc(100dvh-4rem)]",
-        "open:animate-dialog-in backdrop:animate-overlay-in backdrop:bg-slate-900/40",
+        "open:animate-dialog-in backdrop:animate-overlay-in backdrop:bg-black/50",
         className,
       )}
     >
