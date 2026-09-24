@@ -266,6 +266,12 @@ export async function getProjectSummary(
 export interface ProjectHealthRow {
   id: string;
   name: string;
+  deliveryEnabled: boolean;
+  /** Register counts by status — drafts included, as on the register page. */
+  toReview: number;
+  askClient: number;
+  validated: number;
+  agreed: number;
   openTasks: number;
   doneTasks: number;
   overdueTasks: number;
@@ -284,12 +290,12 @@ export async function getProjectHealthRows(
   workspaceId: string,
   now: Date = new Date(),
 ): Promise<ProjectHealthRow[]> {
-  const [projects, open, done, overdue, blocked, uncovered, pending] =
+  const [projects, open, done, overdue, blocked, uncovered, pending, statuses] =
     await Promise.all([
       prisma.project.findMany({
         where: { workspaceId },
         orderBy: { updatedAt: "desc" },
-        select: { id: true, name: true },
+        select: { id: true, name: true, deliveryEnabled: true },
       }),
       prisma.task.groupBy({
         by: ["projectId"],
@@ -327,7 +333,17 @@ export async function getProjectHealthRows(
         where: pendingPlanRunWhere(workspaceId),
         _count: { _all: true },
       }),
+      prisma.requirement.groupBy({
+        by: ["projectId", "status"],
+        where: { workspaceId },
+        _count: { _all: true },
+      }),
     ]);
+
+  const statusCount = (projectId: string, status: RequirementStatus) =>
+    statuses.find(
+      (group) => group.projectId === projectId && group.status === status,
+    )?._count._all ?? 0;
 
   const byProject = (groups: Array<{ projectId: string; _count: { _all: number } }>) =>
     new Map(groups.map((group) => [group.projectId, group._count._all]));
@@ -343,6 +359,11 @@ export async function getProjectHealthRows(
   return projects.map((project) => ({
     id: project.id,
     name: project.name,
+    deliveryEnabled: project.deliveryEnabled,
+    toReview: statusCount(project.id, "draft"),
+    askClient: statusCount(project.id, "needs_clarification"),
+    validated: statusCount(project.id, "validated"),
+    agreed: statusCount(project.id, "approved"),
     openTasks: counts.open.get(project.id) ?? 0,
     doneTasks: counts.done.get(project.id) ?? 0,
     overdueTasks: counts.overdue.get(project.id) ?? 0,
