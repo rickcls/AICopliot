@@ -6,8 +6,11 @@
 // cannot resolve. See src/lib/auth-guard.ts.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  // One LATERAL JOIN query per findMany instead of one query per nested
+  // relation. taskSelect alone was ~17 round trips per board load.
+  previewFeatures = ["relationJoins"]
 }
 
 // Prisma 7: the connection URL lives in prisma.config.ts, not here.

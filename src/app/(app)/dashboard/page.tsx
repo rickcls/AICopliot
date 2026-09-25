@@ -1,5 +1,12 @@
+import { Suspense } from "react";
 import { DashboardSummary } from "@/components/dashboard-summary";
-import { EmptyState, LinkButton } from "@/components/ui";
+import {
+  Card,
+  EmptyState,
+  LinkButton,
+  Skeleton,
+  SkeletonRegion,
+} from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 
@@ -38,8 +45,31 @@ export default async function DashboardPage() {
           action={<LinkButton href="/projects">Create a project</LinkButton>}
         />
       ) : (
-        <DashboardSummary workspaceId={workspaceId} />
+        // The summary is the slow half of the page (a dozen grouped reads), so
+        // the heading streams first instead of waiting on all of it.
+        <Suspense fallback={<SummarySkeleton />}>
+          <DashboardSummary workspaceId={workspaceId} />
+        </Suspense>
       )}
     </div>
+  );
+}
+
+function SummarySkeleton() {
+  return (
+    <SkeletonRegion label="Loading summary" className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-20 bg-slate-100" />
+        ))}
+      </div>
+      <Card className="p-5">
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-full bg-slate-100" />
+          <Skeleton className="h-4 w-11/12 bg-slate-100" />
+          <Skeleton className="h-4 w-4/5 bg-slate-100" />
+        </div>
+      </Card>
+    </SkeletonRegion>
   );
 }

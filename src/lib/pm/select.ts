@@ -128,20 +128,9 @@ export const taskSelect = {
   },
   citations: { select: taskOrRiskCitationSelect },
   requirementLinks: tracedRequirementsSelect,
-  // Comments ride along with the task rather than being fetched when the detail
-  // panel opens, so the create/update/list responses stay one shape and the
-  // client can replace a row in place without dropping the thread. Worth
-  // revisiting if a single task ever accumulates enough discussion to make the
-  // board query heavy — the natural fix is a count here and a fetch on open.
-  comments: {
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      body: true,
-      createdAt: true,
-      author: { select: { id: true, name: true, email: true } },
-    },
-  },
+  // Comments are deliberately absent: every task on the board would otherwise
+  // ship its whole thread to the browser to be read on at most one of them.
+  // TaskComments fetches the thread when the detail panel opens.
 } as const;
 
 export const milestoneSelect = {

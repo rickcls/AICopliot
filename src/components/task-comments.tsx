@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, Button, Spinner } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { TaskCommentRow } from "@/components/task-types";
@@ -17,23 +17,40 @@ import { cn, formatDate } from "@/lib/utils";
  * Posting is optimistic-free on purpose. A comment is a durable statement
  * attributed to you by name, so it appears once the server has actually stored
  * it rather than being drawn immediately and quietly vanishing on failure.
+ *
+ * The thread is fetched when the panel opens rather than riding along with
+ * every task on the board. The panel is keyed on the task, so reopening one
+ * remounts this and always shows the stored thread.
  */
 export function TaskComments({
   taskId,
-  comments,
   currentUserId,
-  onCommentsChange,
 }: {
   taskId: string;
-  comments: TaskCommentRow[];
   currentUserId: string;
-  onCommentsChange: (comments: TaskCommentRow[]) => void;
 }) {
+  const [comments, setComments] = useState<TaskCommentRow[] | null>(null);
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/tasks/${taskId}/comments`, { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error ?? "Could not load comments.");
+        setComments(data.comments);
+      })
+      .catch((cause: Error) => {
+        if (controller.signal.aborted) return;
+        setError(cause.message || "Could not load comments.");
+        setComments([]);
+      });
+    return () => controller.abort();
+  }, [taskId]);
 
   async function post(event: React.FormEvent) {
     event.preventDefault();
@@ -53,7 +70,7 @@ export function TaskComments({
         setError(data.error ?? "Could not post that comment.");
         return;
       }
-      onCommentsChange([...comments, data.comment]);
+      setComments((current) => [...(current ?? []), data.comment]);
       setBody("");
     } catch {
       setError("Could not reach the server.");
@@ -83,7 +100,9 @@ export function TaskComments({
         setError(data.error ?? "Could not delete that comment.");
         return;
       }
-      onCommentsChange(comments.filter((item) => item.id !== comment.id));
+      setComments((current) =>
+        (current ?? []).filter((item) => item.id !== comment.id),
+      );
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -95,7 +114,7 @@ export function TaskComments({
     <div>
       <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
         Comments
-        {comments.length > 0 ? (
+        {comments && comments.length > 0 ? (
           <span className="ml-1.5 font-normal text-slate-400 tabular-nums">
             {comments.length}
           </span>
@@ -108,7 +127,11 @@ export function TaskComments({
         </p>
       ) : null}
 
-      {comments.length === 0 ? (
+      {comments === null ? (
+        <p className="mb-3 flex items-center gap-2 text-xs text-slate-400">
+          <Spinner /> Loading comments…
+        </p>
+      ) : comments.length === 0 ? (
         <p className="mb-3 text-xs text-slate-400">
           No comments yet. Notes here are for people — they are never used to
           answer questions in chat.

@@ -153,9 +153,7 @@ export async function getProjectSummary(
     dueSoonTasks,
     openRisks,
     openMilestones,
-    readyDocuments,
-    totalDocuments,
-    totalRequirements,
+    documentGroups,
     openRequirements,
     approvedRequirements,
     uncoveredRequirements,
@@ -197,11 +195,11 @@ export async function getProjectSummary(
         status: { not: "completed" as const },
       }),
     }),
-    prisma.document.count({ where: { workspaceId, projectId, status: "ready" } }),
-    prisma.document.count({ where: { workspaceId, projectId } }),
-    // The register deliberately counts drafts too: an unconfirmed requirement is
-    // still something the team is carrying, unlike a draft task proposal.
-    prisma.requirement.count({ where: { workspaceId, projectId } }),
+    prisma.document.groupBy({
+      by: ["status"],
+      where: { workspaceId, projectId },
+      _count: { _all: true },
+    }),
     prisma.requirement.count({
       where: officialRecordWhere({
         workspaceId,
@@ -224,12 +222,21 @@ export async function getProjectSummary(
     prisma.generationRun.count({
       where: pendingPlanRunWhere(workspaceId, projectId),
     }),
+    // Unfiltered by source on purpose: the register counts drafts too, since
+    // an unconfirmed requirement is still something the team is carrying.
     prisma.requirement.groupBy({
       by: ["status"],
       where: { workspaceId, projectId },
       _count: { _all: true },
     }),
   ]);
+
+  let totalDocuments = 0;
+  let readyDocuments = 0;
+  for (const group of documentGroups) {
+    totalDocuments += group._count._all;
+    if (group.status === "ready") readyDocuments = group._count._all;
+  }
 
   const requirementsByStatus: Record<RequirementStatus, number> = {
     draft: 0,
@@ -238,8 +245,10 @@ export async function getProjectSummary(
     approved: 0,
     rejected: 0,
   };
+  let totalRequirements = 0;
   for (const group of statusGroups) {
     requirementsByStatus[group.status] = group._count._all;
+    totalRequirements += group._count._all;
   }
 
   return {

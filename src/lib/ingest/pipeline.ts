@@ -22,6 +22,8 @@ import type { SupportedKind } from "./validate-upload";
 const MAX_ERROR_LENGTH = 500;
 /** Cached on the Document row for the detail-page preview. */
 const PREVIEW_LENGTH = 20_000;
+/** Rows per INSERT. Each 1536-d vector literal is ~20KB of text. */
+const INSERT_BATCH_SIZE = 100;
 
 export interface IngestionResult {
   documentId: string;
@@ -91,24 +93,30 @@ export async function runIngestion(
       // Clear any partial state from a previous failed attempt.
       await tx.documentChunk.deleteMany({ where: { documentId } });
 
-      for (const [i, chunk] of chunks.entries()) {
-        // Vector columns are Unsupported() in the schema, so this insert must
-        // be raw SQL. Values are still parameterised by the tagged template.
+      // One statement per slice rather than one per chunk: row-at-a-time
+      // inserts cost a round trip each, and a long PDF ran past maxDuration.
+      // Vector columns are Unsupported() in the schema, so this stays raw SQL;
+      // the arrays are still bound parameters, never interpolated.
+      for (let start = 0; start < chunks.length; start += INSERT_BATCH_SIZE) {
+        const slice = chunks.slice(start, start + INSERT_BATCH_SIZE);
+        const ids = slice.map((_, i) => `${documentId}-${start + i}`);
+        const vectorLiterals = slice.map((_, i) => toVectorLiteral(vectors[start + i]));
+
         await tx.$executeRaw`
           INSERT INTO "DocumentChunk"
             ("id", "documentId", "workspaceId", "content", "chunkIndex",
              "pageNumber", "sectionTitle", "embedding", "createdAt")
-          VALUES (
-            ${`${documentId}-${i}`},
-            ${documentId},
-            ${document.workspaceId},
-            ${chunk.content},
-            ${chunk.chunkIndex},
-            ${chunk.pageNumber},
-            ${chunk.sectionTitle},
-            ${toVectorLiteral(vectors[i])}::vector,
-            NOW()
-          )`;
+          SELECT
+            r.id, ${documentId}, ${document.workspaceId}, r.content, r.chunk_index,
+            r.page_number, r.section_title, r.embedding::vector, NOW()
+          FROM unnest(
+            ${ids}::text[],
+            ${slice.map((c) => c.content)}::text[],
+            ${slice.map((c) => c.chunkIndex)}::int[],
+            ${slice.map((c) => c.pageNumber)}::int[],
+            ${slice.map((c) => c.sectionTitle)}::text[],
+            ${vectorLiterals}::text[]
+          ) AS r(id, content, chunk_index, page_number, section_title, embedding)`;
       }
 
       await tx.document.update({

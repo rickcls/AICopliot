@@ -52,10 +52,6 @@ export default async function ProjectTasksPage({
     startDate: task.startDate ? task.startDate.toISOString() : null,
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
     completedAt: task.completedAt ? task.completedAt.toISOString() : null,
-    comments: task.comments.map((comment) => ({
-      ...comment,
-      createdAt: comment.createdAt.toISOString(),
-    })),
   }));
 
   const initialStatuses: TaskStatusOption[] = statuses;

@@ -99,7 +99,6 @@ export interface TaskRow {
   generationStatus: "not_applicable" | "draft" | "approved" | "rejected";
   dependencies: TaskDependencyRow[];
   citations: TaskCitationRow[];
-  comments: TaskCommentRow[];
   requirementLinks: TracedRequirementRow[];
 }
 

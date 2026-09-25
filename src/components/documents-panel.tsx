@@ -81,9 +81,16 @@ export function DocumentsPanel({
   const toast = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const fixedProjectId = fixedProject?.id;
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/documents");
+      // A project page only ever shows its own documents, so it only polls
+      // for them rather than re-downloading the whole workspace every tick.
+      const response = await fetch(
+        fixedProjectId
+          ? `/api/documents?projectId=${encodeURIComponent(fixedProjectId)}`
+          : "/api/documents",
+      );
       if (!response.ok) throw new Error("Could not load documents");
       const data = await response.json();
       setDocuments(data.documents);
@@ -91,7 +98,7 @@ export function DocumentsPanel({
     } catch (error) {
       setLoadError((error as Error).message);
     }
-  }, []);
+  }, [fixedProjectId]);
 
   // Poll while anything is mid-ingestion. When ingestion moves to a queue this
   // is already the right UI shape — nothing here needs to change.
@@ -99,10 +106,26 @@ export function DocumentsPanel({
     (d) => d.status === "uploaded" || d.status === "processing",
   );
 
+  // Quick at first, when a small file is about to finish, then slower: a
+  // document stuck in `uploaded` would otherwise be polled every two seconds
+  // for as long as the tab stays open.
   useEffect(() => {
     if (!hasPending) return;
-    const timer = setInterval(() => void load(), 2000);
-    return () => clearInterval(timer);
+    const startedAt = Date.now();
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const delay = Date.now() - startedAt < 30_000 ? 2000 : 5000;
+      timer = setTimeout(async () => {
+        await load();
+        if (!cancelled) tick();
+      }, delay);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [hasPending, load]);
 
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {

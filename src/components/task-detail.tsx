@@ -29,7 +29,6 @@ import {
   statusColorToken,
   type MemberOption,
   type MilestoneOption,
-  type TaskCommentRow,
   type TaskPriority,
   type TaskRow,
   type TaskStatusOption,
@@ -155,13 +154,6 @@ export function TaskDetail({
       return;
     }
     void save({ [field]: value } as Partial<TaskDraft>);
-  }
-
-  function setComments(comments: TaskCommentRow[]) {
-    // The board holds the authoritative row, so the thread is pushed up as well
-    // as held here — otherwise closing and reopening the task would show the
-    // list as it was before the comment was posted.
-    onTaskChange({ ...task, comments });
   }
 
   const blockedBy = task.dependencies.filter(
@@ -522,12 +514,7 @@ export function TaskDetail({
           ) : null}
 
           <div className="border-t border-slate-100 pt-4">
-            <TaskComments
-              taskId={task.id}
-              comments={task.comments}
-              currentUserId={currentUserId}
-              onCommentsChange={setComments}
-            />
+            <TaskComments taskId={task.id} currentUserId={currentUserId} />
           </div>
         </div>
 

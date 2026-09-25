@@ -6,12 +6,15 @@ import { getEnv } from "@/lib/env";
 import { getExtension, validateUpload } from "@/lib/ingest/validate-upload";
 import { getStorage } from "@/lib/storage";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { workspaceId } = await requireWorkspace();
+    // Narrows within the workspace only; an id from another workspace matches
+    // nothing because workspaceId stays in the same where clause.
+    const projectId = new URL(request.url).searchParams.get("projectId");
 
     const documents = await prisma.document.findMany({
-      where: { workspaceId },
+      where: { workspaceId, ...(projectId ? { projectId } : {}) },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { WorkspaceRole } from "@/generated/prisma/enums";
@@ -91,10 +92,23 @@ export function requireAdmin(access: WorkspaceAccess): WorkspaceAccess {
 /**
  * Single-workspace MVP: every user gets one workspace, created on first use.
  * Returns the caller's existing membership if there is one.
+ *
+ * The app layout, the project layout, and the page each resolve the workspace,
+ * and layouts cannot hand it down. React `cache` makes that one lookup per
+ * request. It is keyed on primitives because `cache` compares arguments by
+ * identity, so a `user` object would never hit.
  */
-export async function getOrCreateDefaultWorkspace(
+export function getOrCreateDefaultWorkspace(
   user: SessionUser,
 ): Promise<WorkspaceAccess> {
+  return defaultWorkspaceFor(user.id, user.name);
+}
+
+const defaultWorkspaceFor = cache(async function defaultWorkspaceFor(
+  userId: string,
+  userName: string | null,
+): Promise<WorkspaceAccess> {
+  const user = { id: userId, name: userName };
   const existing = await prisma.workspaceMember.findFirst({
     where: { userId: user.id },
     include: { workspace: { select: { name: true } } },
@@ -125,7 +139,7 @@ export async function getOrCreateDefaultWorkspace(
     userId: user.id,
     role: "admin",
   };
-}
+});
 
 /**
  * Resolves a client-supplied project ID *within* an already-authorised
