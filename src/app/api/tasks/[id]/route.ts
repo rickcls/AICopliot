@@ -9,6 +9,7 @@ import {
   officialRecordWhere,
 } from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
+import { resolveTaskRelations } from "@/lib/pm/task-relations";
 import { updateTaskSchema } from "@/lib/schemas";
 
 interface Params {
@@ -17,7 +18,7 @@ interface Params {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
-    const { workspaceId } = await requireWorkspace();
+    const { workspaceId, user } = await requireWorkspace();
     const { id } = await params;
 
     const body = await request.json().catch(() => null);
@@ -92,13 +93,64 @@ export async function PATCH(request: Request, { params }: Params) {
       nextCategory = status.category;
     }
 
+    const relations = await resolveTaskRelations(
+      workspaceId,
+      existing.projectId,
+      data,
+    );
+    if (!relations.ok) {
+      return NextResponse.json({ error: relations.error }, { status: 404 });
+    }
+    const { documentIds, citations, requirementIds } = relations.value;
+
     const completedAt = completedAtOnStatusChange(
       existing.status.category,
       data.statusId !== undefined ? nextCategory : undefined,
       DONE_TASK_CATEGORY,
     );
 
-    const task = await prisma.task.update({
+    const task = await prisma.$transaction(async (tx) => {
+      // Documents are a set the form states in full; citations and requirement
+      // links only accumulate here — each has its own place to be removed.
+      if (documentIds !== undefined) {
+        await tx.taskDocument.deleteMany({
+          where: { taskId: existing.id, documentId: { notIn: documentIds } },
+        });
+        await tx.taskDocument.createMany({
+          data: documentIds.map((documentId) => ({
+            workspaceId,
+            taskId: existing.id,
+            documentId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      if (citations.length > 0) {
+        await tx.taskCitation.createMany({
+          data: citations.map((citation) => ({
+            workspaceId,
+            taskId: existing.id,
+            documentChunkId: citation.documentChunkId,
+            excerpt: citation.excerpt,
+            purpose: "proposal" as const,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      if (requirementIds.length > 0) {
+        await tx.requirementLink.createMany({
+          data: requirementIds.map((requirementId) => ({
+            workspaceId,
+            requirementId,
+            targetType: "task" as const,
+            taskId: existing.id,
+            createdById: user.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return tx.task.update({
       where: { id: existing.id },
       data: {
         ...(data.title !== undefined ? { title: data.title } : {}),
@@ -121,6 +173,7 @@ export async function PATCH(request: Request, { params }: Params) {
         ...(completedAt !== undefined ? { completedAt } : {}),
       },
       select: taskSelect,
+      });
     });
 
     return NextResponse.json({ task });

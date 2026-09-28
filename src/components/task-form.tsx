@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Flag, UserRound } from "lucide-react";
 import {
   Avatar,
@@ -13,6 +14,9 @@ import {
   Textarea,
 } from "@/components/ui";
 import { Modal, ModalBody, ModalFooter } from "@/components/modal";
+import { TaskDocumentsField } from "@/components/task-documents-field";
+import { fillBlockedReason, TaskFillBar } from "@/components/task-fill-bar";
+import { fillDraft, type FillSummary } from "@/components/task-fill-client";
 import { cn } from "@/lib/utils";
 import {
   PRIORITY_FLAG,
@@ -22,6 +26,7 @@ import {
   toDateInput,
   type MemberOption,
   type MilestoneOption,
+  type ProjectDocumentOption,
   type TaskPriority,
   type TaskRow,
   type TaskStatusOption,
@@ -37,6 +42,12 @@ export interface TaskDraft {
   estimatedHours: string;
   startDate: string;
   dueDate: string;
+  /** Linked project documents; saved as a set. */
+  documentIds: string[];
+  /** Passages an AI fill drew on, saved as the task's Sources. */
+  citations: Array<{ chunkId: string; quote: string }>;
+  /** Requirement links an AI fill suggested; added on save. */
+  requirementIds: string[];
 }
 
 export function emptyDraft(statusId: string): TaskDraft {
@@ -50,6 +61,9 @@ export function emptyDraft(statusId: string): TaskDraft {
     estimatedHours: "",
     startDate: "",
     dueDate: "",
+    documentIds: [],
+    citations: [],
+    requirementIds: [],
   };
 }
 
@@ -65,6 +79,9 @@ export function draftFrom(task: TaskRow): TaskDraft {
       task.estimatedHours === null ? "" : String(task.estimatedHours),
     startDate: toDateInput(task.startDate),
     dueDate: toDateInput(task.dueDate),
+    documentIds: task.documents.map((link) => link.document.id),
+    citations: [],
+    requirementIds: [],
   };
 }
 
@@ -79,6 +96,12 @@ function toPayload(draft: TaskDraft) {
     estimatedHours: draft.estimatedHours === "" ? null : draft.estimatedHours,
     startDate: draft.startDate || null,
     dueDate: draft.dueDate || null,
+    documentIds: draft.documentIds,
+    // Add-only on the server, so an empty list is simply omitted.
+    ...(draft.citations.length > 0 ? { citations: draft.citations } : {}),
+    ...(draft.requirementIds.length > 0
+      ? { requirementIds: draft.requirementIds }
+      : {}),
   };
 }
 
@@ -113,27 +136,85 @@ export function toPartialPayload(
   return payload;
 }
 
+/** Linked ids resolved to the board's current documents, which carry live status. */
+export function linkedDocuments(
+  documentIds: string[],
+  documents: ProjectDocumentOption[],
+  fallback: TaskRow["documents"] = [],
+): ProjectDocumentOption[] {
+  const byId = new Map(documents.map((document) => [document.id, document]));
+  for (const link of fallback) {
+    if (!byId.has(link.document.id)) byId.set(link.document.id, link.document);
+  }
+  return documentIds.flatMap((id) => {
+    const document = byId.get(id);
+    return document ? [document] : [];
+  });
+}
+
 export function TaskForm({
+  projectId,
   draft,
   statuses,
   members,
   milestones,
+  documents,
+  linkedRequirementIds = [],
+  initialFill = null,
   saving,
   editing,
   onChange,
+  onDocumentChange,
   onCancel,
   onSubmit,
 }: {
+  projectId: string;
   draft: TaskDraft;
   statuses: TaskStatusOption[];
   members: MemberOption[];
   milestones: MilestoneOption[];
+  documents: ProjectDocumentOption[];
+  /** Requirements an existing task already delivers, so a fill does not re-suggest them. */
+  linkedRequirementIds?: string[];
+  /** A fill already run by the detail panel, shown for review on open. */
+  initialFill?: FillSummary | null;
   saving: boolean;
   editing: boolean;
   onChange: (draft: TaskDraft) => void;
+  onDocumentChange: (document: ProjectDocumentOption) => void;
   onCancel: () => void;
   onSubmit: (payload: Record<string, unknown>) => void;
 }) {
+  // Priority always holds a value, so "blank" for the fill means "still the
+  // default nobody chose". Only this form knows whether it was touched.
+  const [priorityTouched, setPriorityTouched] = useState(
+    () => initialFill?.filled.includes("priority") ?? false,
+  );
+  const [filling, setFilling] = useState(false);
+  const [fillError, setFillError] = useState<string | null>(null);
+  const [fillSummary, setFillSummary] = useState<FillSummary | null>(initialFill);
+
+  async function runFill() {
+    setFilling(true);
+    setFillError(null);
+    try {
+      const result = await fillDraft(projectId, draft, {
+        priorityIsBlank: !priorityTouched && draft.priority === "medium",
+        linkedRequirementIds,
+      });
+      onChange(result.draft);
+      setFillSummary(result.summary);
+      if (result.summary.filled.includes("priority")) setPriorityTouched(true);
+    } catch (error) {
+      setFillError((error as Error).message);
+    } finally {
+      setFilling(false);
+    }
+  }
+
+  const busy = saving || filling;
+  const linked = linkedDocuments(draft.documentIds, documents);
+
   // Mirrors the server rule so the problem is visible before a round trip; the
   // API rejects it independently.
   const datesInverted =
@@ -141,7 +222,7 @@ export function TaskForm({
     draft.dueDate !== "" &&
     draft.startDate > draft.dueDate;
 
-  const submittable = draft.title.trim() !== "" && !saving && !datesInverted;
+  const submittable = draft.title.trim() !== "" && !busy && !datesInverted;
 
   const selectedStatus = statuses.find((status) => status.id === draft.statusId);
   const statusTone = selectedStatus
@@ -155,7 +236,7 @@ export function TaskForm({
       // No subtitle: the fields below already carry their own defaults and
       // placeholders, and a line of explanation above them was one more thing
       // to read before starting to type.
-      onClose={saving ? () => {} : onCancel}
+      onClose={busy ? () => {} : onCancel}
     >
       <form
         onSubmit={(event) => {
@@ -176,7 +257,7 @@ export function TaskForm({
             placeholder="Task name"
             aria-label="Task name"
             maxLength={200}
-            disabled={saving}
+            disabled={busy}
             required
             // Not React's `autoFocus` — see the note in `Modal`.
             data-autofocus
@@ -185,6 +266,36 @@ export function TaskForm({
             // ring gives a keyboard user nothing to locate.
             className="h-auto border-transparent bg-transparent px-0 py-1 text-2xl font-semibold tracking-tight text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus-visible:border-transparent disabled:bg-transparent"
           />
+
+          <div className="mt-2">
+            <TaskFillBar
+              blockedReason={fillBlockedReason(draft.title, linked)}
+              filling={filling}
+              error={fillError}
+              summary={fillSummary}
+              hasLinkedDocuments={draft.documentIds.length > 0}
+              disabled={busy}
+              onFill={() => void runFill()}
+              onRemoveRequirement={(requirementId) => {
+                onChange({
+                  ...draft,
+                  requirementIds: draft.requirementIds.filter(
+                    (id) => id !== requirementId,
+                  ),
+                });
+                setFillSummary((summary) =>
+                  summary
+                    ? {
+                        ...summary,
+                        requirements: summary.requirements.filter(
+                          (requirement) => requirement.id !== requirementId,
+                        ),
+                      }
+                    : summary,
+                );
+              }}
+            />
+          </div>
 
           {/* A plain grid, not the `<dl>` the record lists use: these are form
               controls, and wrapping them in a description list makes a screen
@@ -214,7 +325,7 @@ export function TaskForm({
                 onChange={(event) =>
                   onChange({ ...draft, assigneeId: event.target.value })
                 }
-                disabled={saving}
+                disabled={busy}
               >
                 <option value="">Unassigned</option>
                 {members.map((member) => (
@@ -241,7 +352,7 @@ export function TaskForm({
                 onChange={(event) =>
                   onChange({ ...draft, statusId: event.target.value })
                 }
-                disabled={saving}
+                disabled={busy}
               >
                 {statuses.map((status) => (
                   <option key={status.id} value={status.id}>
@@ -265,13 +376,14 @@ export function TaskForm({
                 id="task-priority"
                 className={cn(QUIET_CONTROL, "capitalize")}
                 value={draft.priority}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setPriorityTouched(true);
                   onChange({
                     ...draft,
                     priority: event.target.value as TaskPriority,
-                  })
-                }
-                disabled={saving}
+                  });
+                }}
+                disabled={busy}
               >
                 {TASK_PRIORITIES.map((priority) => (
                   <option key={priority} value={priority} className="capitalize">
@@ -293,7 +405,7 @@ export function TaskForm({
                 onChange={(event) =>
                   onChange({ ...draft, milestoneId: event.target.value })
                 }
-                disabled={saving}
+                disabled={busy}
               >
                 <option value="">None</option>
                 {milestones.map((milestone) => (
@@ -319,7 +431,7 @@ export function TaskForm({
                 onChange={(event) =>
                   onChange({ ...draft, startDate: event.target.value })
                 }
-                disabled={saving}
+                disabled={busy}
                 aria-label="Start date"
                 aria-invalid={datesInverted || undefined}
                 aria-describedby={datesInverted ? "task-date-error" : undefined}
@@ -335,7 +447,7 @@ export function TaskForm({
                 onChange={(event) =>
                   onChange({ ...draft, dueDate: event.target.value })
                 }
-                disabled={saving}
+                disabled={busy}
                 aria-label="Due date"
                 aria-invalid={datesInverted || undefined}
                 aria-describedby={datesInverted ? "task-date-error" : undefined}
@@ -360,9 +472,36 @@ export function TaskForm({
                 onChange={(event) =>
                   onChange({ ...draft, estimatedHours: event.target.value })
                 }
-                disabled={saving}
+                disabled={busy}
               />
               <span className="text-xs text-slate-400">hours</span>
+            </div>
+
+            {/* Starts at the top rather than centred: the value grows a line
+                per linked document. */}
+            <span className={cn(ROW_LABEL, "self-start pt-2")}>Documents</span>
+            <div className="min-w-0 py-1">
+              <TaskDocumentsField
+                projectId={projectId}
+                linked={linked}
+                available={documents}
+                disabled={busy}
+                onAdd={(document) =>
+                  onChange({
+                    ...draft,
+                    documentIds: draft.documentIds.includes(document.id)
+                      ? draft.documentIds
+                      : [...draft.documentIds, document.id],
+                  })
+                }
+                onRemove={(documentId) =>
+                  onChange({
+                    ...draft,
+                    documentIds: draft.documentIds.filter((id) => id !== documentId),
+                  })
+                }
+                onDocumentChange={onDocumentChange}
+              />
             </div>
           </div>
 
@@ -401,7 +540,7 @@ export function TaskForm({
               }
               placeholder="What does this task involve?"
               maxLength={4000}
-              disabled={saving}
+              disabled={busy}
               className="min-h-56 resize-y leading-relaxed"
             />
           </div>
@@ -412,7 +551,7 @@ export function TaskForm({
             type="button"
             variant="secondary"
             onClick={onCancel}
-            disabled={saving}
+            disabled={busy}
           >
             Cancel
           </Button>

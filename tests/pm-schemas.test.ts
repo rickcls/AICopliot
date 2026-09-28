@@ -6,6 +6,7 @@ import {
   createTaskSchema,
   updateMilestoneSchema,
   updateRiskSchema,
+  taskFillSchema,
   updateTaskSchema,
 } from "@/lib/schemas";
 
@@ -231,5 +232,51 @@ describe("dependency input", () => {
     expect(
       createTaskDependencySchema.safeParse({ dependsOnTaskId: "" }).success,
     ).toBe(false);
+  });
+});
+
+describe("task documents, citations, and requirement links", () => {
+  it("dedupes linked document ids and caps the list", () => {
+    const parsed = createTaskSchema.parse({
+      title: "Migrate data",
+      documentIds: ["doc-1", "doc-1", " doc-2 "],
+    });
+    expect(parsed.documentIds).toEqual(["doc-1", "doc-2"]);
+
+    const tooMany = createTaskSchema.safeParse({
+      title: "Migrate data",
+      documentIds: Array.from({ length: 21 }, (_, index) => `doc-${index}`),
+    });
+    expect(tooMany.success).toBe(false);
+  });
+
+  it("accepts a PATCH that only replaces the linked documents, including clearing them", () => {
+    expect(updateTaskSchema.parse({ documentIds: [] })).toEqual({ documentIds: [] });
+  });
+
+  it("leaves the relations alone when a PATCH does not mention them", () => {
+    const parsed = updateTaskSchema.parse({ title: "Renamed" });
+    expect(parsed.documentIds).toBeUndefined();
+    expect(parsed.citations).toBeUndefined();
+    expect(parsed.requirementIds).toBeUndefined();
+  });
+
+  it("requires a chunk id on every citation", () => {
+    expect(
+      createTaskSchema.safeParse({
+        title: "Migrate data",
+        citations: [{ quote: "no chunk" }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("taskFillSchema", () => {
+  it("needs a task name to search with", () => {
+    expect(taskFillSchema.safeParse({ title: "  " }).success).toBe(false);
+  });
+
+  it("defaults to searching the whole project", () => {
+    expect(taskFillSchema.parse({ title: "Migrate data" }).documentIds).toEqual([]);
   });
 });

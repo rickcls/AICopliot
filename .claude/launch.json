@@ -7,6 +7,24 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": false
+    },
+    {
+      "name": "ai-ops-copilot-local",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_ops_copilot",
+        "DIRECT_URL=postgresql://postgres:postgres@localhost:5432/ai_ops_copilot",
+        "BLOB_READ_WRITE_TOKEN=",
+        "AUTH_URL=http://scopepilot.localhost:3001",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3001"
+      ],
+      "port": 3001,
+      "autoPort": false
     }
   ]
 }

@@ -192,6 +192,17 @@ const optionalText = (max: number) =>
 const requiresOneField = (value: object) =>
   Object.values(value).some((field) => field !== undefined);
 
+export const MAX_TASK_DOCUMENTS = 20;
+export const MAX_TASK_FILL_CITATIONS = 24;
+export const MAX_TASK_REQUIREMENT_LINKS = 10;
+
+/** Distinct, non-empty ids, capped. */
+const idList = (max: number, noun: string) =>
+  z
+    .array(z.string().trim().min(1))
+    .transform((ids) => [...new Set(ids)])
+    .pipe(z.array(z.string()).max(max, `Link no more than ${max} ${noun}`));
+
 const taskFields = {
   title: z.string().trim().min(1, "Task title is required").max(200),
   description: optionalText(4000),
@@ -208,6 +219,28 @@ const taskFields = {
     .optional(),
   startDate: optionalDate,
   dueDate: optionalDate,
+  /**
+   * Project documents the task works from. On create they are linked; on
+   * update the list *replaces* the linked set, so omitting it leaves the links
+   * alone and `[]` clears them.
+   */
+  documentIds: idList(MAX_TASK_DOCUMENTS, "documents").optional(),
+  /**
+   * Passages an AI fill drew on, kept as the task's Sources. Add-only: the
+   * server re-reads each chunk and rebuilds the excerpt, so a client cannot put
+   * words in a document's mouth.
+   */
+  citations: z
+    .array(
+      z.object({
+        chunkId: z.string().trim().min(1),
+        quote: z.string().max(2000).default(""),
+      }),
+    )
+    .max(MAX_TASK_FILL_CITATIONS)
+    .optional(),
+  /** Requirements this task delivers. Add-only; unlinking is on the register. */
+  requirementIds: idList(MAX_TASK_REQUIREMENT_LINKS, "requirements").optional(),
 };
 
 /** A bar cannot end before it begins; checked on both create and update. */
@@ -259,6 +292,21 @@ export const updateTaskStatusSchema = z
 
 export const createTaskDependencySchema = z.object({
   dependsOnTaskId: z.string().min(1, "Select a task"),
+});
+
+export const linkTaskDocumentSchema = z.object({
+  documentId: z.string().trim().min(1, "Select a document"),
+});
+
+/**
+ * An AI fill request. The title and any description typed so far are the
+ * question; `documentIds` narrows the evidence to the task's own documents,
+ * and an empty list searches every ready document in the project.
+ */
+export const taskFillSchema = z.object({
+  title: z.string().trim().min(3, "Give the task a name first").max(200),
+  description: z.string().trim().max(4000).optional(),
+  documentIds: idList(MAX_TASK_DOCUMENTS, "documents").default([]),
 });
 
 export const createTaskCommentSchema = z.object({

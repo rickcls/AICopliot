@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flag, Maximize2, UserRound, X } from "lucide-react";
+import { Flag, Maximize2, Sparkles, UserRound, X } from "lucide-react";
 import {
   Avatar,
   Badge,
@@ -16,8 +16,12 @@ import {
 } from "@/components/ui";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDependencies } from "@/components/task-dependencies";
+import { TaskDocumentsField } from "@/components/task-documents-field";
+import { fillBlockedReason } from "@/components/task-fill-bar";
+import { fillDraft, type FillSummary } from "@/components/task-fill-client";
 import {
   draftFrom,
+  linkedDocuments,
   toPartialPayload,
   type TaskDraft,
 } from "@/components/task-form";
@@ -29,6 +33,7 @@ import {
   statusColorToken,
   type MemberOption,
   type MilestoneOption,
+  type ProjectDocumentOption,
   type TaskPriority,
   type TaskRow,
   type TaskStatusOption,
@@ -61,10 +66,12 @@ export function TaskDetail({
   statuses,
   members,
   milestones,
+  documents,
   currentUserId,
   busy,
   onClose,
   onExpand,
+  onDocumentChange,
   onDelete,
   onTaskChange,
   onError,
@@ -74,17 +81,23 @@ export function TaskDetail({
   statuses: TaskStatusOption[];
   members: MemberOption[];
   milestones: MilestoneOption[];
+  documents: ProjectDocumentOption[];
   currentUserId: string;
   busy: boolean;
   onClose: () => void;
-  /** Reopens the current edits in the full-width form. */
-  onExpand: (draft: TaskDraft) => void;
+  /**
+   * Reopens the current edits in the full-width form — with a fill's report
+   * when an AI fill produced them, so they are reviewed before they are saved.
+   */
+  onExpand: (draft: TaskDraft, fill?: FillSummary) => void;
+  onDocumentChange: (document: ProjectDocumentOption) => void;
   onDelete: () => void;
   onTaskChange: (task: TaskRow) => void;
   onError: (message: string | null) => void;
 }) {
   const [draft, setDraft] = useState<TaskDraft>(() => draftFrom(task));
   const [saving, setSaving] = useState(false);
+  const [filling, setFilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -106,7 +119,62 @@ export function TaskDetail({
     draft.dueDate !== "" &&
     draft.startDate > draft.dueDate;
 
-  const disabled = busy || saving;
+  const disabled = busy || saving || filling;
+  const linked = linkedDocuments(
+    task.documents.map((link) => link.document.id),
+    documents,
+    task.documents,
+  );
+  const fillBlocked = fillBlockedReason(draft.title, linked);
+
+  /**
+   * Every other field here saves as it changes, but a fill must not: it would
+   * write model output straight onto the task. It opens in the form instead,
+   * blanks filled and sources quoted, and nothing is stored until Save.
+   */
+  async function fill() {
+    setFilling(true);
+    setError(null);
+    try {
+      const result = await fillDraft(task.projectId, draft, {
+        // The panel cannot tell a chosen "medium" from the untouched default;
+        // the form shows the result for review either way.
+        priorityIsBlank: draft.priority === "medium",
+        linkedRequirementIds: task.requirementLinks.map(
+          (link) => link.requirement.id,
+        ),
+      });
+      onExpand(result.draft, result.summary);
+    } catch (caught) {
+      setError((caught as Error).message);
+      setFilling(false);
+    }
+  }
+
+  /** Links and unlinks save at once, like the dependencies beside them. */
+  async function changeDocuments(
+    request: () => Promise<Response>,
+    documentIds: string[],
+  ) {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await request();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error ?? "Could not update the task's documents.");
+        return;
+      }
+      // Kept in step with the server so "expand to form" cannot hand the form
+      // a stale set that its Save would then write back.
+      setDraft((current) => ({ ...current, documentIds }));
+      onTaskChange(data.task);
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   /**
    * Applies one field change and persists it.
@@ -442,6 +510,26 @@ export function TaskDetail({
             />
           </div>
 
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void fill()}
+              disabled={disabled || fillBlocked !== null}
+            >
+              {filling ? (
+                <Spinner className="size-3.5" />
+              ) : (
+                <Sparkles className="size-3.5 text-violet-600" aria-hidden />
+              )}
+              {filling ? "Reading documents…" : "Fill blanks with AI"}
+            </Button>
+            <span className="text-xs text-slate-500">
+              {fillBlocked ?? "Opens the result for review before anything is saved."}
+            </span>
+          </div>
+
           {task.status.category !== "done" && blockedBy.length > 0 ? (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Waiting on {blockedBy.length} unfinished task
@@ -459,6 +547,39 @@ export function TaskDetail({
               projectId={task.projectId}
               links={task.requirementLinks}
               empty="No requirement links this task. Link it from the Requirements tab."
+            />
+          </div>
+
+          <div>
+            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              Documents
+            </h3>
+            <TaskDocumentsField
+              projectId={task.projectId}
+              linked={linked}
+              available={documents}
+              disabled={disabled}
+              onAdd={(document) =>
+                void changeDocuments(
+                  () =>
+                    fetch(`/api/tasks/${task.id}/documents`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ documentId: document.id }),
+                    }),
+                  [...draft.documentIds.filter((id) => id !== document.id), document.id],
+                )
+              }
+              onRemove={(documentId) =>
+                void changeDocuments(
+                  () =>
+                    fetch(`/api/tasks/${task.id}/documents/${documentId}`, {
+                      method: "DELETE",
+                    }),
+                  draft.documentIds.filter((id) => id !== documentId),
+                )
+              }
+              onDocumentChange={onDocumentChange}
             />
           </div>
 

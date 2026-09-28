@@ -32,7 +32,7 @@ export default async function ProjectTasksPage({
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
 
-  const [tasks, statuses, members, milestones] = await Promise.all([
+  const [tasks, statuses, members, milestones, documents] = await Promise.all([
     prisma.task.findMany({
       where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: { createdAt: "asc" },
@@ -45,6 +45,11 @@ export default async function ProjectTasksPage({
     }),
     getAssignableMembers(workspaceId),
     getProjectMilestoneOptions(workspaceId, project.id),
+    prisma.document.findMany({
+      where: { workspaceId, projectId: project.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, originalFilename: true, status: true },
+    }),
   ]);
 
   const initialTasks: TaskRow[] = tasks.map((task) => ({
@@ -63,6 +68,7 @@ export default async function ProjectTasksPage({
       initialStatuses={initialStatuses}
       members={members}
       milestones={milestones}
+      initialDocuments={documents}
       currentUserId={user.id}
       initialOpenTaskId={requestedTaskId ?? null}
       initialQuickFilter={parseTaskQuickFilter(filterParam)}
