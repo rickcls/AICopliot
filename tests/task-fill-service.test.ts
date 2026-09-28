@@ -31,7 +31,11 @@ import {
   fillTask,
   NO_EVIDENCE_MESSAGE,
 } from "@/lib/generation/task-fill-service";
-import { MAX_FILL_CHUNKS } from "@/lib/generation/task-fill-prompt";
+import {
+  LINKED_OVERVIEW_QUERY,
+  MAX_FILL_CHUNKS,
+  MAX_LINKED_FILL_CHUNKS,
+} from "@/lib/generation/task-fill-prompt";
 
 const chunk = {
   id: "chunk-real-id",
@@ -98,8 +102,9 @@ describe("fillTask", () => {
       "ws-1",
       ["doc-1"],
       embeddings,
-      ["Migrate customer data"],
-      MAX_FILL_CHUNKS,
+      // The name alone would miss a deck named for what to do with it.
+      ["Migrate customer data", LINKED_OVERVIEW_QUERY],
+      MAX_LINKED_FILL_CHUNKS,
     );
     expect(fakes.retrieveChunks).not.toHaveBeenCalled();
     expect(result.evidence).toBe("linked");
@@ -128,6 +133,8 @@ describe("fillTask", () => {
 
     const sent = JSON.stringify(chat.complete.mock.calls[0]);
     expect(sent).toContain("[S1]");
+    // The model is told these are the task's own material, not search hits.
+    expect(sent).toContain("LINKED by the user to this task");
     expect(sent).toContain("Q1 [agreed]: Migrate legacy data");
     expect(sent).not.toContain("chunk-real-id");
     expect(sent).not.toContain("req-1");
@@ -165,6 +172,7 @@ describe("fillTask", () => {
     expect(result.evidence).toBe("project");
     const sent = JSON.stringify(chat.complete.mock.calls[0]);
     expect(sent).not.toContain("[S2]");
+    expect(sent).toContain("FOUND BY SEARCHING the project");
   });
 
   it("refuses without calling the model when nothing in the project matches", async () => {
