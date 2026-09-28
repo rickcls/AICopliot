@@ -16,7 +16,9 @@ import { modelTaskFillSchema } from "./schemas";
 import { GenerationRequestError } from "./service";
 import {
   buildTaskFillUserMessage,
+  LINKED_OVERVIEW_QUERY,
   MAX_FILL_CHUNKS,
+  MAX_LINKED_FILL_CHUNKS,
   MAX_FILL_REQUIREMENT_CANDIDATES,
   TASK_FILL_SYSTEM_PROMPT,
 } from "./task-fill-prompt";
@@ -88,8 +90,10 @@ function parseFill(raw: string) {
  * Evidence for one task.
  *
  * With linked documents, the user has already said where the answer is, so
- * those documents are read in full when small and probed with the task's name
- * when large — the same selection plan generation uses. Without them, the
+ * those documents are read in full when small, and when large are probed with
+ * the task's name *and* an overview query — the same selection plan generation
+ * uses. The name alone is not enough: a task is often named for what to do
+ * with a document ("Review the Cliff Deck") rather than for what is in it. Without them, the
  * whole project is searched the way chat searches it, and the same relevance
  * gate applies: a passage must clear RAG_MIN_SCORE or match every query term.
  */
@@ -123,8 +127,8 @@ async function selectEvidence(
       workspaceId,
       documentIds,
       embeddings,
-      [query],
-      MAX_FILL_CHUNKS,
+      [query, LINKED_OVERVIEW_QUERY],
+      MAX_LINKED_FILL_CHUNKS,
     );
   }
 
@@ -198,6 +202,7 @@ export async function fillTask(
         title: input.title,
         description: input.description,
         contextBlock: context.contextBlock,
+        evidence: input.documentIds.length > 0 ? "linked" : "project",
         requirements: requirements.map((requirement) => ({
           title: requirement.title,
           agreed: BASELINED_REQUIREMENT_STATUS === requirement.status,
