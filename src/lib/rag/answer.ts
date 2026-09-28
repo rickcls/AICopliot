@@ -256,10 +256,17 @@ export async function answerQuestion(
     { role: "user" as const, content: buildUserMessage(searchQuery, contextBlock) },
   ];
 
+  // A task answer may carry a whole proposed description on top of the
+  // answer, and a reasoning model spends part of the budget thinking first.
+  // At the provider's default the JSON was cut off and the answer refused.
+  const completion = {
+    jsonMode: true,
+    temperature: 0,
+    ...(taskFocus ? { maxTokens: 4000 } : {}),
+  };
+
   report({ phase: "reasoning" });
-  let parsed = parseModelAnswer(
-    await chat.complete(messages, { jsonMode: true, temperature: 0 }),
-  );
+  let parsed = parseModelAnswer(await chat.complete(messages, completion));
 
   // One repair attempt before giving up on malformed output.
   if (!parsed) {
@@ -274,7 +281,7 @@ export async function answerQuestion(
               "Your previous reply was not valid JSON. Reply with ONLY the JSON object described in the system prompt.",
           },
         ],
-        { jsonMode: true, temperature: 0 },
+        completion,
       ),
     );
   }

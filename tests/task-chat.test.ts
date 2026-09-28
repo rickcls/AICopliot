@@ -116,6 +116,16 @@ describe("task-focused answers", () => {
     expect(answer.refused).toBe(false);
   });
 
+  it("gives a task answer room for a proposal on top of the answer", async () => {
+    const { chat, result } = askAboutTask({
+      answer: "Due 30 October 2026 [S1].",
+      confidence: "high",
+      citations: [{ sourceId: "S1" }],
+    });
+    await result;
+    expect((chat.complete.mock.calls[0] as unknown[])[1]).toMatchObject({ maxTokens: 4000 });
+  });
+
   it("searches the whole project when the task has no linked documents", async () => {
     await askAboutTask(
       { answer: "Unknown.", confidence: "low", insufficientContext: true },
