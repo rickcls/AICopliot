@@ -246,3 +246,42 @@ export function isoDayToDate(value: string | null | undefined) {
   if (value === undefined) return undefined;
   return value === null ? null : new Date(`${value}T00:00:00.000Z`);
 }
+
+export const MAX_FILL_REQUIREMENTS = 10;
+
+/**
+ * One filled field: a value and the sources that state it. Each field fails
+ * alone — `.catch(null)` turns a malformed date or an unknown priority into
+ * "no suggestion" instead of rejecting the whole reply, because a fill that
+ * lost its due date is still worth having.
+ */
+function citedFillValue<T extends z.ZodType>(value: T) {
+  return z
+    .object({
+      value,
+      citations: z.array(sourceCitationSchema).max(12).default([]),
+    })
+    .nullable()
+    .catch(null);
+}
+
+/** Exact JSON shape requested from the task-fill prompt. */
+export const modelTaskFillSchema = z.object({
+  description: z
+    .object({
+      text: z.string().trim().min(1).max(4000),
+      citations: z.array(sourceCitationSchema).max(12).default([]),
+    })
+    .nullable()
+    .catch(null),
+  priority: citedFillValue(z.enum(["low", "medium", "high", "urgent"])),
+  estimatedHours: citedFillValue(z.coerce.number().positive().max(10_000)),
+  startDate: citedFillValue(isoDaySchema),
+  dueDate: citedFillValue(isoDaySchema),
+  requirements: z
+    .array(z.string().trim().min(1).max(20))
+    .max(40)
+    .catch([]),
+});
+
+export type ModelTaskFill = z.infer<typeof modelTaskFillSchema>;

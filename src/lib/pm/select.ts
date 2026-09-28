@@ -128,6 +128,15 @@ export const taskSelect = {
   },
   citations: { select: taskOrRiskCitationSelect },
   requirementLinks: tracedRequirementsSelect,
+  documents: {
+    orderBy: { createdAt: "asc" as const },
+    select: {
+      id: true,
+      document: {
+        select: { id: true, originalFilename: true, status: true },
+      },
+    },
+  },
   // Comments are deliberately absent: every task on the board would otherwise
   // ship its whole thread to the browser to be read on at most one of them.
   // TaskComments fetches the thread when the detail panel opens.

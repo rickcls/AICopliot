@@ -78,6 +78,15 @@ export interface TracedRequirementRow {
   requirement: { id: string; sequence: number; title: string; status: string };
 }
 
+export type DocumentStatus = "uploaded" | "processing" | "ready" | "failed";
+
+/** A project document offered for linking to a task. */
+export interface ProjectDocumentOption {
+  id: string;
+  originalFilename: string;
+  status: DocumentStatus;
+}
+
 export interface TaskRow {
   id: string;
   projectId: string;
@@ -100,6 +109,7 @@ export interface TaskRow {
   dependencies: TaskDependencyRow[];
   citations: TaskCitationRow[];
   requirementLinks: TracedRequirementRow[];
+  documents: Array<{ id: string; document: ProjectDocumentOption }>;
 }
 
 export interface MemberOption {

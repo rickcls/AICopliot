@@ -150,19 +150,21 @@ async function retrieveCandidates(
  * with fixed-query hybrid retrieval. The final prompt follows source reading
  * order rather than relevance order so adjacent facts remain intelligible.
  *
- * `queries` is the only flow-specific input: plan generation probes for scope
- * and schedule, requirements extraction probes for obligations and acceptance.
+ * `queries` and `maxChunks` are the flow-specific inputs: plan generation probes
+ * for scope and schedule, requirements extraction for obligations and
+ * acceptance, and a task fill asks about one task, so it needs far less room.
  */
 export async function selectDocumentContext(
   workspaceId: string,
   documentIds: string[],
   embeddings: EmbeddingProvider,
   queries: readonly string[],
+  maxChunks: number = MAX_CONTEXT_CHUNKS,
 ): Promise<GenerationSource[]> {
   const total = await prisma.documentChunk.count({
     where: { workspaceId, documentId: { in: documentIds } },
   });
-  if (total <= MAX_CONTEXT_CHUNKS) {
+  if (total <= maxChunks) {
     return allChunks(workspaceId, documentIds);
   }
 
@@ -195,7 +197,7 @@ export async function selectDocumentContext(
     (a, b) => b.score - a.score || a.chunk.id.localeCompare(b.chunk.id),
   );
   for (const { chunk } of candidates) {
-    if (selected.size >= MAX_CONTEXT_CHUNKS) break;
+    if (selected.size >= maxChunks) break;
     if (selected.has(chunk.id)) continue;
     const count = perDocument.get(chunk.documentId) ?? 0;
     if (count >= MAX_PER_DOCUMENT) continue;
@@ -205,9 +207,9 @@ export async function selectDocumentContext(
 
   // A pathological corpus can exhaust ranked candidates. Fill deterministically
   // without breaking the per-document cap.
-  if (selected.size < MAX_CONTEXT_CHUNKS) {
+  if (selected.size < maxChunks) {
     for (const chunk of await allChunks(workspaceId, documentIds)) {
-      if (selected.size >= MAX_CONTEXT_CHUNKS) break;
+      if (selected.size >= maxChunks) break;
       if (selected.has(chunk.id)) continue;
       const count = perDocument.get(chunk.documentId) ?? 0;
       if (count >= MAX_PER_DOCUMENT) continue;

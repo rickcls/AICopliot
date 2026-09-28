@@ -30,10 +30,24 @@ export interface SessionUser {
   name: string | null;
 }
 
+/**
+ * A JWT outlives the row it names: a reset database, a deleted account, or a
+ * cookie from a server pointed at a different database all leave a valid
+ * signature for a user who is not there. Treated as signed in, that user
+ * reached workspace provisioning and crashed every page on a foreign-key
+ * violation; treated as signed out, they land on the sign-in form, whose next
+ * sign-in replaces the cookie. Cached so a request pays for one lookup.
+ */
+const userExists = cache(async function userExists(id: string) {
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+  return user !== null;
+});
+
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) return null;
+  if (!(await userExists(id))) return null;
   return {
     id,
     email: session.user?.email ?? "",

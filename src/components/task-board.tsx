@@ -23,6 +23,7 @@ import { useToast } from "@/components/toast";
 import { TaskCard } from "@/components/task-card";
 import { TaskDetail } from "@/components/task-detail";
 import { TaskForm, type TaskDraft, emptyDraft } from "@/components/task-form";
+import type { FillSummary } from "@/components/task-fill-client";
 import { TaskFilterBar } from "@/components/task-filter-bar";
 import { TaskListRow } from "@/components/task-list-row";
 import {
@@ -31,6 +32,7 @@ import {
   statusColorToken,
   type MemberOption,
   type MilestoneOption,
+  type ProjectDocumentOption,
   type TaskRow,
   type TaskStatusCategory,
   type TaskStatusOption,
@@ -89,6 +91,7 @@ export function TaskBoard({
   initialStatuses,
   members,
   milestones,
+  initialDocuments,
   currentUserId,
   initialOpenTaskId = null,
   initialQuickFilter = null,
@@ -99,6 +102,8 @@ export function TaskBoard({
   initialStatuses: TaskStatusOption[];
   members: MemberOption[];
   milestones: MilestoneOption[];
+  /** The project's documents, for linking to tasks. Uploads join this list. */
+  initialDocuments: ProjectDocumentOption[];
   currentUserId: string;
   initialOpenTaskId?: string | null;
   /** From `?filter=`, so an Overview card can land on the rows it counted. */
@@ -113,6 +118,9 @@ export function TaskBoard({
   const [statuses, setStatuses] = useState(initialStatuses);
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [documents, setDocuments] = useState(initialDocuments);
+  // A fill the detail panel ran before handing the task to the form.
+  const [draftFill, setDraftFill] = useState<FillSummary | null>(null);
   // A dashboard link arrives as ?task=. Ignore an id this project does not
   // have so a stale link does not open an empty panel.
   const [openTaskId, setOpenTaskId] = useState<string | null>(() =>
@@ -256,6 +264,7 @@ export function TaskBoard({
       upsert(data.task);
       setDraft(null);
       setEditingId(null);
+      setDraftFill(null);
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -587,7 +596,17 @@ export function TaskBoard({
   function openCreate(statusId: string = defaultStatusId) {
     if (!statusId) return;
     setEditingId(null);
+    setDraftFill(null);
     setDraft(emptyDraft(statusId));
+  }
+
+  /** An upload made from a task joins the project list every picker reads. */
+  function upsertDocument(document: ProjectDocumentOption) {
+    setDocuments((current) =>
+      current.some((item) => item.id === document.id)
+        ? current.map((item) => (item.id === document.id ? document : item))
+        : [document, ...current],
+    );
   }
 
   return (
@@ -1160,16 +1179,26 @@ export function TaskBoard({
 
       {draft ? (
         <TaskForm
+          projectId={projectId}
           draft={draft}
           statuses={statuses}
           members={members}
           milestones={milestones}
+          documents={documents}
+          linkedRequirementIds={
+            tasks
+              .find((task) => task.id === editingId)
+              ?.requirementLinks.map((link) => link.requirement.id) ?? []
+          }
+          initialFill={draftFill}
           saving={saving}
           editing={editingId !== null}
           onChange={setDraft}
+          onDocumentChange={upsertDocument}
           onCancel={() => {
             setDraft(null);
             setEditingId(null);
+            setDraftFill(null);
           }}
           onSubmit={saveDraft}
         />
@@ -1183,14 +1212,17 @@ export function TaskBoard({
           statuses={statuses}
           members={members}
           milestones={milestones}
+          documents={documents}
           currentUserId={currentUserId}
           busy={busyIds.has(openTask.id)}
           onClose={() => setOpenTaskId(null)}
-          onExpand={(nextDraft) => {
+          onExpand={(nextDraft, fill) => {
             setEditingId(openTask.id);
+            setDraftFill(fill ?? null);
             setDraft(nextDraft);
             setOpenTaskId(null);
           }}
+          onDocumentChange={upsertDocument}
           onDelete={() => void deleteTask(openTask)}
           onTaskChange={upsert}
           onError={setError}

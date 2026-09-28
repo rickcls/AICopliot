@@ -773,6 +773,49 @@ letting free-text commentary in would put unreviewed opinion behind a citation.
   you by name, so it appears once the server has stored it rather than being
   drawn immediately and quietly vanishing on failure.
 
+**A task's documents are links, not attachments.** `TaskDocument` joins a task
+to an ordinary project document, so uploading from the task form goes through
+the same `/api/documents` route, three-way validation, and indexing as the
+Documents tab — the file is searchable by chat and readable by the AI fill, and
+there is one copy of it. Both foreign keys cascade. Every id is resolved inside
+the task's own project by `resolveTaskRelations()` in
+`src/lib/pm/task-relations.ts` before any write. On `PATCH /api/tasks/[id]`,
+`documentIds` *replaces* the linked set, while `citations` and
+`requirementIds` only add; the detail panel links and unlinks one at a time
+through `/api/tasks/[id]/documents`, and keeps its draft's `documentIds` in
+step so "expand to form" cannot save a stale set back.
+
+**"Fill blanks with AI" proposes; the user saves.** `POST
+/api/projects/[id]/task-fill` (`src/lib/generation/task-fill-*.ts`) is one
+user-initiated request and one model call (plus the usual single repair). It
+persists nothing, which is why there is no generation run to audit: the result
+goes back into the task form, `applyTaskFill()` in `src/lib/pm/task-fill-apply.ts`
+writes it into **blank fields only**, and nothing is stored until Save. Rules:
+
+- **Evidence follows the grounding invariants.** With linked documents, those
+  are read (`selectDocumentContext(…, [title], MAX_FILL_CHUNKS)`); without, the
+  project is searched like chat and must clear `RAG_MIN_SCORE` or match
+  lexically, or the request is refused **before** the model is called.
+  Sources are `S` labels and requirement candidates `Q` labels, never ids.
+- **Every field needs its own citation**, and each fails alone —
+  `modelTaskFillSchema` uses `.catch(null)` per field so one bad date does not
+  discard a good description.
+- **Dates and effort are checked against the cited text, not trusted.**
+  `sourceStatesDate` requires the year and day to appear in a cited passage, and
+  `sourceStatesEffort` the hours (or days × 8). This is the deterministic
+  backstop for the prompt's "stated values only" rule: "two weeks after
+  kickoff" must never become a calendar date.
+- **Priority is blank only while it is the untouched default.** It always holds
+  a value, so the form tracks whether a person chose it.
+- **The detail panel does not apply a fill in place.** Every other field there
+  saves as it changes; a fill would write model output straight to the task, so
+  it opens the form with the report instead.
+- **A saved fill keeps its sources.** The passages behind the filled fields are
+  sent as `citations`, which the server re-reads and re-excerpts
+  (`buildVerifiedExcerpt`) so a client cannot put words in a document's mouth,
+  and are stored as `TaskCitation` with purpose `proposal` — the task detail's
+  existing Sources list shows them. Cited documents join the task's links.
+
 Update schemas (`updateTaskSchema` and friends) are built from a field map with
 **no `.default()`**, because `.partial()` does not strip defaults — a defaulted
 field would materialise on a PATCH and silently overwrite a value the caller

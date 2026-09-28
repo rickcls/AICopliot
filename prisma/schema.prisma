@@ -106,6 +106,7 @@ model Workspace {
   taskDependencyCitations TaskDependencyCitation[]
   generationRuns          GenerationRun[]
   taskComments            TaskComment[]
+  taskDocuments           TaskDocument[]
 
   @@index([ownerId])
 }
@@ -185,6 +186,7 @@ model Document {
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   chunks    DocumentChunk[]
+  tasks     TaskDocument[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, createdAt])
@@ -525,6 +527,7 @@ model Task {
   citations        TaskCitation[]
   requirementLinks RequirementLink[]
   comments         TaskComment[]
+  documents        TaskDocument[]
 
   @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])
@@ -759,6 +762,26 @@ model RequirementLink {
 // always be traced back to the source text. Deleting the chunk removes the
 // citation: evidence that no longer exists must not be displayed as if it did.
 // ---------------------------------------------------------------------------
+
+/// A project document a task works from. A link, not an attachment: the file is
+/// an ordinary project document — indexed, searchable by chat, and readable by
+/// the AI fill — so there is exactly one upload path and one copy of the file.
+/// Both sides cascade: a link to a deleted task or document is unreachable.
+model TaskDocument {
+  id          String   @id @default(cuid())
+  workspaceId String
+  taskId      String
+  documentId  String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  document  Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, documentId])
+  @@index([workspaceId])
+  @@index([documentId])
+}
 
 model TaskCitation {
   id              String          @id @default(cuid())

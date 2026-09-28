@@ -13,6 +13,7 @@ import {
   officialRecordWhere,
 } from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
+import { resolveTaskRelations } from "@/lib/pm/task-relations";
 import { createTaskSchema } from "@/lib/schemas";
 
 interface Params {
@@ -64,7 +65,7 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   try {
-    const { workspaceId } = await requireWorkspace();
+    const { workspaceId, user } = await requireWorkspace();
     const { id } = await params;
     const project = await requireProject(workspaceId, id);
 
@@ -106,8 +107,20 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
+    const relations = await resolveTaskRelations(
+      workspaceId,
+      project.id,
+      parsed.data,
+    );
+    if (!relations.ok) {
+      return NextResponse.json({ error: relations.error }, { status: 404 });
+    }
+    const { documentIds = [], citations, requirementIds } = relations.value;
+
     const now = new Date();
 
+    // One nested write, so a task never exists without the links it was
+    // created with.
     const task = await prisma.task.create({
       data: {
         workspaceId,
@@ -126,6 +139,25 @@ export async function POST(request: Request, { params }: Params) {
           DONE_TASK_CATEGORY,
           now,
         ),
+        documents: {
+          create: documentIds.map((documentId) => ({ workspaceId, documentId })),
+        },
+        citations: {
+          create: citations.map((citation) => ({
+            workspaceId,
+            documentChunkId: citation.documentChunkId,
+            excerpt: citation.excerpt,
+            purpose: "proposal" as const,
+          })),
+        },
+        requirementLinks: {
+          create: requirementIds.map((requirementId) => ({
+            workspaceId,
+            requirementId,
+            targetType: "task" as const,
+            createdById: user.id,
+          })),
+        },
       },
       select: taskSelect,
     });
