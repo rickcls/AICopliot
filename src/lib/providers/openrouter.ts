@@ -119,7 +119,7 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
 }
 
 interface ChatResponse {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
 }
 
 export class OpenRouterChatProvider implements ChatProvider {
@@ -145,9 +145,15 @@ export class OpenRouterChatProvider implements ChatProvider {
       },
     );
 
-    const content = json.choices?.[0]?.message?.content;
+    const choice = json.choices?.[0];
+    const content = choice?.message?.content;
     if (typeof content !== "string" || content.trim() === "") {
-      throw new ProviderError("Model returned an empty response");
+      // "length" here means a reasoning model spent the whole max_tokens budget
+      // thinking and never wrote an answer — a budget problem, not an outage,
+      // and the log should say which.
+      throw new ProviderError(
+        `Model returned an empty response (finish_reason: ${choice?.finish_reason ?? "unknown"})`,
+      );
     }
     return content;
   }

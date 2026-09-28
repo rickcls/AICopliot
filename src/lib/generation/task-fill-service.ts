@@ -210,7 +210,10 @@ export async function fillTask(
       }),
     },
   ];
-  const options = { jsonMode: true, temperature: 0, maxTokens: 1500 };
+  // The budget covers any reasoning the model does before it answers, not
+  // just the JSON. At 1500, describing a 20-passage deck ran out mid-thought:
+  // an empty reply or truncated JSON, twice.
+  const options = { jsonMode: true, temperature: 0, maxTokens: 4000 };
 
   const first = await chat.complete(messages, options);
   let parsed = parseFill(first);
