@@ -9,13 +9,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const mockPrisma = {
+  user: { findUnique: vi.fn() },
   workspaceMember: { findUnique: vi.fn(), findFirst: vi.fn() },
   workspace: { create: vi.fn() },
   document: { findFirst: vi.fn(), findUnique: vi.fn() },
 };
 
 vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
-vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+const mockAuth = vi.fn();
+vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
 vi.mock("server-only", () => ({}));
 
 const {
@@ -23,6 +25,7 @@ const {
   requireWorkspaceAccess,
   requireAdmin,
   getOrCreateDefaultWorkspace,
+  getSessionUser,
 } = await import("@/lib/auth-guard");
 
 beforeEach(() => {
@@ -166,5 +169,24 @@ describe("cross-workspace document access", () => {
     const call = mockPrisma.document.findFirst.mock.calls[0][0];
     expect(call.where).toHaveProperty("workspaceId", "ws-1");
     expect(mockPrisma.document.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe("getSessionUser", () => {
+  it("returns the signed-in user", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1", email: "a@b.c", name: "A" } });
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+
+    expect(await getSessionUser()).toEqual({ id: "user-1", email: "a@b.c", name: "A" });
+  });
+
+  // A valid cookie for a row that is gone used to reach workspace provisioning
+  // and fail every page on a foreign-key violation.
+  it("treats a session whose user no longer exists as signed out", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "deleted-user", email: "x@y.z" } });
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+
+    expect(await getSessionUser()).toBeNull();
+    expect(mockPrisma.workspace.create).not.toHaveBeenCalled();
   });
 });
