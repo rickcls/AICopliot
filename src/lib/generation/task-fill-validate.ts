@@ -1,9 +1,12 @@
 import { resolveDocumentCitations } from "@/lib/grounding/document-citations";
 import { MAX_FILL_REQUIREMENTS, type ModelTaskFill } from "./schemas";
-import type {
-  GenerationSourceMap,
-  ValidatedProposalCitation,
-} from "./validate";
+import type { ValidatedProposalCitation } from "./validate";
+
+/**
+ * Anything a label can resolve to that has text to check against: a document
+ * chunk for the task fill, and a chunk or a live record for task chat.
+ */
+type CheckableSourceMap = Map<string, { id: string; content: string }>;
 
 export type TaskFillField =
   | "description"
@@ -34,7 +37,7 @@ export type RequirementLabelMap = Map<string, string>;
 
 function cite<T>(
   field: { value: T; citations: Array<{ sourceId: string; quote: string }> } | null,
-  sourceMap: GenerationSourceMap,
+  sourceMap: CheckableSourceMap,
 ): FilledValue<T> | null {
   if (!field) return null;
   const { citations } = resolveDocumentCitations(field.citations, sourceMap);
@@ -44,7 +47,7 @@ function cite<T>(
 
 function citedContent(
   filled: FilledValue<unknown>,
-  sourceMap: GenerationSourceMap,
+  sourceMap: CheckableSourceMap,
 ): string {
   return filled.citations
     .map((citation) => sourceMap.get(citation.sourceId)?.content ?? "")
@@ -92,7 +95,7 @@ export function sourceStatesEffort(content: string, hours: number): boolean {
  */
 export function validateTaskFill(
   model: ModelTaskFill,
-  sourceMap: GenerationSourceMap,
+  sourceMap: CheckableSourceMap,
   requirementLabels: RequirementLabelMap,
 ): ValidatedTaskFill {
   const dropped: TaskFillField[] = [];

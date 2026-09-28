@@ -6,7 +6,7 @@ import {
   type ChatProvider,
   type EmbeddingProvider,
 } from "@/lib/providers";
-import { modelAnswerSchema } from "@/lib/schemas";
+import { modelAnswerSchema, type TaskProposal } from "@/lib/schemas";
 import { refusal, validateAnswer, type ValidatedAnswer } from "./citations";
 import {
   buildCombinedContext,
@@ -15,12 +15,16 @@ import {
   PROJECT_REFUSAL_TEXT,
   PROJECT_SYSTEM_PROMPT,
   SYSTEM_PROMPT,
+  TASK_REFUSAL_TEXT,
+  TASK_SYSTEM_PROMPT,
   type GroundingSourceAudit,
 } from "./prompt";
 import {
   getProjectGroundingContext,
+  getTaskGroundingContext,
   type ProjectGroundingContext,
 } from "./project-context";
+import { validateProposals } from "./proposals";
 import { hasGroundingEvidence } from "./ranking";
 import { retrieveChunks, type RetrievedChunk } from "./retrieve";
 import { needsRewrite, rewriteQuestion, type ChatTurn } from "./rewrite";
@@ -43,7 +47,22 @@ export interface AnswerResult extends ValidatedAnswer {
   latencyMs: number;
   /** The standalone question actually embedded; differs on follow-ups. */
   searchQuery: string;
+  /** Validated task edits, offered for the user to apply. Task focus only. */
+  proposals: TaskProposal[];
 }
+
+/**
+ * What a thread is narrowed to inside its scope.
+ *
+ * - `task`: the task's live record and its connected records replace the
+ *   project-wide record selection, and retrieval reads `documentIds` — the
+ *   task's linked documents — or the whole project when it has none.
+ * - `documents`: retrieval reads only `documentIds`. Document-only, like
+ *   global chat: pointing at files is a request to hear from those files.
+ */
+export type AnswerFocus =
+  | { kind: "task"; taskId: string; documentIds: string[] }
+  | { kind: "documents"; documentIds: string[] };
 
 /**
  * The pipeline's real boundaries, reported so a caller can show what is
@@ -77,6 +96,8 @@ export interface AnswerDeps {
   projectId?: string | null;
   groundingScope?: "documents" | "project_combined";
   projectContext?: typeof getProjectGroundingContext;
+  focus?: AnswerFocus;
+  taskContext?: typeof getTaskGroundingContext;
   /**
    * Fire-and-forget phase notifications. The channel is a UI stream that may be
    * gone long before the answer is finished and persisted, so a throw here is
@@ -124,9 +145,20 @@ export async function answerQuestion(
   const minScore = deps.minScore ?? env.RAG_MIN_SCORE;
 
   const history = deps.history ?? [];
+  const focus = deps.focus;
+  const taskFocus = focus?.kind === "task" && Boolean(deps.projectId);
   const combined =
-    deps.groundingScope === "project_combined" && Boolean(deps.projectId);
-  const refusalText = combined ? PROJECT_REFUSAL_TEXT : undefined;
+    !taskFocus &&
+    focus?.kind !== "documents" &&
+    deps.groundingScope === "project_combined" &&
+    Boolean(deps.projectId);
+  const refusalText = taskFocus
+    ? TASK_REFUSAL_TEXT
+    : combined
+      ? PROJECT_REFUSAL_TEXT
+      : undefined;
+  const focusDocumentIds =
+    focus && focus.documentIds.length > 0 ? focus.documentIds : null;
 
   const report = (progress: AnswerProgress) => {
     try {
@@ -152,6 +184,23 @@ export async function answerQuestion(
     partial: false,
   };
   const projectContext = deps.projectContext ?? getProjectGroundingContext;
+  const taskContext = deps.taskContext ?? getTaskGroundingContext;
+  const liveContextFor = (): Promise<ProjectGroundingContext> => {
+    if (taskFocus && focus?.kind === "task" && deps.projectId) {
+      return taskContext(workspaceId, deps.projectId, focus.taskId, new Date()).then(
+        (context) => ({
+          ...emptyProjectContext,
+          sources: context.sources,
+          observedAt: context.observedAt,
+          hasProjectData: context.sources.length > 0,
+        }),
+      );
+    }
+    if (combined && deps.projectId) {
+      return projectContext(workspaceId, deps.projectId, searchQuery);
+    }
+    return Promise.resolve(emptyProjectContext);
+  };
   report({ phase: "retrieving" });
   const [retrieved, liveContext] = await Promise.all([
     embeddings.embed([searchQuery]).then(([queryEmbedding]) =>
@@ -161,11 +210,10 @@ export async function answerQuestion(
         searchQuery,
         topK,
         deps.projectId ?? null,
+        focusDocumentIds,
       ),
     ),
-    combined && deps.projectId
-      ? projectContext(workspaceId, deps.projectId, searchQuery)
-      : Promise.resolve(emptyProjectContext),
+    liveContextFor(),
   ]);
 
   // --- Guard 1: refuse before calling the model when evidence is too weak ---
@@ -185,16 +233,22 @@ export async function answerQuestion(
       modelName: chat.modelName,
       latencyMs: Date.now() - startedAt,
       searchQuery,
+      proposals: [],
     };
   }
 
-  const { contextBlock, sourceMap, groundingSources } = combined
-    ? buildCombinedContext(relevant, liveContext.sources)
-    : buildContext(relevant);
+  const { contextBlock, sourceMap, groundingSources } =
+    combined || taskFocus
+      ? buildCombinedContext(relevant, liveContext.sources)
+      : buildContext(relevant);
   const messages = [
     {
       role: "system" as const,
-      content: combined ? PROJECT_SYSTEM_PROMPT : SYSTEM_PROMPT,
+      content: taskFocus
+        ? TASK_SYSTEM_PROMPT
+        : combined
+          ? PROJECT_SYSTEM_PROMPT
+          : SYSTEM_PROMPT,
     },
     // Conversation history was used to rewrite `searchQuery` above, but is not
     // sent to the answering model. This makes it structurally impossible for a
@@ -235,20 +289,35 @@ export async function answerQuestion(
       modelName: chat.modelName,
       latencyMs: Date.now() - startedAt,
       searchQuery,
+      proposals: [],
     };
   }
 
   // --- Guard 2: drop uncitable claims ---
   report({ phase: "validating" });
-  const validated = validateAnswer(parsed, sourceMap, {
-    refusalText,
-    requireMixedHeadings: combined,
-    question: searchQuery,
-    enforceIntentFamilies: combined,
-  });
+  const validated = validateAnswer(
+    parsed,
+    sourceMap,
+    taskFocus
+      ? // No intent gate and no mixed headings: in a task thread nearly every
+        // question says "task", and [T1] is always supplied, so the project
+        // rules would refuse ordinary answers that cite only a document.
+        { refusalText }
+      : {
+          refusalText,
+          requireMixedHeadings: combined,
+          question: searchQuery,
+          enforceIntentFamilies: combined,
+        },
+  );
 
   return {
     ...validated,
+    // A refused answer offers nothing to apply: its evidence did not hold up.
+    proposals:
+      taskFocus && !validated.refused
+        ? validateProposals(parsed.proposals, sourceMap)
+        : [],
     retrievedChunkIds: relevant.map((c) => c.id),
     retrievedChunks: relevant,
     groundingSourceIds: groundingSources,

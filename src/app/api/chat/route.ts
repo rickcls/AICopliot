@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { errorMessageFor, handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { answerFocusFor, resolveNewThreadScope, type ResolvedScope } from "@/lib/chat/focus";
 import { answerQuestion } from "@/lib/rag/answer";
 import { askQuestionSchema } from "@/lib/schemas";
 
@@ -48,54 +49,76 @@ export async function POST(request: Request) {
     }
 
     const { question } = parsed.data;
-    const projectId = parsed.data.projectId ?? null;
-    const groundingScope = projectId ? "project_combined" : "documents";
 
-    if (projectId) {
-      const project = await prisma.project.findFirst({
-        where: { id: projectId, workspaceId },
-        select: { id: true },
-      });
-      if (!project) {
-        return NextResponse.json({ error: "Project not found" }, { status: 404 });
-      }
-    }
-
-    // Resolve the conversation, scoped to this workspace AND this user.
+    // Resolve the conversation, scoped to this workspace AND this user. An
+    // existing thread keeps the scope and focus it was started with — the
+    // request can name them, but never re-point them (invariant 13).
     let conversationId = parsed.data.conversationId;
     let conversationTitle: string;
+    let scope: ResolvedScope;
     if (conversationId) {
       const existing = await prisma.chatConversation.findFirst({
-        where: {
-          id: conversationId,
-          workspaceId,
-          userId: user.id,
-          projectId,
-          groundingScope,
+        where: { id: conversationId, workspaceId, userId: user.id },
+        select: {
+          id: true,
+          title: true,
+          projectId: true,
+          groundingScope: true,
+          focus: true,
+          taskId: true,
+          focusDocumentIds: true,
         },
-        select: { id: true, title: true },
       });
-      if (!existing) {
+      const requestedProject = parsed.data.projectId;
+      const requestedTask = parsed.data.taskId;
+      if (
+        !existing ||
+        (requestedProject !== undefined &&
+          (requestedProject ?? null) !== existing.projectId) ||
+        (requestedTask != null && requestedTask !== existing.taskId)
+      ) {
         return NextResponse.json(
           { error: "Conversation not found" },
           { status: 404 },
         );
       }
+      // The task was deleted (taskId is SET NULL). Its answers stay readable,
+      // but there is no longer a record to ground a new one on.
+      if (existing.focus === "task" && !existing.taskId) {
+        return NextResponse.json(
+          { error: "The task this thread was about has been deleted. Start a new thread." },
+          { status: 409 },
+        );
+      }
       conversationTitle = existing.title;
+      scope = existing;
     } else {
+      const resolved = await resolveNewThreadScope(workspaceId, {
+        projectId: parsed.data.projectId ?? null,
+        taskId: parsed.data.taskId ?? null,
+        documentIds: parsed.data.documentIds ?? [],
+      });
+      if (!resolved.ok) {
+        return NextResponse.json(
+          { error: resolved.error },
+          { status: resolved.status },
+        );
+      }
+      scope = resolved.scope;
       const created = await prisma.chatConversation.create({
         data: {
           workspaceId,
-          projectId,
           userId: user.id,
           title: question.slice(0, 80),
-          groundingScope,
+          ...scope,
         },
         select: { id: true, title: true },
       });
       conversationId = created.id;
       conversationTitle = created.title;
     }
+    const { projectId, groundingScope } = scope;
+    const focus = await answerFocusFor(workspaceId, scope);
 
     // Load prior turns before writing the new one, so the history passed to the
     // model excludes the question being asked right now.
@@ -148,6 +171,7 @@ export async function POST(request: Request) {
             const result = await answerQuestion(workspaceId, question, {
               projectId,
               groundingScope,
+              focus,
               history: priorTurns.toReversed().map((turn) => ({
                 role: turn.role,
                 content: turn.content,
@@ -172,6 +196,9 @@ export async function POST(request: Request) {
                   modelName: result.modelName,
                   retrievedChunkIds: jsonValue(result.retrievedChunkIds),
                   groundingSourceIds: jsonValue(result.groundingSourceIds),
+                  ...(result.proposals.length > 0
+                    ? { proposals: jsonValue(result.proposals) }
+                    : {}),
                 },
                 select: { id: true, createdAt: true },
               }),
@@ -198,6 +225,7 @@ export async function POST(request: Request) {
               latencyMs: result.latencyMs,
               modelName: result.modelName,
               groundingScope,
+              proposals: result.proposals,
               createdAt: assistantMessage.createdAt.toISOString(),
             });
           } catch (error) {

@@ -217,6 +217,7 @@ async function loadProjectRows(workspaceId: string, projectId: string) {
           select: {
             task: {
               select: {
+                id: true,
                 title: true,
                 status: { select: { category: true } },
               },
@@ -266,7 +267,8 @@ function taskSource(
     id: task.id,
     title: task.title,
     content,
-    href: `/projects/${projectId}/tasks`,
+    // Opens the task itself; TaskBoard reads `?task=` into its detail panel.
+    href: `/projects/${projectId}/tasks?task=${task.id}`,
     observedAt,
     snapshot,
   };
@@ -726,5 +728,55 @@ export async function getProjectGroundingContext(
     totalDetailedRecords: scored.length,
     selectedDetailedRecords: selected.length,
     partial: selected.length < scored.length,
+  };
+}
+
+export interface TaskGroundingContext {
+  task: { id: string; projectId: string; title: string } | null;
+  sources: ProjectGroundingSource[];
+  observedAt: string;
+}
+
+/**
+ * The live records a task-focused thread answers from: the task itself —
+ * always first, whatever the question — then its dependencies either way, its
+ * milestone, and the *approved* requirements it delivers.
+ *
+ * Built from the same rows and the same source builders as the project
+ * context, so a task reads identically in both and a citation's snapshot has
+ * one shape. Official records only, like every operational read: a draft task
+ * cannot be the focus of a thread. Comments are deliberately absent — they
+ * are discussion, not evidence.
+ */
+export async function getTaskGroundingContext(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  now: Date = new Date(),
+): Promise<TaskGroundingContext> {
+  const observedAt = now.toISOString();
+  const rows = await loadProjectRows(workspaceId, projectId);
+  const task = rows.tasks.find((row) => row.id === taskId);
+  if (!rows.project || !task) return { task: null, sources: [], observedAt };
+
+  const milestone = task.milestone
+    ? rows.milestones.find((row) => row.id === task.milestone?.id)
+    : undefined;
+  const dependencies = rows.dependencies.filter(
+    (row) => row.task.id === taskId || row.dependsOnTask.id === taskId,
+  );
+  const requirements = rows.requirements.filter((requirement) =>
+    requirement.links.some((link) => link.task?.id === taskId),
+  );
+
+  return {
+    task: { id: task.id, projectId, title: task.title },
+    sources: [
+      taskSource(task, projectId, observedAt),
+      ...dependencies.map((row) => dependencySource(row, projectId, observedAt)),
+      ...(milestone ? [milestoneSource(milestone, projectId, observedAt)] : []),
+      ...requirements.map((row) => requirementSource(row, projectId, observedAt)),
+    ],
+    observedAt,
   };
 }

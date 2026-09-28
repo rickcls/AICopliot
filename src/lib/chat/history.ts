@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import type { Citation, Confidence } from "@/lib/schemas";
+import { taskProposalSchema, type Citation, type Confidence, type TaskProposal } from "@/lib/schemas";
 import { parseStoredCitations } from "./stored-citations";
 
 /**
@@ -20,6 +20,11 @@ export interface ThreadSummary {
   projectId: string | null;
   projectName: string | null;
   groundingScope: "documents" | "project_combined";
+  focus: "none" | "task" | "documents";
+  /** Null once the task is deleted; `focus` still says it was a task thread. */
+  taskId: string | null;
+  taskTitle: string | null;
+  focusDocumentIds: string[];
   messageCount: number;
   createdAt: string;
   lastMessageAt: string;
@@ -37,11 +42,18 @@ export interface ConversationTurn {
   latencyMs: number | null;
   createdAt: string;
   myRating: "up" | "down" | null;
+  proposals: TaskProposal[];
 }
 
 export interface LoadedConversation {
   conversation: ThreadSummary;
   turns: ConversationTurn[];
+}
+
+function parseStoredProposals(value: unknown): TaskProposal[] {
+  if (value == null) return [];
+  const parsed = taskProposalSchema.array().safeParse(value);
+  return parsed.success ? parsed.data : [];
 }
 
 export async function listConversations(
@@ -58,6 +70,10 @@ export async function listConversations(
       title: true,
       projectId: true,
       groundingScope: true,
+      focus: true,
+      taskId: true,
+      focusDocumentIds: true,
+      task: { select: { title: true } },
       createdAt: true,
       lastMessageAt: true,
       project: { select: { name: true } },
@@ -71,6 +87,10 @@ export async function listConversations(
     projectId: row.projectId,
     projectName: row.project?.name ?? null,
     groundingScope: row.groundingScope,
+    focus: row.focus,
+    taskId: row.taskId,
+    taskTitle: row.task?.title ?? null,
+    focusDocumentIds: row.focusDocumentIds,
     messageCount: row._count.messages,
     createdAt: row.createdAt.toISOString(),
     lastMessageAt: row.lastMessageAt.toISOString(),
@@ -89,6 +109,10 @@ export async function loadConversation(
       title: true,
       projectId: true,
       groundingScope: true,
+      focus: true,
+      taskId: true,
+      focusDocumentIds: true,
+      task: { select: { title: true } },
       createdAt: true,
       lastMessageAt: true,
       project: { select: { name: true } },
@@ -104,6 +128,7 @@ export async function loadConversation(
           confidence: true,
           refused: true,
           latencyMs: true,
+          proposals: true,
           createdAt: true,
           // Unique on (chatMessageId, userId), so at most one row.
           feedback: { where: { userId }, select: { rating: true } },
@@ -121,6 +146,10 @@ export async function loadConversation(
       projectId: row.projectId,
       projectName: row.project?.name ?? null,
       groundingScope: row.groundingScope,
+      focus: row.focus,
+      taskId: row.taskId,
+      taskTitle: row.task?.title ?? null,
+      focusDocumentIds: row.focusDocumentIds,
       messageCount: row._count.messages,
       createdAt: row.createdAt.toISOString(),
       lastMessageAt: row.lastMessageAt.toISOString(),
@@ -139,6 +168,9 @@ export async function loadConversation(
         latencyMs: message.latencyMs,
         createdAt: message.createdAt.toISOString(),
         myRating: message.feedback[0]?.rating ?? null,
+        // Re-validated like citations: a stored blob that no longer parses
+        // offers nothing rather than a malformed Apply button.
+        proposals: parseStoredProposals(message.proposals),
       };
     }),
   };

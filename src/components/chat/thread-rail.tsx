@@ -136,7 +136,18 @@ export function ThreadRail({
                     {thread.title}
                   </span>
                   <span className="mt-1 flex items-center gap-1.5">
-                    {thread.projectName ? (
+                    {thread.focus === "task" ? (
+                      // The task outranks the project: it is the narrower,
+                      // more useful thing to recognise a thread by.
+                      <Badge tone="info" className="max-w-[9rem] truncate">
+                        Task: {thread.taskTitle ?? "deleted"}
+                      </Badge>
+                    ) : thread.focus === "documents" ? (
+                      <Badge tone="neutral" className="max-w-[9rem] truncate">
+                        {thread.focusDocumentIds.length} doc
+                        {thread.focusDocumentIds.length === 1 ? "" : "s"}
+                      </Badge>
+                    ) : thread.projectName ? (
                       <Badge tone="info" className="max-w-[9rem] truncate">
                         {thread.projectName}
                       </Badge>

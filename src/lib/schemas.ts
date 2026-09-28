@@ -12,18 +12,39 @@ export type Confidence = z.infer<typeof confidenceSchema>;
  * put in the prompt, never a database ID — validated against the retrieved set
  * in src/lib/rag/citations.ts.
  */
+export const TASK_PROPOSAL_FIELDS = [
+  "description",
+  "priority",
+  "estimatedHours",
+  "startDate",
+  "dueDate",
+] as const;
+
+const modelCitationSchema = z.object({
+  sourceId: z.string().min(1),
+  quote: z.string().max(600).default(""),
+});
+
 export const modelAnswerSchema = z.object({
   answer: z.string().min(1),
   confidence: confidenceSchema,
   insufficientContext: z.boolean().default(false),
-  citations: z
+  citations: z.array(modelCitationSchema).default([]),
+  /**
+   * Task-focused threads only. `.catch([])` because proposals are optional
+   * extras: a malformed list must cost the proposals, never a good answer.
+   * Each value is checked per field downstream (see src/lib/rag/proposals.ts).
+   */
+  proposals: z
     .array(
       z.object({
-        sourceId: z.string().min(1),
-        quote: z.string().max(600).default(""),
+        field: z.enum(TASK_PROPOSAL_FIELDS),
+        value: z.union([z.string(), z.number()]),
+        citations: z.array(modelCitationSchema).max(12).default([]),
       }),
     )
-    .default([]),
+    .max(10)
+    .catch([]),
 });
 export type ModelAnswer = z.infer<typeof modelAnswerSchema>;
 
@@ -96,12 +117,45 @@ export interface ProjectCitation extends z.infer<typeof projectCitationSchema> {
 /** Discriminated union keeps existing document fields safe after narrowing. */
 export type Citation = DocumentCitation | ProjectCitation;
 
+/**
+ * A validated edit a task-focused answer offers, as stored on the message and
+ * sent to the client. `chunkId` is set only for document citations — the only
+ * kind that can be saved as a TaskCitation when the proposal is applied.
+ */
+export const taskProposalSchema = z.object({
+  field: z.enum(TASK_PROPOSAL_FIELDS),
+  value: z.union([z.string(), z.number()]),
+  citations: z.array(
+    z.object({
+      label: z.string(),
+      kind: z.enum(["document", "record"]),
+      chunkId: z.string().nullable(),
+      excerpt: z.string(),
+    }),
+  ),
+});
+export type TaskProposal = z.infer<typeof taskProposalSchema>;
+
 // --- API inputs ------------------------------------------------------------
+
+export const MAX_FOCUS_DOCUMENTS = 20;
 
 export const askQuestionSchema = z.object({
   question: z.string().trim().min(3, "Question is too short").max(2000),
   conversationId: z.string().optional(),
   projectId: z.string().min(1).nullable().optional(),
+  /** Focus a new thread on one task. Its project is the task's own. */
+  taskId: z.string().min(1).nullable().optional(),
+  /** Focus a new thread on chosen documents. Ignored with `taskId`. */
+  documentIds: z
+    .array(z.string().trim().min(1))
+    .transform((ids) => [...new Set(ids)])
+    .pipe(
+      z
+        .array(z.string())
+        .max(MAX_FOCUS_DOCUMENTS, `Choose no more than ${MAX_FOCUS_DOCUMENTS} documents`),
+    )
+    .optional(),
 });
 
 export const renameConversationSchema = z.object({

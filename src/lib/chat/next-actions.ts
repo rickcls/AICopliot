@@ -29,6 +29,10 @@ const PROJECT_ACTION_LABELS = {
   project_snapshot: "Open the project overview",
 } as const;
 
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
 export function nextActionsFor(citations: Citation[]): NextAction[] {
   const byHref = new Map<string, NextAction>();
 
@@ -40,7 +44,12 @@ export function nextActionsFor(citations: Citation[]): NextAction[] {
             href: `/documents/${citation.documentId}`,
           }
         : {
-            label: PROJECT_ACTION_LABELS[citation.kind],
+            // A task link opens that task, so it is named — several cited
+            // tasks would otherwise be several identical "Open in Tasks".
+            label:
+              citation.kind === "task"
+                ? `Open “${truncate(citation.title, 40)}”`
+                : PROJECT_ACTION_LABELS[citation.kind],
             // Already constrained to an in-app path by projectCitationSchema, so
             // a model-influenced value can never become an off-site URL.
             href: citation.href,

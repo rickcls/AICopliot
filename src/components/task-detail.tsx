@@ -14,6 +14,8 @@ import {
   Select,
   Spinner,
 } from "@/components/ui";
+import { proposalPatch } from "@/components/chat/proposal-card";
+import { TaskChat } from "@/components/task-chat";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDependencies } from "@/components/task-dependencies";
 import { TaskDocumentsField } from "@/components/task-documents-field";
@@ -38,6 +40,7 @@ import {
   type TaskRow,
   type TaskStatusOption,
 } from "@/components/task-types";
+import type { TaskProposal } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { TracedRequirements } from "@/components/traced-requirements";
 
@@ -98,6 +101,7 @@ export function TaskDetail({
   const [draft, setDraft] = useState<TaskDraft>(() => draftFrom(task));
   const [saving, setSaving] = useState(false);
   const [filling, setFilling] = useState(false);
+  const [tab, setTab] = useState<"details" | "ai">("details");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -183,7 +187,10 @@ export function TaskDetail({
    * value while the request is in flight, and is restored from the value the
    * panel had before the edit if the server refuses.
    */
-  async function save(patch: Partial<TaskDraft>) {
+  async function save(
+    patch: Partial<TaskDraft>,
+    extra: Record<string, unknown> = {},
+  ): Promise<boolean> {
     const before = draft;
     setDraft({ ...draft, ...patch });
     setSaving(true);
@@ -193,21 +200,37 @@ export function TaskDetail({
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toPartialPayload(patch)),
+        body: JSON.stringify({ ...toPartialPayload(patch), ...extra }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setDraft(before);
         setError(data.error ?? "Could not save that change.");
-        return;
+        return false;
       }
       onTaskChange(data.task);
+      return true;
     } catch {
       setDraft(before);
       setError("Could not reach the server.");
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  /**
+   * Applies a chat proposal as an ordinary edit of that one field, so the
+   * field on the Details tab updates with it and every server rule a hand edit
+   * meets (dates in order, workspace scope) applies. The passages it cited
+   * travel along and become the task's Sources.
+   */
+  function applyProposal(proposal: TaskProposal): Promise<boolean> {
+    const { citations } = proposalPatch(proposal);
+    return save(
+      { [proposal.field]: String(proposal.value) } as Partial<TaskDraft>,
+      citations ? { citations } : {},
+    );
   }
 
   /** Commits a text field on blur — saving per keystroke would be a request per
@@ -248,7 +271,7 @@ export function TaskDetail({
         aria-modal="true"
         className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-slate-200 bg-white shadow-xl"
       >
-        <div className="sticky top-0 z-10 flex items-start gap-2 border-b border-slate-200 bg-white/95 p-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex flex-wrap items-start gap-2 border-b border-slate-200 bg-white/95 px-4 pt-4 backdrop-blur">
           {/* The name is edited in place at heading size, matching the create
               form — the title of the thing you are looking at, not a field. */}
           <Input
@@ -280,9 +303,77 @@ export function TaskDetail({
           >
             <X className="size-4" aria-hidden />
           </button>
+
+          {/* A real tablist: both panels live in this component and swap in
+              place, unlike the project tabs, which are separate routes. It
+              wraps onto its own line inside the sticky header. */}
+          <div role="tablist" aria-label="Task views" className="-ml-1 flex basis-full gap-1">
+            {(
+              [
+                ["details", "Details"],
+                ["ai", "Ask AI"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                id={`task-tab-${value}`}
+                aria-selected={tab === value}
+                aria-controls={`task-panel-${value}`}
+                onClick={() => setTab(value)}
+                className={cn(
+                  "-mb-px inline-flex items-center gap-1.5 border-b-2 px-1.5 pt-1 pb-2 text-sm font-medium transition-colors",
+                  tab === value
+                    ? "border-slate-900 text-slate-900"
+                    : "border-transparent text-slate-500 hover:text-slate-800",
+                )}
+              >
+                {value === "ai" ? (
+                  <Sparkles className="size-3.5 text-violet-600" aria-hidden />
+                ) : null}
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1 space-y-5 p-4">
+        {/* Details stays mounted while hidden, so a half-typed edit survives a
+            look at the chat. */}
+        {tab === "ai" ? (
+          <div
+            role="tabpanel"
+            id="task-panel-ai"
+            aria-labelledby="task-tab-ai"
+            className="flex flex-1 flex-col"
+          >
+            {error ? (
+              <div className="px-4 pt-4">
+                <ErrorState message={error} />
+              </div>
+            ) : null}
+            <TaskChat
+              taskId={task.id}
+              linkedDocumentCount={task.documents.length}
+              current={{
+                description: task.description,
+                priority: task.priority,
+                estimatedHours: task.estimatedHours,
+                startDate: task.startDate?.slice(0, 10) ?? null,
+                dueDate: task.dueDate?.slice(0, 10) ?? null,
+              }}
+              onApply={applyProposal}
+            />
+          </div>
+        ) : null}
+
+        <div
+          role="tabpanel"
+          id="task-panel-details"
+          aria-labelledby="task-tab-details"
+          hidden={tab !== "details"}
+          className="flex-1 space-y-5 p-4"
+        >
           {error ? <ErrorState message={error} /> : null}
 
           {/* A narrower label column than the create modal's: the panel is
@@ -639,7 +730,10 @@ export function TaskDetail({
           </div>
         </div>
 
-        <div className="sticky bottom-0 flex items-center gap-2 border-t border-slate-200 bg-white p-4">
+        <div
+          hidden={tab !== "details"}
+          className="sticky bottom-0 flex items-center gap-2 border-t border-slate-200 bg-white p-4"
+        >
           {/* Saving is reported rather than commanded: there is no Save button
               because there is nothing to submit — each field commits itself. */}
           <span className="flex-1 text-xs text-slate-500">

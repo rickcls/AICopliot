@@ -242,6 +242,16 @@ enum GroundingScope {
   project_combined
 }
 
+/// What a thread is narrowed to *inside* its grounding scope. `none` is the
+/// scope itself; `task` adds the task's live record and reads its linked
+/// documents; `documents` restricts retrieval to the chosen ones. Changing it
+/// starts a new thread, like changing project, so evidence sets never mix.
+enum ChatFocus {
+  none
+  task
+  documents
+}
+
 model ChatConversation {
   id             String         @id @default(cuid())
   workspaceId    String
@@ -249,6 +259,14 @@ model ChatConversation {
   userId         String
   title          String
   groundingScope GroundingScope @default(documents)
+  focus          ChatFocus      @default(none)
+  // SET NULL, like projectId: a thread is answer history and outlives its
+  // task. `focus` stays `task`, so the route can tell a thread whose task was
+  // deleted from one that never had a task, and refuses to continue it.
+  taskId         String?
+  // A filter, not a relation: a deleted document simply stops matching, and
+  // retrieval re-checks workspace and project for every id on every turn.
+  focusDocumentIds String[]     @default([])
   createdAt      DateTime       @default(now())
   // Not `updatedAt`: the row is never edited, only appended to, and Prisma's
   // @updatedAt fires only on a write to this model — it would never move for a
@@ -257,10 +275,12 @@ model ChatConversation {
 
   workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task      Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  ChatMessage[]
 
   @@index([workspaceId, userId])
+  @@index([taskId])
   @@index([workspaceId, userId, lastMessageAt(sort: Desc)])
 }
 
@@ -281,6 +301,10 @@ model ChatMessage {
   modelName          String?
   retrievedChunkIds  Json?
   groundingSourceIds Json?
+  // Task-focused answers only: validated edits the user can apply. Stored so
+  // a replayed thread still offers them; applying goes through the ordinary
+  // task PATCH, never through this row.
+  proposals          Json?
   createdAt          DateTime          @default(now())
 
   conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -528,6 +552,7 @@ model Task {
   requirementLinks RequirementLink[]
   comments         TaskComment[]
   documents        TaskDocument[]
+  conversations    ChatConversation[]
 
   @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])

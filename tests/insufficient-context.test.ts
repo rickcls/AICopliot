@@ -78,6 +78,28 @@ describe("retrieval gate — refusing before the model is called", () => {
       "project question",
       8,
       "project-1",
+      // No focus: the whole project, not a document subset.
+      null,
+    );
+  });
+
+  it("narrows retrieval to the chosen documents in a document-focused thread", async () => {
+    retrieveChunks.mockResolvedValue([]);
+
+    await answerQuestion("ws-1", "what does the deck say", {
+      embeddings,
+      chat: chatReturning({}),
+      projectId: "project-1",
+      focus: { kind: "documents", documentIds: ["doc-1", "doc-2"] },
+    });
+
+    expect(retrieveChunks).toHaveBeenCalledWith(
+      "ws-1",
+      [0.1, 0.2, 0.3],
+      "what does the deck say",
+      8,
+      "project-1",
+      ["doc-1", "doc-2"],
     );
   });
 
