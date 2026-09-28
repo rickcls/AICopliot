@@ -104,15 +104,25 @@ export const askQuestionSchema = z.object({
   projectId: z.string().min(1).nullable().optional(),
 });
 
+export const renameConversationSchema = z.object({
+  title: z.string().trim().min(1, "Give the thread a name").max(120),
+});
+
 export const createProjectSchema = z.object({
   name: z.string().trim().min(1, "Project name is required").max(120),
   description: z.string().trim().max(1000).optional(),
 });
 
-export const updateProjectSchema = createProjectSchema.partial().refine(
-  (value) => value.name !== undefined || value.description !== undefined,
-  "Provide a name or description",
-);
+export const updateProjectSchema = createProjectSchema
+  .partial()
+  .extend({ deliveryEnabled: z.boolean().optional() })
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.description !== undefined ||
+      value.deliveryEnabled !== undefined,
+    "Provide a name, description, or delivery setting",
+  );
 
 export const assignDocumentProjectSchema = z.object({
   projectId: z.string().min(1).nullable(),

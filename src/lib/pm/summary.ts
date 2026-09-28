@@ -1,4 +1,5 @@
 import "server-only";
+import type { RequirementStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import {
   activeProjectWhere,
@@ -9,7 +10,10 @@ import {
   uncoveredRequirementWhere,
   unvalidatedRequirementWhere,
   upcomingMilestoneWhere,
+  undecidedRequirementWhere,
+  pendingPlanRunWhere,
   OPEN_REQUIREMENT_STATUSES,
+  OPEN_TASK_CATEGORIES,
   DONE_TASK_CATEGORY,
   officialRecordWhere,
 } from "./rules";
@@ -130,6 +134,10 @@ export interface ProjectSummary {
   approvedRequirements: number;
   uncoveredRequirements: number;
   unvalidatedRequirements: number;
+  undecidedRequirements: number;
+  pendingPlanRuns: number;
+  /** Register rows by lifecycle status, drafts included (invariant 14). */
+  requirementsByStatus: Record<RequirementStatus, number>;
 }
 
 export async function getProjectSummary(
@@ -145,13 +153,14 @@ export async function getProjectSummary(
     dueSoonTasks,
     openRisks,
     openMilestones,
-    readyDocuments,
-    totalDocuments,
-    totalRequirements,
+    documentGroups,
     openRequirements,
     approvedRequirements,
     uncoveredRequirements,
     unvalidatedRequirements,
+    undecidedRequirements,
+    pendingPlanRuns,
+    statusGroups,
   ] = await Promise.all([
     prisma.task.count({
       where: officialRecordWhere({
@@ -186,11 +195,11 @@ export async function getProjectSummary(
         status: { not: "completed" as const },
       }),
     }),
-    prisma.document.count({ where: { workspaceId, projectId, status: "ready" } }),
-    prisma.document.count({ where: { workspaceId, projectId } }),
-    // The register deliberately counts drafts too: an unconfirmed requirement is
-    // still something the team is carrying, unlike a draft task proposal.
-    prisma.requirement.count({ where: { workspaceId, projectId } }),
+    prisma.document.groupBy({
+      by: ["status"],
+      where: { workspaceId, projectId },
+      _count: { _all: true },
+    }),
     prisma.requirement.count({
       where: officialRecordWhere({
         workspaceId,
@@ -207,7 +216,40 @@ export async function getProjectSummary(
     prisma.requirement.count({
       where: unvalidatedRequirementWhere(workspaceId, projectId),
     }),
+    prisma.requirement.count({
+      where: undecidedRequirementWhere(workspaceId, projectId),
+    }),
+    prisma.generationRun.count({
+      where: pendingPlanRunWhere(workspaceId, projectId),
+    }),
+    // Unfiltered by source on purpose: the register counts drafts too, since
+    // an unconfirmed requirement is still something the team is carrying.
+    prisma.requirement.groupBy({
+      by: ["status"],
+      where: { workspaceId, projectId },
+      _count: { _all: true },
+    }),
   ]);
+
+  let totalDocuments = 0;
+  let readyDocuments = 0;
+  for (const group of documentGroups) {
+    totalDocuments += group._count._all;
+    if (group.status === "ready") readyDocuments = group._count._all;
+  }
+
+  const requirementsByStatus: Record<RequirementStatus, number> = {
+    draft: 0,
+    needs_clarification: 0,
+    validated: 0,
+    approved: 0,
+    rejected: 0,
+  };
+  let totalRequirements = 0;
+  for (const group of statusGroups) {
+    requirementsByStatus[group.status] = group._count._all;
+    totalRequirements += group._count._all;
+  }
 
   return {
     openTasks,
@@ -224,5 +266,118 @@ export async function getProjectSummary(
     approvedRequirements,
     uncoveredRequirements,
     unvalidatedRequirements,
+    undecidedRequirements,
+    pendingPlanRuns,
+    requirementsByStatus,
   };
+}
+
+export interface ProjectHealthRow {
+  id: string;
+  name: string;
+  deliveryEnabled: boolean;
+  /** Register counts by status — drafts included, as on the register page. */
+  toReview: number;
+  askClient: number;
+  validated: number;
+  agreed: number;
+  openTasks: number;
+  doneTasks: number;
+  overdueTasks: number;
+  blockedTasks: number;
+  uncoveredRequirements: number;
+  pendingPlanRuns: number;
+}
+
+/**
+ * One row per project for the dashboard, built from grouped counts so the cost
+ * is a fixed handful of queries however many projects there are. Each count
+ * uses the same predicate as the project's own Overview, so the two pages
+ * cannot disagree about a project.
+ */
+export async function getProjectHealthRows(
+  workspaceId: string,
+  now: Date = new Date(),
+): Promise<ProjectHealthRow[]> {
+  const [projects, open, done, overdue, blocked, uncovered, pending, statuses] =
+    await Promise.all([
+      prisma.project.findMany({
+        where: { workspaceId },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, name: true, deliveryEnabled: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: officialRecordWhere({
+          workspaceId,
+          status: { category: { in: [...OPEN_TASK_CATEGORIES] } },
+        }),
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: officialRecordWhere({
+          workspaceId,
+          status: { category: DONE_TASK_CATEGORY },
+        }),
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: overdueTaskWhere(workspaceId, now),
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: blockedTaskWhere(workspaceId),
+        _count: { _all: true },
+      }),
+      prisma.requirement.groupBy({
+        by: ["projectId"],
+        where: uncoveredRequirementWhere(workspaceId),
+        _count: { _all: true },
+      }),
+      prisma.generationRun.groupBy({
+        by: ["projectId"],
+        where: pendingPlanRunWhere(workspaceId),
+        _count: { _all: true },
+      }),
+      prisma.requirement.groupBy({
+        by: ["projectId", "status"],
+        where: { workspaceId },
+        _count: { _all: true },
+      }),
+    ]);
+
+  const statusCount = (projectId: string, status: RequirementStatus) =>
+    statuses.find(
+      (group) => group.projectId === projectId && group.status === status,
+    )?._count._all ?? 0;
+
+  const byProject = (groups: Array<{ projectId: string; _count: { _all: number } }>) =>
+    new Map(groups.map((group) => [group.projectId, group._count._all]));
+  const counts = {
+    open: byProject(open),
+    done: byProject(done),
+    overdue: byProject(overdue),
+    blocked: byProject(blocked),
+    uncovered: byProject(uncovered),
+    pending: byProject(pending),
+  };
+
+  return projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    deliveryEnabled: project.deliveryEnabled,
+    toReview: statusCount(project.id, "draft"),
+    askClient: statusCount(project.id, "needs_clarification"),
+    validated: statusCount(project.id, "validated"),
+    agreed: statusCount(project.id, "approved"),
+    openTasks: counts.open.get(project.id) ?? 0,
+    doneTasks: counts.done.get(project.id) ?? 0,
+    overdueTasks: counts.overdue.get(project.id) ?? 0,
+    blockedTasks: counts.blocked.get(project.id) ?? 0,
+    uncoveredRequirements: counts.uncovered.get(project.id) ?? 0,
+    pendingPlanRuns: counts.pending.get(project.id) ?? 0,
+  }));
 }

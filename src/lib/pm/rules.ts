@@ -440,6 +440,38 @@ export function unvalidatedRequirementWhere(
 }
 
 /**
+ * Register entries still waiting on a decision: drafts nobody has reviewed and
+ * questions that have to go back to the client. Not the official predicate —
+ * a draft requirement is the working state this queue exists to show
+ * (invariant 14).
+ */
+export const UNDECIDED_REQUIREMENT_STATUSES = [
+  "draft",
+  "needs_clarification",
+] as const satisfies readonly RequirementStatus[];
+
+export function undecidedRequirementWhere(
+  workspaceId: string,
+  projectId?: string,
+) {
+  return {
+    workspaceId,
+    ...(projectId ? { projectId } : {}),
+    status: { in: [...UNDECIDED_REQUIREMENT_STATUSES] },
+  };
+}
+
+/** Generated delivery plans that exist only as proposals on the Review tab. */
+export function pendingPlanRunWhere(workspaceId: string, projectId?: string) {
+  return {
+    workspaceId,
+    ...(projectId ? { projectId } : {}),
+    type: { in: ["project_plan" as const, "tasks" as const] },
+    status: "draft" as const,
+  };
+}
+
+/**
  * A project counts as active while it still has unfinished work. A project with
  * no tasks and no milestones has nothing in flight, so it is not counted.
  */

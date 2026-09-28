@@ -428,4 +428,24 @@ export async function getStatusReport(workspaceId: string, id: string) {
   return row ? serializeStatusReportRun(row) : null;
 }
 
+/** The newest report that produced output, for the Overview card. */
+export async function getLatestStatusReport(workspaceId: string, projectId: string) {
+  const row = await prisma.generationRun.findFirst({
+    where: { workspaceId, projectId, type: "status_report", status: "draft" },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      projectId: true,
+      model: true,
+      promptVersion: true,
+      status: true,
+      errorMessage: true,
+      latencyMs: true,
+      validatedOutput: true,
+      createdAt: true,
+    },
+  });
+  return row ? serializeStatusReportRun(row) : null;
+}
+
 export type StatusReportRun = Awaited<ReturnType<typeof listStatusReports>>[number];

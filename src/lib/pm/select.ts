@@ -71,6 +71,23 @@ const officialLinksSelect = {
   },
 };
 
+/**
+ * The requirements a delivery record traces back to — the reverse of a
+ * requirement's `links`. Rejected requirements are left out: rejected scope is
+ * nothing work can be traced to. Drafts stay, because the register treats them
+ * as the working state (invariant 14) and a link made from one is real.
+ */
+const tracedRequirementsSelect = {
+  where: { requirement: { status: { not: "rejected" as const } } },
+  orderBy: { requirement: { sequence: "asc" as const } },
+  select: {
+    id: true,
+    requirement: {
+      select: { id: true, sequence: true, title: true, status: true },
+    },
+  },
+};
+
 export const taskSelect = {
   id: true,
   projectId: true,
@@ -110,20 +127,10 @@ export const taskSelect = {
     },
   },
   citations: { select: taskOrRiskCitationSelect },
-  // Comments ride along with the task rather than being fetched when the detail
-  // panel opens, so the create/update/list responses stay one shape and the
-  // client can replace a row in place without dropping the thread. Worth
-  // revisiting if a single task ever accumulates enough discussion to make the
-  // board query heavy — the natural fix is a count here and a fetch on open.
-  comments: {
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      body: true,
-      createdAt: true,
-      author: { select: { id: true, name: true, email: true } },
-    },
-  },
+  requirementLinks: tracedRequirementsSelect,
+  // Comments are deliberately absent: every task on the board would otherwise
+  // ship its whole thread to the browser to be read on at most one of them.
+  // TaskComments fetches the thread when the detail panel opens.
 } as const;
 
 export const milestoneSelect = {
@@ -141,6 +148,7 @@ export const milestoneSelect = {
   reviewedById: true,
   createdAt: true,
   citations: { select: citationBaseSelect },
+  requirementLinks: tracedRequirementsSelect,
 } as const;
 
 export const riskSelect = {
@@ -160,6 +168,7 @@ export const riskSelect = {
   createdAt: true,
   milestone: { select: { id: true, title: true } },
   citations: { select: taskOrRiskCitationSelect },
+  requirementLinks: tracedRequirementsSelect,
 } as const;
 
 export const requirementSelect = {

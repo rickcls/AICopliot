@@ -11,6 +11,7 @@ import { buildLabelledContext, selectDocumentContext } from "./context";
 import { extractJsonObject } from "./prompt";
 import {
   buildRequirementsUserMessage,
+  MAX_EXISTING_TITLES,
   REQUIREMENTS_PROMPT_VERSION,
   REQUIREMENTS_QUERIES,
   REQUIREMENTS_SYSTEM_PROMPT,
@@ -165,11 +166,26 @@ export async function generateRequirements(
       sourceLabels: context.sourceLabels,
     });
 
+    // Everything already recorded, rejected rows included: a requirement the
+    // client turned down should not come back with every new meeting note.
+    const existing = await prisma.requirement.findMany({
+      where: { workspaceId, projectId },
+      orderBy: { sequence: "asc" },
+      take: MAX_EXISTING_TITLES,
+      select: { title: true, status: true },
+    });
+
     const baseMessages = [
       { role: "system" as const, content: REQUIREMENTS_SYSTEM_PROMPT },
       {
         role: "user" as const,
-        content: buildRequirementsUserMessage(context.contextBlock),
+        content: buildRequirementsUserMessage(
+          context.contextBlock,
+          existing.map((row) => ({
+            title: row.title,
+            rejected: row.status === "rejected",
+          })),
+        ),
       },
     ];
 
@@ -208,7 +224,11 @@ export async function generateRequirements(
       );
     }
 
-    const validated = validateRequirements(parsed, context.sourceMap);
+    const validated = validateRequirements(
+      parsed,
+      context.sourceMap,
+      existing.map((row) => row.title),
+    );
     return await persistDraftRequirements({
       workspaceId,
       projectId,

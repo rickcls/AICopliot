@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesQuery } from "@/lib/pm/filters";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  SearchField,
   SectionHeader,
   Select,
   Spinner,
@@ -74,13 +76,21 @@ export function DocumentsPanel({
     fixedProject?.id ?? initialProjectFilter,
   );
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const confirm = useConfirm();
   const toast = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const fixedProjectId = fixedProject?.id;
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/documents");
+      // A project page only ever shows its own documents, so it only polls
+      // for them rather than re-downloading the whole workspace every tick.
+      const response = await fetch(
+        fixedProjectId
+          ? `/api/documents?projectId=${encodeURIComponent(fixedProjectId)}`
+          : "/api/documents",
+      );
       if (!response.ok) throw new Error("Could not load documents");
       const data = await response.json();
       setDocuments(data.documents);
@@ -88,7 +98,7 @@ export function DocumentsPanel({
     } catch (error) {
       setLoadError((error as Error).message);
     }
-  }, []);
+  }, [fixedProjectId]);
 
   // Poll while anything is mid-ingestion. When ingestion moves to a queue this
   // is already the right UI shape — nothing here needs to change.
@@ -96,10 +106,26 @@ export function DocumentsPanel({
     (d) => d.status === "uploaded" || d.status === "processing",
   );
 
+  // Quick at first, when a small file is about to finish, then slower: a
+  // document stuck in `uploaded` would otherwise be polled every two seconds
+  // for as long as the tab stays open.
   useEffect(() => {
     if (!hasPending) return;
-    const timer = setInterval(() => void load(), 2000);
-    return () => clearInterval(timer);
+    const startedAt = Date.now();
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const delay = Date.now() - startedAt < 30_000 ? 2000 : 5000;
+      timer = setTimeout(async () => {
+        await load();
+        if (!cancelled) tick();
+      }, delay);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [hasPending, load]);
 
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -191,6 +217,7 @@ export function DocumentsPanel({
   }
 
   const visibleDocuments = documents.filter((document) => {
+    if (!matchesQuery(query, [document.originalFilename])) return false;
     if (projectFilter === "all") return true;
     if (projectFilter === "unassigned") return document.projectId === null;
     return document.projectId === projectFilter;
@@ -285,6 +312,15 @@ export function DocumentsPanel({
             : `${documents.length} document${documents.length === 1 ? "" : "s"} across every project.`
         }
       >
+        {documents.length > 0 ? (
+          <SearchField
+            label="Search documents by filename"
+            placeholder="Search filenames"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="w-full sm:w-56"
+          />
+        ) : null}
         {!fixedProject ? (
           <div className="flex items-center gap-2">
             <label htmlFor="project-filter" className="text-xs text-slate-500">
@@ -325,16 +361,23 @@ export function DocumentsPanel({
           }
         />
       ) : visibleDocuments.length === 0 ? (
-        <EmptyState
-          title="No documents in this project"
-          description="Assign an existing document or upload a new one using the selected project."
-        />
+        query.trim() ? (
+          <EmptyState
+            title="No filenames match"
+            description={`Nothing here is named like “${query.trim()}”.`}
+          />
+        ) : (
+          <EmptyState
+            title="No documents in this project"
+            description="Assign an existing document or upload a new one using the selected project."
+          />
+        )
       ) : (
         <Card className="divide-y divide-slate-100">
           {visibleDocuments.map((doc) => (
             <div
               key={doc.id}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4"
+              className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3"
             >
               <div className="min-w-0 flex-1">
                 <Link
@@ -343,26 +386,31 @@ export function DocumentsPanel({
                 >
                   {doc.originalFilename}
                 </Link>
+                {/* The project is not repeated here: on a project tab every
+                    row would say the same thing, and in the library the
+                    assignment select beside the row already names it. */}
                 <p className="mt-0.5 text-xs text-slate-500">
                   {formatBytes(doc.sizeBytes)} · {formatDate(doc.createdAt)}
                   {doc.status === "ready"
                     ? ` · ${doc.chunkCount} chunks indexed`
                     : ""}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Project: {doc.project?.name ?? "Unassigned"}
-                </p>
                 {doc.status === "failed" && doc.errorMessage ? (
                   <p className="mt-1 text-xs text-red-700">{doc.errorMessage}</p>
                 ) : null}
               </div>
 
-              <Badge tone={STATUS_TONE[doc.status]}>
-                {doc.status === "processing" ? (
-                  <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-current" />
-                ) : null}
-                {STATUS_LABEL[doc.status]}
-              </Badge>
+              {/* Ready is the normal state, so only the exceptions are badged;
+                  the chunk count in the metadata line already says it is
+                  indexed. */}
+              {doc.status !== "ready" ? (
+                <Badge tone={STATUS_TONE[doc.status]}>
+                  {doc.status === "processing" ? (
+                    <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-current" />
+                  ) : null}
+                  {STATUS_LABEL[doc.status]}
+                </Badge>
+              ) : null}
 
               {doc.status === "failed" ? (
                 <Button

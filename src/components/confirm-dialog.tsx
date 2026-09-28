@@ -101,7 +101,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           // the element rather than the panel inside it is a click outside.
           if (event.target === dialogRef.current) settle(false);
         }}
-        className="m-auto w-[calc(100vw-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-xl open:animate-dialog-in backdrop:bg-slate-900/40 backdrop:animate-overlay-in"
+        className="m-auto w-[calc(100vw-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-xl open:animate-dialog-in backdrop:bg-black/50 backdrop:animate-overlay-in"
       >
         {options ? (
           <div className="p-5">

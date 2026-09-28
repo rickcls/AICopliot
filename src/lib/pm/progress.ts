@@ -44,7 +44,7 @@ export interface ProgressCounts {
  * rather than a 0% that denies the work already done. Both are the kind of
  * number a reader would treat as a lie about the state of the project.
  */
-function percentOf(done: number, total: number): number {
+export function percentOf(done: number, total: number): number {
   if (total === 0 || done === 0) return 0;
   if (done >= total) return 100;
   return Math.min(99, Math.max(1, Math.round((done / total) * 100)));

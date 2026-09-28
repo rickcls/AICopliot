@@ -1,17 +1,39 @@
 "use client";
 
+import { REQUIREMENT_STATUS_HINT, REQUIREMENT_STATUS_LABEL, requirementStatusLabel } from "@/lib/pm/labels";
+import {
+  EMPTY_REQUIREMENT_FILTER,
+  type RegisterFilter,
+  type RequirementFilter,
+  requirementMatches,
+} from "@/lib/pm/filters";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ChevronRight, FileText, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Check,
+  ChevronRight,
+  Download,
+  FileText,
+  Grid3x3,
+  ListChecks,
+  Sparkles,
+} from "lucide-react";
+import { TraceabilityMatrix } from "@/components/traceability-matrix";
 import {
   Badge,
   Button,
+  buttonClasses,
   Card,
+  CHECKBOX,
+  DescriptionList,
   EmptyState,
   ErrorState,
   Field,
+  FOCUS_RING,
   Input,
+  SearchField,
+  SectionHeader,
   Select,
   Spinner,
   Textarea,
@@ -116,13 +138,11 @@ const PRIORITIES: Array<{ value: RequirementPriority; label: string }> = [
   { value: "wont", label: "Won't" },
 ];
 
-const STATUSES: Array<{ value: RequirementStatus; label: string }> = [
-  { value: "draft", label: "Draft" },
-  { value: "needs_clarification", label: "Needs clarification" },
-  { value: "validated", label: "Validated" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-];
+// Labels come from labels.ts so the register, matrix, exports, and overview
+// all call a status the same thing.
+const STATUSES: Array<{ value: RequirementStatus; label: string }> = (
+  ["draft", "needs_clarification", "validated", "approved", "rejected"] as const
+).map((value) => ({ value, label: REQUIREMENT_STATUS_LABEL[value] }));
 
 const CONFIDENCES: Array<{ value: RequirementConfidence; label: string }> = [
   { value: "high", label: "High" },
@@ -158,8 +178,7 @@ const PRIORITY_STYLE = {
   wont: "bg-slate-50 text-slate-400 line-through",
 } as const;
 
-/** "all" and "gaps" are views over the register, not stored states. */
-type RegisterFilter = "all" | "gaps" | RequirementStatus;
+
 
 interface Draft {
   title: string;
@@ -205,9 +224,14 @@ function isUncovered(requirement: RequirementRow) {
  * of them, which meant nothing stood out. These are the conditions a reviewer
  * has to act on; everything else lives in the expanded body.
  */
-function warningsFor(requirement: RequirementRow): string[] {
+function warningsFor(
+  requirement: RequirementRow,
+  deliveryEnabled: boolean,
+): string[] {
   const warnings: string[] = [];
-  if (isUncovered(requirement)) warnings.push("no task");
+  // "No task" is only a gap when this project tracks delivery here; otherwise
+  // it would badge every agreed requirement for work that lives elsewhere.
+  if (deliveryEnabled && isUncovered(requirement)) warnings.push("no task");
   if (requirement.status === "approved" && !requirement.acceptanceCriteria) {
     warnings.push("no criteria");
   }
@@ -217,15 +241,139 @@ function warningsFor(requirement: RequirementRow): string[] {
   return warnings;
 }
 
+export interface LinkTargetOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * Linked records as removable chips, plus an inline picker for one more.
+ *
+ * One component for tasks, milestones, and risks, so the three edges of the
+ * traceability matrix cannot drift apart. Only official records reach
+ * `options` — the API refuses anything else — so a link can never be satisfied
+ * by a draft proposal.
+ */
+function LinkEditor({
+  noun,
+  code,
+  links,
+  options,
+  empty,
+  busy,
+  onLink,
+  onUnlink,
+}: {
+  noun: string;
+  code: string;
+  links: Array<{ id: string; targetId: string; label: string; done: boolean }>;
+  options: LinkTargetOption[];
+  empty: React.ReactNode;
+  busy: boolean;
+  onLink: (targetId: string) => Promise<void>;
+  onUnlink: (linkId: string) => Promise<void>;
+}) {
+  const [picking, setPicking] = useState(false);
+  const available = options.filter(
+    (option) => !links.some((link) => link.targetId === option.id),
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {links.length === 0 ? (
+        <span className="text-slate-400">{empty}</span>
+      ) : (
+        links.map((link) => (
+          <span
+            key={link.id}
+            className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700"
+          >
+            {link.done ? (
+              <Check
+                className="size-3 shrink-0 text-emerald-600"
+                aria-label="done"
+              />
+            ) : null}
+            <span className="min-w-0 truncate" title={link.label}>
+              {link.label}
+            </span>
+            <button
+              type="button"
+              aria-label={`Unlink ${link.label}`}
+              className="text-slate-400 hover:text-red-700"
+              disabled={busy}
+              onClick={() => void onUnlink(link.id)}
+            >
+              ×
+            </button>
+          </span>
+        ))
+      )}
+
+      {picking ? (
+        <Select
+          aria-label={`Link a ${noun} to ${code}`}
+          className="h-7 max-w-xs py-0 text-xs"
+          defaultValue=""
+          disabled={busy}
+          // Focus lands on the picker the moment it replaces the button, so a
+          // keyboard user is not left on an element that just disappeared.
+          autoFocus
+          onBlur={() => setPicking(false)}
+          onChange={async (event) => {
+            const targetId = event.target.value;
+            if (!targetId) return;
+            await onLink(targetId);
+            setPicking(false);
+          }}
+        >
+          <option value="">Select a {noun}…</option>
+          {available.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <button
+          type="button"
+          className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+          disabled={busy || available.length === 0}
+          title={
+            options.length === 0
+              ? `This project has no official ${noun}s yet`
+              : undefined
+          }
+          onClick={() => setPicking(true)}
+        >
+          + Link {noun}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Muted label + readable content, so the body has one measure instead of four. */
 export function RequirementsPanel({
   projectId,
   initialRequirements,
   readyDocuments,
   taskOptions,
+  milestoneOptions,
+  riskOptions,
   activeRun,
+  initialFilter = "all",
+  initialOpenId = null,
+  deliveryEnabled,
 }: {
   projectId: string;
+  /** Delivery tabs on: task/milestone/risk links, gaps, and the matrix show. */
+  deliveryEnabled: boolean;
+  initialFilter?: RegisterFilter;
+  milestoneOptions: LinkTargetOption[];
+  riskOptions: LinkTargetOption[];
+  /** From `?req=`: a traced-requirement chip elsewhere opens this row. */
+  initialOpenId?: string | null;
   initialRequirements: RequirementRow[];
   readyDocuments: ReadyDocument[];
   taskOptions: TaskOption[];
@@ -233,12 +381,30 @@ export function RequirementsPanel({
 }) {
   const router = useRouter();
   const [requirements, setRequirements] = useState(initialRequirements);
-  const [filter, setFilter] = useState<RegisterFilter>("all");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<RegisterFilter>(initialFilter);
+  const [refine, setRefine] = useState<RequirementFilter>(EMPTY_REQUIREMENT_FILTER);
+  const [view, setView] = useState<"register" | "matrix">("register");
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () =>
+      new Set(
+        initialOpenId &&
+          initialRequirements.some((item) => item.id === initialOpenId)
+          ? [initialOpenId]
+          : [],
+      ),
+  );
+
+  // Bring a deep-linked row into view once. Scrolling is a side effect on the
+  // DOM, not state, so it belongs in an effect rather than in render.
+  useEffect(() => {
+    if (!initialOpenId) return;
+    document
+      .getElementById(`requirement-${initialOpenId}`)
+      ?.scrollIntoView({ block: "center" });
+  }, [initialOpenId]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<Draft | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [linkingId, setLinkingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const confirm = useConfirm();
@@ -260,12 +426,21 @@ export function RequirementsPanel({
   const approvedCount = requirements.filter(
     (item) => item.status === "approved",
   ).length;
-  const visible =
+  // The status chips and the refine controls are separate axes: chips pick a
+  // lifecycle slice, refine narrows within it. Chip counts stay unrefined so
+  // they still describe the register rather than the current search.
+  const refineActive =
+    refine.query.trim() !== "" ||
+    refine.type !== null ||
+    refine.priority !== null ||
+    refine.confidence !== null;
+  const visible = (
     filter === "all"
       ? requirements
       : filter === "gaps"
         ? requirements.filter(isUncovered)
-        : requirements.filter((item) => item.status === filter);
+        : requirements.filter((item) => item.status === filter)
+  ).filter((item) => !refineActive || requirementMatches(item, refine));
   const visibleIds = visible.map((item) => item.id);
   const selectedVisible = visibleIds.filter((id) => selected.has(id));
   const allVisibleSelected =
@@ -430,23 +605,26 @@ export function RequirementsPanel({
     }
   }
 
-  async function linkTask(requirement: RequirementRow, taskId: string) {
-    if (!taskId) return;
+  async function link(
+    requirement: RequirementRow,
+    targetType: "task" | "milestone" | "risk",
+    targetId: string,
+  ) {
+    if (!targetId) return;
     setBusyId(requirement.id);
     setError(null);
     try {
       const response = await fetch(`/api/requirements/${requirement.id}/links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetType: "task", targetId: taskId }),
+        body: JSON.stringify({ targetType, targetId }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not link that task.");
+        setError(data.error ?? `Could not link that ${targetType}.`);
         return;
       }
       upsert(data.requirement);
-      setLinkingId(null);
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -598,6 +776,9 @@ export function RequirementsPanel({
               ScopePilot reads only the documents you select and cites every
               requirement it proposes. Extracted requirements arrive as drafts —
               nothing becomes agreed scope until you approve it here.
+              {requirements.length > 0
+                ? ` The ${requirements.length} already in the register are checked against, so a new meeting note adds only what is new.`
+                : null}
             </p>
 
             {readyDocuments.length === 0 ? (
@@ -683,52 +864,121 @@ export function RequirementsPanel({
 
       {error ? <ErrorState message={error} /> : null}
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">
-            Requirement register
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+      <SectionHeader
+        title="Requirement register"
+        description={
+          <>
             {requirements.length} recorded ·{" "}
             {/* "Every approved requirement is covered" reads as reassurance, so
                 it must not be shown when nothing has been approved at all. */}
             {approvedCount === 0 ? (
-              "none approved yet — nothing here is agreed scope"
+              "nothing agreed with the client yet"
+            ) : !deliveryEnabled ? (
+              `${approvedCount} agreed`
             ) : uncoveredCount === 0 ? (
-              `all ${approvedCount} approved have a delivery task`
+              `all ${approvedCount} agreed have a delivery task`
             ) : (
               <span className="font-medium text-red-700">
-                {uncoveredCount} of {approvedCount} approved have no delivery task
+                {uncoveredCount} of {approvedCount} agreed have no delivery task
               </span>
             )}
-          </p>
+          </>
+        }
+      >
+        {deliveryEnabled ? (
+        <div
+          role="group"
+          aria-label="Requirements view"
+          className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+        >
+          {(
+            [
+              ["register", "Register", ListChecks],
+              ["matrix", "Matrix", Grid3x3],
+            ] as const
+          ).map(([value, text, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={view === value}
+              onClick={() => setView(value)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+                FOCUS_RING,
+                view === value
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900",
+              )}
+            >
+              <Icon className="size-3.5" aria-hidden />
+              {text}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() =>
-              setExpanded((previous) =>
-                previous.size > 0 ? new Set() : new Set(visibleIds),
-              )
-            }
+        ) : null}
+        {view === "register" ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            setExpanded((previous) =>
+              previous.size > 0 ? new Set() : new Set(visibleIds),
+            )
+          }
+        >
+          {expanded.size > 0 ? "Collapse all" : "Expand all"}
+        </Button>
+        ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setEditingId(null);
+            setDraft({ ...EMPTY });
+          }}
+        >
+          New requirement
+        </Button>
+        {requirements.length > 0 ? (
+          // The two packs are what goes to the client; they open as printable
+          // pages (Save as PDF) with a Markdown download there too. The CSV is
+          // the whole register for a spreadsheet. Plain anchors throughout:
+          // the export route answers with Content-Disposition.
+          <div
+            className="flex flex-wrap items-center gap-1"
+            role="group"
+            aria-label="Share with the client"
           >
-            {expanded.size > 0 ? "Collapse all" : "Expand all"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              setEditingId(null);
-              setDraft({ ...EMPTY });
-            }}
-          >
-            New requirement
-          </Button>
-        </div>
-      </div>
+            <Download className="size-3.5 text-slate-400" aria-hidden />
+            <a
+              href={`/print/requirements/${projectId}?pack=questions`}
+              target="_blank"
+              rel="noopener"
+              className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
+            >
+              Client questions
+            </a>
+            <a
+              href={`/print/requirements/${projectId}?pack=signoff`}
+              target="_blank"
+              rel="noopener"
+              className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
+            >
+              Sign-off document
+            </a>
+            <a
+              href={`/api/projects/${projectId}/requirements/export?format=csv`}
+              download
+              aria-label="Download the whole register as CSV"
+              className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
+            >
+              CSV
+            </a>
+          </div>
+        ) : null}
+      </SectionHeader>
 
       {draft ? (
         <Card className="p-4">
@@ -1044,6 +1294,7 @@ export function RequirementsPanel({
 
             {/* Gaps cuts across the lifecycle statuses rather than being one of
                 them, so it is a separate group. */}
+            {deliveryEnabled ? (
             <button
               type="button"
               aria-pressed={filter === "gaps"}
@@ -1067,8 +1318,78 @@ export function RequirementsPanel({
                 {uncoveredCount}
               </span>
             </button>
+            ) : null}
           </div>
 
+          <div
+            role="search"
+            aria-label="Search the requirement register"
+            className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2"
+          >
+            <SearchField
+              label="Search requirements"
+              placeholder="Search code, title, criteria, stakeholder"
+              value={refine.query}
+              onChange={(event) =>
+                setRefine((previous) => ({ ...previous, query: event.target.value }))
+              }
+              className="w-full sm:w-72"
+            />
+            {(
+              [
+                ["type", "Any type", TYPES],
+                ["priority", "Any priority", PRIORITIES],
+                ["confidence", "Any confidence", CONFIDENCES],
+              ] as const
+            ).map(([key, anyLabel, options]) => (
+              <Select
+                key={key}
+                aria-label={`Filter by ${key}`}
+                value={refine[key] ?? ""}
+                onChange={(event) =>
+                  setRefine((previous) => ({
+                    ...previous,
+                    [key]: event.target.value || null,
+                  }))
+                }
+                className="h-8 text-xs"
+              >
+                <option value="">{anyLabel}</option>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            ))}
+            {refineActive ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setRefine(EMPTY_REQUIREMENT_FILTER)}
+              >
+                Clear
+              </Button>
+            ) : null}
+          </div>
+
+          {view === "matrix" && deliveryEnabled ? (
+            <TraceabilityMatrix
+              projectId={projectId}
+              requirements={visible}
+              onOpen={(id) => {
+                setView("register");
+                setExpanded((previous) => new Set(previous).add(id));
+                requestAnimationFrame(() =>
+                  document
+                    .getElementById(`requirement-${id}`)
+                    ?.scrollIntoView({ block: "center" }),
+                );
+              }}
+            />
+          ) : (
+          <>
           {/* Reviewing a whole extraction is the point of this page, so the
               batch path is first-class rather than 19 individual dropdowns. */}
           {selectedVisible.length > 0 ? (
@@ -1088,13 +1409,13 @@ export function RequirementsPanel({
               <span aria-hidden className="mx-1 h-4 w-px bg-white/20" />
               {(
                 [
-                  ["approved", "Approve"],
+                  ["approved", "Mark agreed"],
                   ["validated", "Validate"],
-                  ["needs_clarification", "Needs clarification"],
+                  ["needs_clarification", "Ask client"],
                   ["rejected", "Reject"],
                   // Without a way back, one mis-aimed batch approval could only
                   // be undone a row at a time. Undo belongs wherever bulk does.
-                  ["draft", "Back to draft"],
+                  ["draft", "Back to review"],
                 ] as Array<[RequirementStatus, string]>
               ).map(([status, text]) => (
                 <button
@@ -1120,9 +1441,11 @@ export function RequirementsPanel({
 
           {visible.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-500">
-              {filter === "gaps"
-                ? "Every approved requirement has at least one delivery task."
-                : `No ${label(filter)} requirements.`}
+              {refineActive
+                ? "No requirements match this search."
+                : filter === "gaps"
+                  ? "Every approved requirement has at least one delivery task."
+                  : `Nothing is “${requirementStatusLabel(filter)}”.`}
             </div>
           ) : (
             <>
@@ -1148,7 +1471,9 @@ export function RequirementsPanel({
                 {selectedVisible.length > 0
                   ? `${selectedVisible.length} of ${visible.length} selected`
                   : `${visible.length} shown${
-                      filter === "all" ? "" : ` of ${requirements.length}`
+                      filter === "all" && !refineActive
+                        ? ""
+                        : ` of ${requirements.length}`
                     }`}
               </span>
             </div>
@@ -1157,11 +1482,15 @@ export function RequirementsPanel({
                 const links = taskLinks(requirement);
                 const busy = busyId === requirement.id;
                 const open = expanded.has(requirement.id);
-                const warnings = warningsFor(requirement);
+                const warnings = warningsFor(requirement, deliveryEnabled);
                 const code = formatRequirementCode(requirement.sequence);
 
                 return (
-                  <li key={requirement.id}>
+                  <li
+                    key={requirement.id}
+                    id={`requirement-${requirement.id}`}
+                    className="scroll-mt-24"
+                  >
                     {/* Wraps below `sm`: at 375px the fixed-width badges left
                         roughly 60px for the title, truncating every row to
                         "Evalua…". The metadata drops to its own line instead. */}
@@ -1176,7 +1505,7 @@ export function RequirementsPanel({
                         aria-label={`Select ${code}`}
                         checked={selected.has(requirement.id)}
                         onChange={() => toggleSelected(requirement.id)}
-                        className="size-4 shrink-0 rounded border-slate-300"
+                        className={CHECKBOX}
                       />
                       <button
                         type="button"
@@ -1217,14 +1546,16 @@ export function RequirementsPanel({
                           {requirement.priority}
                         </span>
                         <Badge tone={STATUS_TONE[requirement.status]}>
-                          {label(requirement.status)}
+                          <span title={REQUIREMENT_STATUS_HINT[requirement.status]}>
+                            {REQUIREMENT_STATUS_LABEL[requirement.status]}
+                          </span>
                         </Badge>
                       </div>
                     </div>
 
                     {open ? (
                       <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-12">
-                        <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                        <DescriptionList labelWidth="8rem">
                           <Field name="Description">
                             {requirement.description ? (
                               <p className="max-w-3xl text-pretty">
@@ -1279,78 +1610,86 @@ export function RequirementsPanel({
                             </span>
                           </Field>
 
+                          {deliveryEnabled ? (
+                          <>
                           <Field name="Delivery">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {links.length === 0 ? (
-                                <span
-                                  className={cn(
-                                    isUncovered(requirement)
-                                      ? "text-red-700"
-                                      : "text-slate-400",
-                                  )}
-                                >
-                                  {isUncovered(requirement)
-                                    ? "No delivery task — this approved requirement is uncovered."
-                                    : "No linked task yet."}
-                                </span>
-                              ) : (
-                                links.map((link) => (
-                                  <span
-                                    key={link.id}
-                                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700"
-                                  >
-                                    {link.task?.title}
-                                    <button
-                                      type="button"
-                                      aria-label={`Unlink ${link.task?.title}`}
-                                      className="text-slate-400 hover:text-red-700"
-                                      disabled={busy}
-                                      onClick={() =>
-                                        void unlink(requirement, link.id)
-                                      }
-                                    >
-                                      ×
-                                    </button>
+                            <LinkEditor
+                              noun="task"
+                              code={code}
+                              busy={busy}
+                              links={links.map((link) => ({
+                                id: link.id,
+                                targetId: link.task?.id ?? "",
+                                label: link.task?.title ?? "",
+                                done: link.task?.status.category === "done",
+                              }))}
+                              options={taskOptions.map((task) => ({
+                                id: task.id,
+                                label: task.title,
+                              }))}
+                              empty={
+                                isUncovered(requirement) ? (
+                                  <span className="text-red-700">
+                                    No delivery task — this approved requirement
+                                    is uncovered.
                                   </span>
-                                ))
-                              )}
-
-                              {linkingId === requirement.id ? (
-                                <Select
-                                  aria-label={`Link a task to ${code}`}
-                                  className="h-7 py-0 text-xs"
-                                  defaultValue=""
-                                  disabled={busy}
-                                  onChange={(event) =>
-                                    void linkTask(requirement, event.target.value)
-                                  }
-                                >
-                                  <option value="">Select a task…</option>
-                                  {taskOptions
-                                    .filter(
-                                      (task) =>
-                                        !links.some(
-                                          (link) => link.task?.id === task.id,
-                                        ),
-                                    )
-                                    .map((task) => (
-                                      <option key={task.id} value={task.id}>
-                                        {task.title}
-                                      </option>
-                                    ))}
-                                </Select>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
-                                  disabled={busy || taskOptions.length === 0}
-                                  onClick={() => setLinkingId(requirement.id)}
-                                >
-                                  + Link task
-                                </button>
-                              )}
-                            </div>
+                                ) : (
+                                  "No linked task yet."
+                                )
+                              }
+                              onLink={(targetId) =>
+                                link(requirement, "task", targetId)
+                              }
+                              onUnlink={(linkId) => unlink(requirement, linkId)}
+                            />
                           </Field>
+
+                          <Field name="Milestones">
+                            <LinkEditor
+                              noun="milestone"
+                              code={code}
+                              busy={busy}
+                              links={requirement.links
+                                .filter((item) => item.milestone)
+                                .map((item) => ({
+                                  id: item.id,
+                                  targetId: item.milestone!.id,
+                                  label: item.milestone!.title,
+                                  done: item.milestone!.status === "completed",
+                                }))}
+                              options={milestoneOptions}
+                              empty="None"
+                              onLink={(targetId) =>
+                                link(requirement, "milestone", targetId)
+                              }
+                              onUnlink={(linkId) => unlink(requirement, linkId)}
+                            />
+                          </Field>
+
+                          <Field name="Risks">
+                            <LinkEditor
+                              noun="risk"
+                              code={code}
+                              busy={busy}
+                              links={requirement.links
+                                .filter((item) => item.risk)
+                                .map((item) => ({
+                                  id: item.id,
+                                  targetId: item.risk!.id,
+                                  label: item.risk!.description,
+                                  done: false,
+                                }))}
+                              options={riskOptions}
+                              empty="None"
+                              onLink={(targetId) =>
+                                link(requirement, "risk", targetId)
+                              }
+                              onUnlink={(linkId) => unlink(requirement, linkId)}
+                            />
+                          </Field>
+
+                          </>
+                          ) : null}
 
                           {requirement.citations.length > 0 ? (
                             <Field name="Evidence">
@@ -1380,7 +1719,7 @@ export function RequirementsPanel({
                               </ul>
                             </Field>
                           ) : null}
-                        </dl>
+                        </DescriptionList>
 
                         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
                           <Select
@@ -1427,6 +1766,8 @@ export function RequirementsPanel({
               })}
             </ul>
             </>
+          )}
+          </>
           )}
         </div>
       )}

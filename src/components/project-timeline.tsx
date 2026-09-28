@@ -117,7 +117,9 @@ export function ProjectTimeline({
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-slate-200 px-5 py-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold">Schedule</h2>
+          <h2 className="text-base font-semibold tracking-tight text-slate-900">
+            Schedule
+          </h2>
           <p className="mt-0.5 text-xs text-slate-500">
             {view === "calendar"
               ? `${calendar.inMonthCount} due in ${calendar.label}`

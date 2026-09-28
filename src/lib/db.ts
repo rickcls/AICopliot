@@ -17,11 +17,13 @@ function createClient(): PrismaClient {
       "DATABASE_URL is not set. On Vercel, the Neon integration’s Storage_DATABASE_URL is accepted too.",
     );
   }
-  // A serverless instance serves one request at a time. The driver's default
-  // pool would open several connections per instance and exhaust Neon.
+  // Small but not 1: a single connection serialises every Promise.all in a
+  // page, turning ~20 parallel reads into ~20 round trips in a row. Neon's
+  // pooled URL (PgBouncer) absorbs a few connections per instance; the
+  // driver's default of 10 would not survive a burst of cold starts.
   const pool =
     process.env.NODE_ENV === "production"
-      ? { connectionString, max: 1 }
+      ? { connectionString, max: 4 }
       : { connectionString };
   return new PrismaClient({ adapter: new PrismaPg(pool) });
 }

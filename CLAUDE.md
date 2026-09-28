@@ -4,11 +4,24 @@ Guidance for working in this repository.
 
 ## What this project is
 
-**ScopePilot — AI Requirements-to-Delivery Copilot** — a single-workspace
-discovery and delivery assistant. Users create project workspaces, upload project
-documents, extract cited draft *requirements* and cited draft *plans* for human
-approval, trace agreed requirements to the work that delivers them, and ask
-questions grounded in documents and approved live project records.
+**ScopePilot — AI Requirements-to-Delivery Copilot** — for project managers and
+business analysts (consultants and small teams) who turn client documents into
+agreed scope. **The core product is requirements discovery:** upload client
+documents → extract cited draft requirements → review them → take open questions
+back to the client → agree → hand over a sign-off document. Grounded Q&A over
+the documents supports every step.
+
+**Delivery is an optional layer, off by default per project**
+(`Project.deliveryEnabled`): tasks, timeline, risks, AI draft plans, and weekly
+reports. It exists for teams who run delivery here; everyone else exports the
+agreed requirements to the tool they already use. **Do not grow the delivery
+layer into a Jira/Asana competitor** — new work should make the discovery loop
+better, and anything that is not part of it belongs behind the switch.
+
+**`deliveryEnabled` gates navigation, never data or security.** It decides which
+tabs show and which delivery widgets render. Hidden routes still resolve (with a
+notice and a way to turn the tools on), still enforce workspace scoping, and
+project chat still grounds on official records whatever the switch says.
 
 **This is a RAG workflow, not an autonomous agent.** Do not add multi-agent
 orchestration, autonomous loops, external tool calling, ServiceNow (or similar)
@@ -22,7 +35,7 @@ single request/response inside a user-initiated action.
 | Framework | Next.js 16 (App Router), React 19, TypeScript strict |
 | Styling | Tailwind v4, local primitives in `src/components/ui.tsx` |
 | ORM | Prisma 7 — **driver adapter required**, no Rust engine |
-| Database | PostgreSQL 17 + pgvector 0.8.6 (Docker) |
+| Database | PostgreSQL 17 + pgvector 0.8.6. Docker locally; Neon on Vercel |
 | Auth | Auth.js v5 (`next-auth@beta`), Credentials + JWT sessions |
 | Validation | Zod 4 — all API inputs and all model JSON output |
 | Tests | Vitest 4 |
@@ -32,17 +45,19 @@ single request/response inside a user-initiated action.
 
 ```bash
 npm run dev          # dev server
-npm run build        # production build
+npm run build        # prisma generate && next build
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm test             # vitest run — no DB, network, or API key needed
 npm run db:up        # start Postgres+pgvector
-npm run db:migrate   # prisma migrate deploy && prisma generate
+npm run db:migrate   # migrate deploy, prisma generate, then the vector-index check
 npm run db:seed      # demo user: demo@example.com / demo-password-123
 ```
 
 Prisma 7 does **not** run `generate` automatically after `migrate` — run it
-explicitly (`npm run db:migrate` already chains both).
+explicitly (`npm run db:migrate` and `npm run build` already chain it). The
+generated client is gitignored (`/src/generated`), so a Vercel build has no
+client until that step runs.
 
 ## Invariants — do not break these
 
@@ -193,8 +208,10 @@ Three abstractions exist so pieces can be swapped without touching call sites:
 
 - **`src/lib/providers/`** — `EmbeddingProvider` / `ChatProvider`. Swapping
   models is an env change; swapping vendors is one new file.
-- **`src/lib/storage/`** — `StorageProvider`. Local disk today; the S3 adapter
-  is one new file implementing `put/get/delete`.
+- **`src/lib/storage/`** — `StorageProvider`. Local disk when
+  `BLOB_READ_WRITE_TOKEN` is unset; Vercel Blob (private, same
+  `{workspaceId}/{documentId}.{ext}` key) when it is set. An S3 adapter is
+  still one new file implementing `put/get/delete`.
 - **`runIngestion(documentId)`** in `src/lib/ingest/pipeline.ts` — takes only an
   ID and reads everything else from the DB and storage. **This is the seam for
   the planned S3 + SQS + Lambda migration.** A queue consumer calls the same
@@ -202,6 +219,51 @@ Three abstractions exist so pieces can be swapped without touching call sites:
 
 Prefer passing providers in as arguments (see `AnswerDeps`, `IngestionDeps`) so
 tests can inject fakes rather than mocking modules.
+
+## Production on Vercel
+
+The live app is [ai-copliot.vercel.app](https://ai-copliot.vercel.app), built
+from `main` on `rickcls/AICopliot`. Local `npm run dev` stays on Docker and
+disk. Production switches on env vars. Do not commit `.env`; `.vercelignore`
+keeps it out of CLI deploys, because a copied local `DATABASE_URL` once made
+production open `127.0.0.1`.
+
+**Connection strings are resolved in `src/lib/database-url.ts`, not read ad hoc.**
+The Neon integration on this project is named Storage, so Vercel injects
+`Storage_DATABASE_URL` (pooled) and `Storage_DATABASE_URL_UNPOOLED` (direct).
+Requests use the pooled URL. `npm run db:migrate` and `db:ensure-index` prefer
+`DIRECT_URL`, then the unpooled Storage name, so `CREATE INDEX` does not run
+through Neon’s pooler. A `DATABASE_URL` whose host is `localhost`, `127.0.0.1`, or `::1` loses to a
+hosted URL when both are present. The production `pg`
+pool is capped at four connections per serverless instance — not one, because a
+single connection serialises every `Promise.all` in a page.
+
+**Functions run in `sin1` because Neon is in `ap-southeast-1`.** `vercel.json`
+pins the region. Without it Vercel defaults to `iad1`, every query crosses the
+Pacific (~200ms), and a page making thirty reads takes seconds. If the database
+ever moves, move the region with it.
+
+`prisma/ensure-vector-index.ts` forces IPv4 before it connects. On a network
+that advertises IPv6 but cannot route it, the check otherwise times out with an
+empty `AggregateError` after the migrations have already succeeded.
+
+Chat, document processing, plan generation, requirement extraction, and weekly
+reports export `maxDuration = 60`, the Hobby ceiling. A large PDF needs a
+higher limit on Pro. The upload screen already polls and can retry a document
+left `failed`.
+
+Signed-in `/` redirects to `/dashboard`. It opens on the **discovery inbox** —
+requirements to review and questions for clients, per project — and renders its
+delivery half only when some project has delivery tools on, listing only those
+projects. The delivery half lists overdue, due-within-7-days
+(`dueSoonTaskWhere`), and blocked tasks. Each row opens
+`/projects/{projectId}/tasks?task={taskId}`, and `TaskBoard` opens `TaskDetail`
+when that id is in the loaded tasks. Do not point those rows at the bare
+project list. Below the lists, `getProjectHealthRows()` in `src/lib/pm/summary.ts`
+builds one line per project from grouped counts (a fixed handful of queries
+however many projects exist), using the same predicates as each project's
+Overview so the two pages cannot disagree. Its badges deep-link to the filtered
+rows they count. With zero projects the page shows only the empty state.
 
 ## The grounding and generation pipelines
 
@@ -304,6 +366,36 @@ never stated converts an open question into a false agreement — which is exact
 the failure the register exists to prevent. Unresolved detail goes in
 `assumptions`; an unstated verification stays `null` rather than being invented.
 
+**Re-extraction adds only what is new (rule 12, `requirements-v2`).** A
+consultant uploads meeting notes every week, so each run receives the register's
+existing titles as `E1..En` — titles only, never IDs, for the same reason sources
+are `S` labels — rejected ones included so a turned-down requirement does not
+come back. `validateRequirements(…, existingTitles)` is the deterministic
+backstop: it drops a proposal whose `requirementTitleKey()` (case, punctuation,
+and spacing ignored; wording not) matches an existing title. Keep that match
+strict — a fuzzy one would silently drop a genuinely new obligation, and a missed
+requirement costs more than a duplicate someone rejects in one click. A run with
+nothing new fails with that explanation, not "no supported requirements".
+
+**Status labels are written for the job, not the model.** `src/lib/pm/labels.ts`
+is the only place they live: `draft` → *To review*, `needs_clarification` → *Ask
+client*, `validated` → *Validated*, `approved` → *Agreed*, `rejected` →
+*Rejected*. Change copy there; never rename an enum value for wording. The
+Overview's single "Next step" comes from the pure `nextDiscoveryStep()` in
+`src/lib/pm/discovery.ts` (upload → wait for indexing → extract → review →
+clarify → agree → sign off); earlier steps win, because reviewing drafts is what
+produces the client questions.
+
+**Client packs are the hand-off.** `buildPack("questions" | "signoff", rows)` in
+`requirements-export.ts` builds each pack once as data; the export route renders
+it as Markdown (`?format=md&pack=…`) and `/print/requirements/[projectId]` as
+HTML. That page sits **outside** the `(app)` group so no shell needs hiding —
+what is on screen is what prints, and "Save as PDF" is the delivery mechanism, no
+integration. The questions pack asks the recorded `assumptions` and never invents
+a question's specifics (rule 4 again); the sign-off pack is agreed scope only,
+Must first. The dark palette is `@media screen` only, so print is always dark
+text on white.
+
 **`sequence` is an integer, `REQ-007` is a rendering.** `formatRequirementCode()`
 in `rules.ts` is the only place the display format lives. Sequences are handed out
 inside the same transaction as the insert, and `@@unique([projectId, sequence])`
@@ -314,9 +406,38 @@ once on `P2002`.
 A bare id has no referential integrity, so deleting a task would leave a link that
 coverage queries still count. `RequirementLink_exactly_one_target` is a
 hand-written CHECK because Prisma cannot express it. Only *official* records may
-be linked, so a coverage count can never be satisfied by a draft proposal. Phase 1
-uses only the task edge; the milestone and risk edges exist so the traceability
-matrix needs no migration.
+be linked, so a coverage count can never be satisfied by a draft proposal. All
+three edges are in use: the register links tasks, milestones, and risks through
+one `LinkEditor`, so the three cannot drift apart. **Coverage still counts the
+task edge only** — `uncoveredRequirementWhere` and chat grounding ask "does
+work exist to deliver this?", and a milestone or risk link does not answer that.
+
+**Traceability reads in both directions.** `tracedRequirementsSelect` in
+`src/lib/pm/select.ts` rides on `taskSelect`, `milestoneSelect`, and
+`riskSelect` as `requirementLinks`, so task detail, milestone rows, and risk rows
+show the requirements they deliver (`traced-requirements.tsx`). Rejected
+requirements are excluded; drafts are kept, because the register treats them as
+the working state. Each chip opens `/projects/{id}/requirements?req={id}`, which
+expands and scrolls to that row.
+
+**The Matrix view is the register's second view, not a second page.** It renders
+the register's *current filtered rows*, so a search narrows both views alike.
+Delivery state comes from the pure `deliveryState()` in
+`src/lib/pm/traceability.ts`: `no_task`, `planned` (no linked task done),
+`partial`, `delivered` (every linked task done). Two rules:
+
+- **States key off `TaskStatusCategory`, never a column label.** A category
+  cannot tell Backlog from In progress, so no state claims to.
+- **Delivery is claimed only for approved scope.** A draft with a finished task
+  linked is still a draft; showing it as "Delivered" would read as agreed.
+
+**Exports** (`GET /api/projects/[id]/requirements/export?format=csv|md`) use the
+same register rows (drafts included — the export is what goes back to the client
+to confirm) and the same `deliveryState()`. The pure formatters live in
+`src/lib/pm/requirements-export.ts`. CSV cells beginning `= + - @` are prefixed
+with `'`, because they hold text lifted from client documents and a spreadsheet
+would otherwise execute them. The file carries a BOM and CRLF so Excel on Windows
+opens it intact.
 
 Approved requirements are a chat evidence family labelled `Q1..Qn` (`R` was
 already risk). The project snapshot carries exact requirement counts including
@@ -359,8 +480,21 @@ prose in the expansion.**
 The shared pieces live in `src/components/ui.tsx` so the lists cannot drift
 apart again: `SectionHeader` (every panel had grown its own, at three different
 heading weights), `Field` (the `<dl>` pair — a fragment, because a wrapper would
-make each pair one grid cell and collapse the two columns), `Avatar`, and badge
+make each pair one grid cell and collapse the two columns) inside
+`DescriptionList` (the grid; label width is its only knob), `Avatar`, and badge
 tones carrying a `ring-inset` so a pale pill still has an edge on a white row.
+Also there, and to be reused rather than re-typed:
+
+- `buttonClasses()` / `LinkButton` — a navigation styled as a button stays an
+  `<a>`. Fourteen links had hand-copied button classes at three heights.
+- `StatCard` (a zero renders neutral whatever its tone) and `ProgressBar` (fed
+  by `percentOf` from `progress.ts`, never a raw `Math.round`).
+- `FilterChip` (`aria-pressed` carries the state), `SearchField`, and `CHECKBOX`.
+
+**The Review page follows the same pattern.** Proposals were a card each with
+every field a live input; they are now one line (title, the facts that decide
+approval, a source count, inline approve/reject) expanding into the editor and
+sources. Decided items expand into read-only values, not disabled inputs.
 
 Two devices earn their keep in dense rows. **Priority is a coloured flag, not a
 badge** — next to a status pill, two same-shaped pills compete for one glance,
@@ -373,10 +507,11 @@ Wherever colour replaces a word, the word goes to `sr-only` — see the flag on
 
 ## Project management notes
 
-`/projects/[id]` has sections — Overview, Requirements, Tasks, Timeline,
-Documents, Risks, Review, and Reports — built as nested routes under a shared
-`layout.tsx`. Requirements comes before Tasks because discovery precedes
-delivery. Each
+`/projects/[id]` has three core sections in workflow order — **Overview,
+Documents, Requirements** — and, when `deliveryEnabled`, five delivery sections:
+**Tasks, Timeline, Risks, Plan** (route `/review`; renamed because the tab is
+where a plan is generated, not merely reviewed) **and Reports**. They are nested
+routes under a shared `layout.tsx`. Each
 is its own server page fetching only its own data. Layouts cannot pass data to
 children and do not re-render, so the project lookup goes through `getScopedProject` in
 `src/lib/pm/project.ts`, wrapped in React `cache` so the layout and the page
@@ -384,7 +519,7 @@ share one query.
 
 **Navigation is split by question: the sidebar picks the project, the tab strip
 picks the section.** `src/components/app-sidebar.tsx` holds global links and a
-flat project list; `src/components/project-tabs.tsx` renders the eight sections
+flat project list; `src/components/project-tabs.tsx` renders the sections
 inside the project layout. Both read `usePathname`, because the layouts
 rendering them do not re-render on navigation.
 
@@ -414,10 +549,29 @@ The app shell is full width; the old `max-w-5xl` cap is what squeezed five board
 columns into ~180px each. Prose pages (`/chat`, `/documents/[id]`) opt back out
 with their own `max-w-*`, because text gets harder to read as it widens.
 
-**Routes:** `/dashboard` is the workspace summary only, and `/documents` is
-cross-project document administration. They were one page; splitting them is why
+**Routes:** `/dashboard` is the morning inbox (overdue, due soon, blocked) plus
+the workspace counts, and `/documents` is cross-project document
+administration. They were one page; splitting them is why
 the sidebar entry labelled "All Documents" leads to documents and nothing else.
 `/projects/[id]/documents` remains the project-scoped library.
+
+**The Overview leads somewhere.** Each stat card opens the filtered rows it
+counts (`/tasks?filter=overdue`, `/requirements?filter=gaps`, …), overdue and
+blocked rows open the task itself, and a "waiting on a decision" banner counts
+`undecidedRequirementWhere` and `pendingPlanRunWhere` from `rules.ts`.
+
+**List filters live in `src/lib/pm/filters.ts` and are pure.** Task quick
+filters (`overdue`, `due_soon`, `blocked`, `mine`, `unassigned`) call
+`isOverdue`/`isDueWithinDays` rather than restating them, so a quick-filter
+count agrees with the server count on the Overview. Filters only narrow rows the
+page already loaded — they never widen a read past the official records. One
+filter bar serves both board and list, so switching view keeps the same rows.
+`?filter=` is parsed by `parseTaskQuickFilter` / `parseRegisterFilter`, which
+live in that module rather than in the client panels: a server page cannot call
+a function exported from a `"use client"` file. `TaskBoard` takes `nowIso` from
+the server for the same hydration reason `ProjectTimeline` does. Risks default
+to highest exposure first (`sortRisks`); exposure orders the list and is never
+shown as a number, so it does not become a severity scale of its own.
 
 **All date and status logic lives in `src/lib/pm/rules.ts` and is pure.**
 Overdue, blocked, due-in-7-days, active-project, and timeline bucketing each have
@@ -498,7 +652,9 @@ editing, deleting, or changing a status stays in sync without a second fetch.
 The List view keeps the Jira-style quick filters for the project's statuses;
 filter counts are derived from the current task state and must update with it.
 The whole list row is mouse- and keyboard-activated and opens the same
-`TaskDetail` slide-over used by board cards, including its Edit action.
+`TaskDetail` slide-over used by board cards, including its Edit action. A
+`?task=` search param initializes that panel, which is how the dashboard opens
+a specific task. An id that is not in `initialTasks` is ignored.
 
 **The list is grouped by status, in board order, and the group header is the
 only place the status is written.** Filters and groups are different axes and
@@ -609,11 +765,10 @@ letting free-text commentary in would put unreviewed opinion behind a citation.
   but a comment on a deleted task is unreachable in every view.
 - The author is always the session user, never a value from the request body,
   and only the author may delete their own comment.
-- Comments ride along in `taskSelect` rather than being fetched when the panel
-  opens, so the create/update/list responses stay one shape and the client can
-  replace a row in place without dropping the thread. If a single task ever
-  accumulates enough discussion to make the board query heavy, the fix is a
-  count in `taskSelect` and a fetch on open.
+- Comments are **not** in `taskSelect`. `TaskComments` fetches the thread when
+  the detail panel opens; every task on the board carrying its whole thread was
+  payload read on at most one of them. The panel is keyed on the task, so
+  reopening one remounts the thread and shows what is stored.
 - Posting is **not** optimistic: a comment is a durable statement attributed to
   you by name, so it appears once the server has stored it rather than being
   drawn immediately and quietly vanishing on failure.
@@ -660,6 +815,42 @@ value. Do not read it as precedent.
 - Server components fetch initial data and pass it to client components as
   props — do not fetch on mount in an effect (React 19 lint forbids the
   resulting `setState`-in-effect).
+- Error boundaries use `retry()`, stable in Next 16.3, rather than `reset()`:
+  `retry` re-fetches server data, which is what a failed query needs.
+  `app/global-error.tsx` covers a failure in the root layout itself.
+
+## Dark mode
+
+Dark mode is a **palette remap, not `dark:` variants.** Every utility reads a
+`--color-*` variable, so the generated block between `/* dark-palette:start */`
+and `/* dark-palette:end */` in `src/app/globals.css` inverts each scale
+(50↔950, 100↔900, …) and the whole UI follows. Consequences:
+
+- **Do not add `dark:` classes.** Write light-mode classes; they invert.
+- **White is a surface, not white.** It maps one step above the page so
+  `slate-100` hovers stay visible on a card. For something that must stay dark
+  in both themes (a dialog backdrop), use `black`, which is not remapped.
+- **Regenerate the block rather than hand-editing it** if Tailwind's palette
+  changes or a new colour family comes into use. It is derived from
+  `node_modules/tailwindcss/theme.css`.
+
+It follows the OS preference unless the viewer picks Light or Dark in the
+sidebar's `ThemeToggle`. The choice is stored in `localStorage` and applied to
+`<html data-theme>` by an inline script in the root layout before first paint —
+hence `suppressHydrationWarning` on `<html>` — and read back with
+`useSyncExternalStore`, so there is no flash and no effect copying the DOM into
+state. The script is inline: adding a CSP later needs a nonce for it.
+
+## Chat thread management
+
+`PATCH`/`DELETE /api/chat/conversations/[id]` rename and delete a thread. Both
+go through `renameConversation` / `deleteConversation` in
+`src/lib/chat/history.ts`, which use `updateMany`/`deleteMany` with the full
+`(id, workspaceId, userId)` triple, so another person's thread id matches nothing
+and there is no gap between an ownership check and the write. Deleting cascades
+to messages and their feedback. With no evidence to ask against, the chat page
+keeps the rail and heading so earlier threads stay reachable; only the composer
+gives way to the empty state.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteDocumentButton } from "@/components/delete-document-button";
 import { RetryIngestionButton } from "@/components/retry-ingestion-button";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, LinkButton, SectionHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { formatBytes, formatDate } from "@/lib/utils";
@@ -76,7 +76,6 @@ export default async function DocumentDetailPage({
 
       <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Status", value: document.status },
           { label: "Project", value: document.project?.name ?? "Unassigned" },
           { label: "Chunks indexed", value: String(document.chunkCount) },
           { label: "Content type", value: document.mimeType || "unknown" },
@@ -93,18 +92,25 @@ export default async function DocumentDetailPage({
 
       {document.chunkCount > 0 ? (
         <section className="mt-8">
-          <Link
+          <LinkButton
             href={`/documents/${document.id}/chunks`}
-            className="inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"
+            variant="secondary"
           >
             Review indexed chunks ({document.chunkCount})
-          </Link>
+          </LinkButton>
         </section>
       ) : null}
 
       {document.extractedText ? (
         <section className="mt-8">
-          <h2 className="text-sm font-semibold">Extracted text preview</h2>
+          <SectionHeader
+            title="Extracted text preview"
+            description={
+              document.extractedText.length > 5000
+                ? "First 5,000 characters. The full text is in the indexed chunks."
+                : undefined
+            }
+          />
           <Card className="mt-3 max-h-96 overflow-auto p-4">
             <pre className="font-sans text-xs whitespace-pre-wrap text-slate-700">
               {document.extractedText.slice(0, 5000)}

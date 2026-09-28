@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronRight,
   Columns3,
@@ -23,6 +23,7 @@ import { useToast } from "@/components/toast";
 import { TaskCard } from "@/components/task-card";
 import { TaskDetail } from "@/components/task-detail";
 import { TaskForm, type TaskDraft, emptyDraft } from "@/components/task-form";
+import { TaskFilterBar } from "@/components/task-filter-bar";
 import { TaskListRow } from "@/components/task-list-row";
 import {
   STATUS_DOT,
@@ -34,6 +35,15 @@ import {
   type TaskStatusCategory,
   type TaskStatusOption,
 } from "@/components/task-types";
+import {
+  EMPTY_TASK_FILTER,
+  isTaskFilterActive,
+  matchesTaskQuickFilter,
+  taskMatches,
+  TASK_QUICK_FILTERS,
+  type TaskFilter,
+  type TaskQuickFilter,
+} from "@/lib/pm/filters";
 import { cn } from "@/lib/utils";
 
 export type { TaskRow } from "@/components/task-types";
@@ -81,6 +91,8 @@ export function TaskBoard({
   milestones,
   currentUserId,
   initialOpenTaskId = null,
+  initialQuickFilter = null,
+  nowIso,
 }: {
   projectId: string;
   initialTasks: TaskRow[];
@@ -89,6 +101,13 @@ export function TaskBoard({
   milestones: MilestoneOption[];
   currentUserId: string;
   initialOpenTaskId?: string | null;
+  /** From `?filter=`, so an Overview card can land on the rows it counted. */
+  initialQuickFilter?: TaskQuickFilter | null;
+  /**
+   * From the server, like the timeline's: overdue computed from the client
+   * clock at hydration could disagree with the server render across midnight.
+   */
+  nowIso: string;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [statuses, setStatuses] = useState(initialStatuses);
@@ -108,6 +127,10 @@ export function TaskBoard({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [view, setView] = useState<TaskView>("board");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [filter, setFilter] = useState<TaskFilter>(() => ({
+    ...EMPTY_TASK_FILTER,
+    quick: initialQuickFilter,
+  }));
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
@@ -151,10 +174,27 @@ export function TaskBoard({
     statuses[0]?.id ??
     "";
 
+  const filterContext = useMemo(
+    () => ({ now: new Date(nowIso), currentUserId }),
+    [nowIso, currentUserId],
+  );
+  const filterActive = isTaskFilterActive(filter);
+  // Both views draw from this, so switching Board/List keeps the same rows.
+  const matchingTasks = filterActive
+    ? tasks.filter((task) => taskMatches(task, filter, filterContext))
+    : tasks;
+  const quickCounts = Object.fromEntries(
+    TASK_QUICK_FILTERS.map((quick) => [
+      quick,
+      tasks.filter((task) => matchesTaskQuickFilter(task, quick, filterContext))
+        .length,
+    ]),
+  ) as Record<TaskQuickFilter, number>;
+
   const filteredTasks =
     statusFilter === "all"
-      ? tasks
-      : tasks.filter((task) => task.statusId === statusFilter);
+      ? matchingTasks
+      : matchingTasks.filter((task) => task.statusId === statusFilter);
 
   const taskGroups = (
     statusFilter === "all"
@@ -729,6 +769,20 @@ export function TaskBoard({
 
       {error ? <ErrorState message={error} /> : null}
 
+      {tasks.length > 0 ? (
+        <TaskFilterBar
+          filter={filter}
+          onChange={(next) => {
+            setFilter(next);
+            clearSelection();
+          }}
+          counts={quickCounts}
+          milestones={milestones}
+          shown={matchingTasks.length}
+          total={tasks.length}
+        />
+      ) : null}
+
       {tasks.length === 0 ? (
         <EmptyState
           title="No tasks yet"
@@ -743,6 +797,20 @@ export function TaskBoard({
             </Button>
           }
         />
+      ) : filterActive && matchingTasks.length === 0 ? (
+        <EmptyState
+          title="No tasks match these filters"
+          description="Nothing in this project fits every filter at once. Clear them to see the whole board."
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setFilter(EMPTY_TASK_FILTER)}
+            >
+              Clear filters
+            </Button>
+          }
+        />
       ) : view === "board" ? (
         <div
           className={cn(
@@ -751,7 +819,7 @@ export function TaskBoard({
           )}
         >
           {statuses.map((status) => {
-            const columnTasks = tasks.filter(
+            const columnTasks = matchingTasks.filter(
               (task) => task.statusId === status.id,
             );
             const isTarget = dragOverStatusId === status.id;
@@ -834,11 +902,11 @@ export function TaskBoard({
                   statusFilter === "all" ? "text-slate-300" : "text-slate-400",
                 )}
               >
-                {tasks.length}
+                {matchingTasks.length}
               </span>
             </button>
             {statuses.map((status) => {
-              const count = tasks.filter(
+              const count = matchingTasks.filter(
                 (task) => task.statusId === status.id,
               ).length;
               const selected = statusFilter === status.id;

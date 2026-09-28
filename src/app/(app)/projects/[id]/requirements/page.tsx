@@ -8,6 +8,7 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getRequirementRuns } from "@/lib/generation/requirements-service";
 import { getScopedProject } from "@/lib/pm/project";
+import { parseRegisterFilter } from "@/lib/pm/filters";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { requirementSelect } from "@/lib/pm/select";
 
@@ -15,16 +16,23 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectRequirementsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    filter?: string | string[];
+    req?: string | string[];
+  }>;
 }) {
   const { workspaceId } = await requireWorkspace();
   const { id } = await params;
+  const { filter, req } = await searchParams;
 
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
 
-  const [requirements, readyDocuments, tasks, runs] = await Promise.all([
+  const [requirements, readyDocuments, tasks, milestones, risks, runs] =
+    await Promise.all([
     // Not officialRecordWhere: the register shows drafts on purpose. Coverage
     // and grounding reads still use the baselined predicate. See invariant 14.
     prisma.requirement.findMany({
@@ -41,6 +49,17 @@ export default async function ProjectRequirementsPage({
       where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: { createdAt: "asc" },
       select: { id: true, title: true },
+    }),
+    // Link targets are official records only; the links API enforces the same.
+    prisma.milestone.findMany({
+      where: officialRecordWhere({ workspaceId, projectId: project.id }),
+      orderBy: [{ targetDate: "asc" }, { createdAt: "asc" }],
+      select: { id: true, title: true },
+    }),
+    prisma.projectRisk.findMany({
+      where: officialRecordWhere({ workspaceId, projectId: project.id }),
+      orderBy: { createdAt: "asc" },
+      select: { id: true, description: true },
     }),
     getRequirementRuns(workspaceId, project.id),
   ]);
@@ -71,6 +90,14 @@ export default async function ProjectRequirementsPage({
       readyDocuments={readyDocuments}
       taskOptions={tasks}
       activeRun={activeRun}
+      initialFilter={parseRegisterFilter(filter)}
+      initialOpenId={typeof req === "string" ? req : null}
+      deliveryEnabled={project.deliveryEnabled}
+      milestoneOptions={milestones.map((milestone) => ({
+        id: milestone.id,
+        label: milestone.title,
+      }))}
+      riskOptions={risks.map((risk) => ({ id: risk.id, label: risk.description }))}
     />
   );
 }

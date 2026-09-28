@@ -1,24 +1,32 @@
 "use client";
 
+import { matchesQuery, sortRisks, type RiskSort } from "@/lib/pm/filters";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import {
   Badge,
+  type BadgeTone,
   Button,
   Card,
+  DescriptionList,
   EmptyState,
   ErrorState,
   Field,
+  FilterChip,
+  SearchField,
   SectionHeader,
   Select,
   Spinner,
   Textarea,
-  type BadgeTone,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
-import type { MilestoneOption } from "@/components/task-types";
+import type {
+  MilestoneOption,
+  TracedRequirementRow,
+} from "@/components/task-types";
+import { TracedRequirements } from "@/components/traced-requirements";
 
 export type RiskLevel = "low" | "medium" | "high";
 export type RiskStatus = "open" | "monitoring" | "mitigated" | "accepted";
@@ -46,6 +54,7 @@ export interface RiskRow {
   status: RiskStatus;
   source: "manual" | "ai_suggested";
   citations: RiskCitationRow[];
+  requirementLinks: TracedRequirementRow[];
 }
 
 const LEVELS: RiskLevel[] = ["low", "medium", "high"];
@@ -117,6 +126,9 @@ export function RisksPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<RiskStatus | "all">("all");
+  const [sort, setSort] = useState<RiskSort>("exposure");
+  const [query, setQuery] = useState("");
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -129,6 +141,16 @@ export function RisksPanel({
   }
 
   const openRisks = risks.filter((risk) => risk.status === "open").length;
+  // Exposure first by default: the list exists to find the risk to act on,
+  // and creation order says nothing about that.
+  const visibleRisks = sortRisks(
+    risks.filter(
+      (risk) =>
+        (statusFilter === "all" || risk.status === statusFilter) &&
+        matchesQuery(query, [risk.description, risk.mitigation]),
+    ),
+    sort,
+  );
 
   function upsert(risk: RiskRow) {
     setRisks((previous) =>
@@ -453,8 +475,56 @@ export function RisksPanel({
         />
       ) : (
         <Card className="overflow-hidden">
+          <div
+            role="search"
+            aria-label="Filter risks"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
+          >
+            <div className="flex flex-wrap items-center gap-1.5">
+              <FilterChip
+                pressed={statusFilter === "all"}
+                count={risks.length}
+                onClick={() => setStatusFilter("all")}
+              >
+                All
+              </FilterChip>
+              {STATUSES.map((status) => (
+                <FilterChip
+                  key={status.value}
+                  pressed={statusFilter === status.value}
+                  count={risks.filter((risk) => risk.status === status.value).length}
+                  onClick={() => setStatusFilter(status.value)}
+                >
+                  {status.label}
+                </FilterChip>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <SearchField
+                label="Search risks"
+                placeholder="Search risks"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="w-full sm:w-52"
+              />
+              <Select
+                aria-label="Sort risks"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as RiskSort)}
+                className="h-8 text-xs"
+              >
+                <option value="exposure">Highest exposure first</option>
+                <option value="recent">Newest first</option>
+              </Select>
+            </div>
+          </div>
+          {visibleRisks.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-slate-500">
+              No risks match this filter.
+            </p>
+          ) : null}
           <ul className="divide-y divide-slate-100">
-            {risks.map((risk) => {
+            {visibleRisks.map((risk) => {
               const open = expanded.has(risk.id);
               const busy = busyId === risk.id;
 
@@ -505,7 +575,7 @@ export function RisksPanel({
                     <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-9">
                       {/* A two-column list gives the prose one wide measure
                           instead of stacking four narrow labelled blocks. */}
-                      <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
+                      <DescriptionList className="text-sm">
                         <Field name="Risk">
                           <p className="max-w-3xl text-pretty">
                             {risk.description}
@@ -535,6 +605,15 @@ export function RisksPanel({
                             <span className="text-slate-600">
                               {risk.milestone.title}
                             </span>
+                          </Field>
+                        ) : null}
+
+                        {risk.requirementLinks.length > 0 ? (
+                          <Field name="Requirements">
+                            <TracedRequirements
+                              projectId={projectId}
+                              links={risk.requirementLinks}
+                            />
                           </Field>
                         ) : null}
 
@@ -570,7 +649,7 @@ export function RisksPanel({
                             </ul>
                           </Field>
                         ) : null}
-                      </dl>
+                      </DescriptionList>
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <Select

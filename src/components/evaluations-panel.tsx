@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  CHECKBOX,
   EmptyState,
   ErrorState,
   Input,
@@ -304,7 +305,7 @@ export function EvaluationsPanel({
                   checked={shouldRefuse}
                   onChange={(e) => setShouldRefuse(e.target.checked)}
                   disabled={running}
-                  className="size-4"
+                  className={CHECKBOX}
                 />
                 Should refuse (not in the selected evidence)
               </label>
@@ -445,6 +446,7 @@ export function EvaluationsPanel({
                 <Button
                   size="sm"
                   variant={row.result === "pass" ? "secondary" : "ghost"}
+                  aria-pressed={row.result === "pass"}
                   onClick={() => review(row.id, "pass")}
                 >
                   Pass
@@ -452,6 +454,7 @@ export function EvaluationsPanel({
                 <Button
                   size="sm"
                   variant={row.result === "fail" ? "secondary" : "ghost"}
+                  aria-pressed={row.result === "fail"}
                   onClick={() => review(row.id, "fail")}
                 >
                   Fail

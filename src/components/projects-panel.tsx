@@ -8,6 +8,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  LinkButton,
   Input,
   Spinner,
   Textarea,
@@ -237,18 +238,16 @@ export function ProjectsPanel({
                 {project.riskCount} risk{project.riskCount === 1 ? "" : "s"}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="inline-flex h-8 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700"
-                >
+                <LinkButton href={`/projects/${project.id}`} size="sm">
                   Open project
-                </Link>
-                <Link
+                </LinkButton>
+                <LinkButton
                   href={`/chat?project=${project.id}`}
-                  className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50"
+                  variant="secondary"
+                  size="sm"
                 >
                   Ask
-                </Link>
+                </LinkButton>
                 <Button
                   type="button"
                   size="sm"

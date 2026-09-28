@@ -60,7 +60,10 @@ export default async function ProjectLayout({
         </Link>
       </div>
 
-      <ProjectTabs projectId={project.id} />
+      <ProjectTabs
+        projectId={project.id}
+        deliveryEnabled={project.deliveryEnabled}
+      />
 
       <div className="mt-6">{children}</div>
     </div>

@@ -7,6 +7,7 @@ const fakes = vi.hoisted(() => {
   };
   const prisma = {
     document: { findMany: vi.fn() },
+    requirement: { findMany: vi.fn() },
     generationRun: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   };
@@ -91,6 +92,7 @@ const input = {
 beforeEach(() => {
   vi.clearAllMocks();
   fakes.prisma.document.findMany.mockResolvedValue([{ id: "doc-1" }]);
+  fakes.prisma.requirement.findMany.mockResolvedValue([]);
   fakes.prisma.generationRun.findFirst.mockResolvedValue(null);
   fakes.prisma.generationRun.create.mockResolvedValue({ id: "run-1" });
   fakes.prisma.generationRun.update.mockResolvedValue({ id: "run-1" });
@@ -113,6 +115,50 @@ beforeEach(() => {
   fakes.prisma.$transaction.mockImplementation(
     async (operation: (tx: typeof fakes.tx) => unknown) => operation(fakes.tx),
   );
+});
+
+describe("generateRequirements against an existing register", () => {
+  it("lists existing titles as E labels, scoped to the project, with no IDs", async () => {
+    fakes.prisma.requirement.findMany.mockResolvedValue([
+      { title: "Staff sign in with SSO", status: "approved" },
+      { title: "Export to Excel", status: "rejected" },
+    ]);
+    const chat = chatWith(validOutput);
+    await generateRequirements(input, { chat, embeddings });
+
+    expect(fakes.prisma.requirement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { workspaceId: "workspace-1", projectId: "project-1" },
+      }),
+    );
+    const prompt = (chat.complete.mock.calls[0][0] as Array<{ content: string }>)
+      .map((message) => message.content)
+      .join("\n");
+    expect(prompt).toContain("E1: Staff sign in with SSO");
+    expect(prompt).toContain("E2 [rejected]: Export to Excel");
+  });
+
+  it("drops a proposal that repeats an existing title, keeping the new one", async () => {
+    fakes.prisma.requirement.findMany.mockResolvedValue([
+      { title: "Managers approve leave requests.", status: "approved" },
+    ]);
+    await generateRequirements(input, { chat: chatWith(validOutput), embeddings });
+
+    expect(fakes.tx.requirement.create).toHaveBeenCalledTimes(1);
+    expect(fakes.tx.requirement.create.mock.calls[0][0].data.title).toBe(
+      "The portal must be secure",
+    );
+  });
+
+  it("fails the run with a clear message when nothing is new", async () => {
+    fakes.prisma.requirement.findMany.mockResolvedValue([
+      { title: "Managers approve leave requests", status: "approved" },
+      { title: "the portal must be SECURE", status: "draft" },
+    ]);
+    await expect(
+      generateRequirements(input, { chat: chatWith(validOutput), embeddings }),
+    ).rejects.toThrow(/already in the register/);
+  });
 });
 
 describe("generateRequirements audit and isolation", () => {
