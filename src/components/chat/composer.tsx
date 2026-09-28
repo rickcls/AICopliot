@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { ArrowUp } from "lucide-react";
 import { Button, QUIET_CONTROL, Select, Spinner, Textarea } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import type { ProjectOption } from "./types";
+import type { ChatFocusState, FocusOptions, ProjectOption } from "./types";
 
 /**
  * Where you type. Three things here are what stop the page reading as a search
@@ -26,9 +26,12 @@ export function Composer({
   projectId,
   projects,
   readyDocumentCount,
+  focus,
+  focusOptions,
   pending,
   onChange,
   onProjectChange,
+  onFocusChange,
   onSubmit,
   className,
 }: {
@@ -36,9 +39,13 @@ export function Composer({
   projectId: string;
   projects: ProjectOption[];
   readyDocumentCount: number;
+  focus: ChatFocusState;
+  focusOptions: FocusOptions;
   pending: boolean;
   onChange: (value: string) => void;
   onProjectChange: (projectId: string) => void;
+  /** "" | "task:<id>" | "doc:<id>" | "choose-documents" */
+  onFocusChange: (value: string) => void;
   onSubmit: () => void;
   className?: string;
 }) {
@@ -49,7 +56,18 @@ export function Composer({
     ? (selectedProject?.readyDocumentCount ?? 0)
     : readyDocumentCount;
   const recordCount = projectId ? (selectedProject?.liveRecordCount ?? 0) : 0;
-  const evidenceCount = documentCount + recordCount;
+  // A focused thread always has evidence to offer: the task record itself, or
+  // documents the page already confirmed exist.
+  const evidenceCount =
+    focus.kind === "none" ? documentCount + recordCount : 1;
+  const focusValue =
+    focus.kind === "task" && focus.taskId
+      ? `task:${focus.taskId}`
+      : focus.kind === "documents"
+        ? focus.documents.length === 1
+          ? `doc:${focus.documents[0].id}`
+          : "several-documents"
+        : "";
   const canSend = !pending && value.trim().length >= 3 && evidenceCount > 0;
 
   function grow(element: HTMLTextAreaElement) {
@@ -117,8 +135,52 @@ export function Composer({
             ))}
           </Select>
 
-          <span className="min-w-0 truncate text-xs text-slate-500">
-            {projectId
+          <label htmlFor="chat-focus" className="sr-only">
+            Focus on
+          </label>
+          <Select
+            id="chat-focus"
+            value={focusValue}
+            onChange={(event) => onFocusChange(event.target.value)}
+            disabled={pending}
+            className={cn(QUIET_CONTROL, "h-8 w-auto max-w-[14rem] text-xs")}
+          >
+            <option value="">{projectId ? "Whole project" : "Every document"}</option>
+            {focus.kind === "task" && !focus.taskId ? (
+              <option value="task:deleted" disabled>
+                Deleted task
+              </option>
+            ) : null}
+            {focusOptions.tasks.length > 0 ? (
+              <optgroup label="A task">
+                {focusOptions.tasks.map((task) => (
+                  <option key={task.id} value={`task:${task.id}`}>
+                    {task.title}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+            {focusOptions.documents.length > 0 ? (
+              <optgroup label="A document">
+                {focusOptions.documents.map((document) => (
+                  <option key={document.id} value={`doc:${document.id}`}>
+                    {document.filename}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+            {focusValue === "several-documents" ? (
+              <option value="several-documents" disabled>
+                {focus.kind === "documents" ? `${focus.documents.length} documents` : ""}
+              </option>
+            ) : null}
+            {focusOptions.documents.length > 1 ? (
+              <option value="choose-documents">Several documents…</option>
+            ) : null}
+          </Select>
+
+          <span className="hidden min-w-0 truncate text-xs text-slate-500 sm:inline">
+            {focus.kind !== "none" ? "" : projectId
               ? `${documentCount} document${documentCount === 1 ? "" : "s"} · ${recordCount} record${recordCount === 1 ? "" : "s"}`
               : `${documentCount} document${documentCount === 1 ? "" : "s"} indexed`}
           </span>
@@ -145,9 +207,13 @@ export function Composer({
         </p>
       ) : (
         <p className="mt-2 px-1 text-xs text-slate-400">
-          {projectId
-            ? "Answers combine this project's documents with its current approved records, and cite both."
-            : "Answers come from your indexed documents. Pick a project to include its live records."}
+          {focus.kind === "task"
+            ? "Answers come from this task, its connected records, and its linked documents, and can propose edits you apply."
+            : focus.kind === "documents"
+              ? "Answers come only from the chosen documents."
+              : projectId
+                ? "Answers combine this project's documents with its current approved records, and cite both. Pick a task or document to narrow it."
+                : "Answers come from your indexed documents. Pick a project to include its live records."}
           {" Enter to send, Shift+Enter for a new line."}
         </p>
       )}

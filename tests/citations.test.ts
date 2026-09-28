@@ -55,6 +55,7 @@ function answer(overrides: Partial<ModelAnswer> = {}): ModelAnswer {
     confidence: "high",
     insufficientContext: false,
     citations: [{ sourceId: "S1", quote: "Restart the service" }],
+    proposals: [],
     ...overrides,
   };
 }

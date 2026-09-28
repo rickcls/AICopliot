@@ -70,13 +70,25 @@ describe("nextActionsFor", () => {
     expect(actions).toHaveLength(1);
   });
 
-  it("collapses a task and a dependency, which share the board", () => {
+  it("names a task link after the task it opens", () => {
     const actions = nextActionsFor([
-      projectCitation("task", "/projects/p1/tasks"),
+      projectCitation("task", "/projects/p1/tasks?task=t1"),
       projectCitation("dependency", "/projects/p1/tasks"),
     ]);
 
-    expect(actions).toEqual([{ label: "Open in Tasks", href: "/projects/p1/tasks" }]);
+    expect(actions).toEqual([
+      { label: expect.stringMatching(/^Open “.+”$/), href: "/projects/p1/tasks?task=t1" },
+      { label: "Open in Tasks", href: "/projects/p1/tasks" },
+    ]);
+  });
+
+  it("collapses two citations of the same task into one link", () => {
+    const actions = nextActionsFor([
+      projectCitation("task", "/projects/p1/tasks?task=t1"),
+      projectCitation("task", "/projects/p1/tasks?task=t1"),
+    ]);
+
+    expect(actions).toHaveLength(1);
   });
 
   it("keeps first-seen order, which is the model's citation order", () => {

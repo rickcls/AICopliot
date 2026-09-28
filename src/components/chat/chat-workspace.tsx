@@ -4,17 +4,24 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MessagesSquare } from "lucide-react";
 import type { LoadedConversation, ThreadSummary } from "@/lib/chat/history";
-import { parseSseChunk } from "@/lib/chat/sse";
 import type { AnswerProgress } from "@/lib/rag/answer";
-import { citationSchema } from "@/lib/schemas";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { Modal, ModalBody } from "@/components/modal";
 import { Button, EmptyState, ErrorState, LinkButton } from "@/components/ui";
+import { assistantTurnFrom, streamAnswer } from "./ask-stream";
 import { Composer } from "./composer";
+import { DocumentChooser } from "./document-chooser";
 import { ThreadRail } from "./thread-rail";
 import { Transcript } from "./transcript";
-import { toTurns, type ProjectOption, type Turn } from "./types";
+import { ProposalCard, proposalPatch } from "./proposal-card";
+import {
+  toTurns,
+  type ChatFocusState,
+  type FocusOptions,
+  type ProjectOption,
+  type Turn,
+} from "./types";
 
 /**
  * The chat surface: thread rail, transcript, composer, and the stream that
@@ -27,23 +34,14 @@ import { toTurns, type ProjectOption, type Turn } from "./types";
  * *inside* the wide row, so prose stays readable while the rail gets real space.
  */
 
-interface StreamResult {
-  messageId: string;
-  conversationId: string;
-  answer: string;
-  confidence: "high" | "medium" | "low";
-  citations: unknown;
-  refused: boolean;
-  latencyMs: number;
-  createdAt: string;
-}
-
 export function ChatWorkspace({
   readyDocumentCount,
   projects,
   threads,
   conversation,
   initialProjectId,
+  focus,
+  focusOptions,
   nowIso,
 }: {
   readyDocumentCount: number;
@@ -51,6 +49,9 @@ export function ChatWorkspace({
   threads: ThreadSummary[];
   conversation: LoadedConversation | null;
   initialProjectId: string;
+  /** Like the project: changing it is a navigation to a new thread. */
+  focus: ChatFocusState;
+  focusOptions: FocusOptions;
   nowIso: string;
 }) {
   const router = useRouter();
@@ -73,6 +74,16 @@ export function ChatWorkspace({
   const [phases, setPhases] = useState<AnswerProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [threadsOpen, setThreadsOpen] = useState(false);
+  const [choosingDocuments, setChoosingDocuments] = useState(false);
+
+  // Sent with every question; the server holds an existing thread to what it
+  // was started with, so this only decides the focus of a new one.
+  const focusRequest =
+    focus.kind === "task" && focus.taskId
+      ? { taskId: focus.taskId }
+      : focus.kind === "documents"
+        ? { documentIds: focus.documents.map((document) => document.id) }
+        : {};
 
   // Guards a stale stream from writing over a newer one.
   const requestId = useRef(0);
@@ -83,11 +94,13 @@ export function ChatWorkspace({
       (project) => project.readyDocumentCount > 0 || project.liveRecordCount > 0,
     );
 
-  async function changeProject(nextProjectId: string) {
-    if (nextProjectId === projectId) return;
-
-    // Evidence sets are never mixed within one thread (invariant 13). That used
-    // to silently wipe the answer list; now it says so first.
+  /** Evidence sets are never mixed within one thread (invariant 13), so a
+   *  new scope or focus is a new thread — confirmed first when one is open. */
+  async function startThread(target: {
+    projectId: string;
+    taskId?: string;
+    documentIds?: string[];
+  }) {
     if (turns.length > 0) {
       const confirmed = await confirm({
         title: "Start a new thread?",
@@ -97,7 +110,52 @@ export function ChatWorkspace({
       if (!confirmed) return;
     }
 
-    router.push(nextProjectId ? `/chat?project=${nextProjectId}` : "/chat");
+    const params = new URLSearchParams();
+    if (target.projectId) params.set("project", target.projectId);
+    if (target.taskId) params.set("task", target.taskId);
+    if (target.documentIds?.length) params.set("docs", target.documentIds.join(","));
+    const query = params.toString();
+    router.push(query ? `/chat?${query}` : "/chat");
+  }
+
+  async function changeProject(nextProjectId: string) {
+    if (nextProjectId === projectId) return;
+    await startThread({ projectId: nextProjectId });
+  }
+
+  async function changeFocus(value: string) {
+    if (value === "choose-documents") {
+      setChoosingDocuments(true);
+      return;
+    }
+    if (value.startsWith("task:")) {
+      await startThread({ projectId, taskId: value.slice("task:".length) });
+    } else if (value.startsWith("doc:")) {
+      await startThread({ projectId, documentIds: [value.slice("doc:".length)] });
+    } else {
+      await startThread({ projectId });
+    }
+  }
+
+  async function applyProposal(proposal: Parameters<typeof proposalPatch>[0]) {
+    if (focus.kind !== "task" || !focus.taskId) return false;
+    try {
+      const response = await fetch(`/api/tasks/${focus.taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(proposalPatch(proposal)),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data.error ?? "Could not apply that change.");
+        return false;
+      }
+      toast.success("Applied to the task");
+      return true;
+    } catch {
+      toast.error("Could not reach the server.");
+      return false;
+    }
   }
 
   async function ask(content: string) {
@@ -134,84 +192,46 @@ export function ChatWorkspace({
       );
     };
 
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: trimmed,
-          conversationId,
-          projectId: projectId || null,
-        }),
-      });
-
-      // Guards return JSON with a real status; only a 200 carries a stream.
-      if (!response.ok || !response.body) {
-        const data = await response.json().catch(() => ({}));
-        fail(data.error ?? "Could not get an answer.");
-        return;
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let settled = false;
-
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (generation !== requestId.current) return; // superseded
-
-        buffer += decoder.decode(value, { stream: true });
-        const { events, rest } = parseSseChunk(buffer);
-        buffer = rest;
-
-        for (const frame of events) {
-          const payload = JSON.parse(frame.data);
-
-          if (frame.event === "accepted") {
-            setConversationId(payload.conversationId);
-            // Pin the new thread to its own URL so a reload returns to it.
-            // `replaceState` rather than a router navigation: Next syncs it
-            // with usePathname without re-fetching the page, so the turn that
-            // is mid-flight right now is not thrown away and replaced by a
-            // server render. This is why /chat and /chat/[id] are one segment.
-            if (isNewThread) {
-              window.history.replaceState(null, "", `/chat/${payload.conversationId}`);
-            }
-            setTurns((previous) =>
-              previous.map((turn) =>
-                turn.id === localId && turn.kind === "user"
-                  ? { ...turn, id: payload.questionMessageId, status: "sent" }
-                  : turn,
-              ),
-            );
-          } else if (frame.event === "progress") {
-            setPhases((previous) => [...previous, payload as AnswerProgress]);
-          } else if (frame.event === "result") {
-            settled = true;
-            appendAnswer(payload as StreamResult);
-          } else if (frame.event === "error") {
-            settled = true;
-            fail(payload.error ?? "Could not get an answer.");
+    const outcome = await streamAnswer(
+      {
+        question: trimmed,
+        conversationId,
+        projectId: projectId || null,
+        ...focusRequest,
+      },
+      {
+        isCurrent: () => generation === requestId.current,
+        onAccepted: (payload) => {
+          setConversationId(payload.conversationId);
+          // Pin the new thread to its own URL so a reload returns to it.
+          // `replaceState` rather than a router navigation: Next syncs it with
+          // usePathname without re-fetching the page, so the turn that is
+          // mid-flight right now is not thrown away and replaced by a server
+          // render. This is why /chat and /chat/[id] are one segment.
+          if (isNewThread) {
+            window.history.replaceState(null, "", `/chat/${payload.conversationId}`);
           }
-        }
-      }
+          setTurns((previous) =>
+            previous.map((turn) =>
+              turn.id === localId && turn.kind === "user"
+                ? { ...turn, id: payload.questionMessageId, status: "sent" }
+                : turn,
+            ),
+          );
+        },
+        onProgress: (progress) => setPhases((previous) => [...previous, progress]),
+        onResult: (payload) =>
+          setTurns((previous) => [...previous, assistantTurnFrom(payload)]),
+        onError: fail,
+      },
+    );
 
-      if (!settled) fail("The answer stream ended unexpectedly.");
-      // A brand-new thread needs to appear in the rail; refresh re-runs the
-      // page's server components without discarding this component's state.
-      else if (isNewThread) router.refresh();
-    } catch {
-      if (generation === requestId.current) {
-        fail("Could not reach the server. Please try again.");
-      }
-    } finally {
-      if (generation === requestId.current) {
-        setPending(false);
-        setPhases([]);
-      }
-    }
+    if (outcome === "superseded") return;
+    setPending(false);
+    setPhases([]);
+    // A brand-new thread needs to appear in the rail; refresh re-runs the
+    // page's server components without discarding this component's state.
+    if (outcome === "answered" && isNewThread) router.refresh();
   }
 
   async function renameThread(thread: ThreadSummary, title: string) {
@@ -260,29 +280,6 @@ export function ChatWorkspace({
     }
   }
 
-  function appendAnswer(result: StreamResult) {
-    // Citations cross the wire as JSON, so they are re-validated here for the
-    // same reason a stored blob is: the renderer must never be handed a shape
-    // it cannot narrow.
-    const parsed = citationSchema.array().safeParse(result.citations);
-
-    setTurns((previous) => [
-      ...previous,
-      {
-        kind: "assistant",
-        id: result.messageId,
-        content: result.answer,
-        citations: parsed.success ? parsed.data : [],
-        citationsUnavailable: !parsed.success && !result.refused,
-        confidence: result.confidence,
-        refused: result.refused,
-        latencyMs: result.latencyMs,
-        createdAt: result.createdAt,
-        myRating: null,
-      },
-    ]);
-  }
-
   // Without evidence there is nothing to ask against, but earlier threads are
   // still worth reaching — so the rail and heading stay and only the composer
   // gives way to the empty state.
@@ -306,10 +303,38 @@ export function ChatWorkspace({
               <h1 className="truncate text-2xl font-semibold tracking-tight">
                 {conversation?.conversation.title ?? "Ask"}
               </h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Grounded answers from your documents, and from a project&rsquo;s
-                approved records when you pick one.
-              </p>
+              {focus.kind === "task" ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  About the task{" "}
+                  {focus.taskId && projectId ? (
+                    <a
+                      href={`/projects/${projectId}/tasks?task=${focus.taskId}`}
+                      className="font-medium text-slate-900 underline"
+                    >
+                      {focus.taskTitle}
+                    </a>
+                  ) : (
+                    <span className="font-medium">(deleted)</span>
+                  )}
+                  : its record, connected records, and linked documents. Answers
+                  can propose edits for you to apply.
+                </p>
+              ) : focus.kind === "documents" ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  Only from{" "}
+                  <span className="font-medium text-slate-900">
+                    {focus.documents.length === 1
+                      ? focus.documents[0].filename
+                      : `${focus.documents.length} chosen documents`}
+                  </span>
+                  .
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-slate-600">
+                  Grounded answers from your documents, and from a project&rsquo;s
+                  approved records when you pick one.
+                </p>
+              )}
             </div>
             {/* Below lg the rail has no room beside the 56px icon sidebar, so
                 the same component opens in a dialog instead. */}
@@ -348,6 +373,22 @@ export function ChatWorkspace({
               phases={phases}
               projectScoped={Boolean(projectId)}
               onRetry={ask}
+              renderProposals={
+                focus.kind === "task" && focus.taskId
+                  ? (turn) => (
+                      <div className="space-y-2">
+                        {turn.proposals.map((proposal) => (
+                          <ProposalCard
+                            key={proposal.field}
+                            proposal={proposal}
+                            current={focus.current}
+                            onApply={applyProposal}
+                          />
+                        ))}
+                      </div>
+                    )
+                  : undefined
+              }
             />
           )}
 
@@ -363,9 +404,12 @@ export function ChatWorkspace({
             projectId={projectId}
             projects={projects}
             readyDocumentCount={readyDocumentCount}
+            focus={focus}
+            focusOptions={focusOptions}
             pending={pending}
             onChange={setQuestion}
             onProjectChange={changeProject}
+            onFocusChange={changeFocus}
             onSubmit={() => ask(question)}
             // The negative margin lets the sticky bar cover content edge to
             // edge instead of letting text slide through the gutter beside it.
@@ -374,6 +418,18 @@ export function ChatWorkspace({
           )}
         </div>
       </div>
+
+      {choosingDocuments ? (
+        <DocumentChooser
+          documents={focusOptions.documents}
+          initial={focus.kind === "documents" ? focus.documents.map((d) => d.id) : []}
+          onCancel={() => setChoosingDocuments(false)}
+          onChoose={(documentIds) => {
+            setChoosingDocuments(false);
+            void startThread({ projectId, documentIds });
+          }}
+        />
+      ) : null}
 
       {threadsOpen ? (
         <Modal

@@ -69,9 +69,12 @@ export function UnansweredNotice({ onRetry }: { onRetry?: () => void }) {
 export function AssistantTurn({
   turn,
   projectScoped,
+  proposals,
 }: {
   turn: AssistantTurnModel;
   projectScoped: boolean;
+  /** Apply-able edits, rendered by whoever can apply them. */
+  proposals?: React.ReactNode;
 }) {
   return (
     <div className="flex gap-3">
@@ -103,6 +106,8 @@ export function AssistantTurn({
           text={turn.content}
           citations={turn.citations}
         />
+
+        {proposals ? <div className="mt-4">{proposals}</div> : null}
 
         {turn.refused ? (
           <p className="mt-3 text-xs text-slate-500">

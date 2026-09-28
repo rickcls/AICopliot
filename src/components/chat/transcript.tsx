@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { AnswerProgress } from "@/lib/rag/answer";
 import { AssistantTurn, PendingTurn, UnansweredNotice, UserTurn } from "./turns";
-import type { Turn } from "./types";
+import type { AssistantTurn as AssistantTurnModel, Turn } from "./types";
 
 /**
  * The conversation, oldest first.
@@ -20,12 +20,15 @@ export function Transcript({
   phases,
   projectScoped,
   onRetry,
+  renderProposals,
 }: {
   turns: Turn[];
   pending: boolean;
   phases: AnswerProgress[];
   projectScoped: boolean;
   onRetry: (content: string) => void;
+  /** Task-focused threads: renders an answer's proposed edits with Apply. */
+  renderProposals?: (turn: AssistantTurnModel) => React.ReactNode;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   const lastUserTurnCount = useRef(0);
@@ -79,6 +82,11 @@ export function Transcript({
             key={turn.id}
             turn={turn}
             projectScoped={projectScoped}
+            proposals={
+              renderProposals && turn.proposals.length > 0
+                ? renderProposals(turn)
+                : undefined
+            }
           />
         );
       })}

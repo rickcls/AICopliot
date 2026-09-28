@@ -904,3 +904,44 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Focused chat: one task, or chosen documents
+
+A thread can be narrowed inside its scope. `ChatConversation.focus` is `none`,
+`task`, or `documents`; changing it starts a new thread exactly as changing
+project does, so evidence sets never mix. The route resolves a new thread's
+focus with `resolveNewThreadScope()` in `src/lib/chat/focus.ts`, and an
+existing thread is **held to what it was started with** — a request may name
+its project or task, never re-point it.
+
+- **Task focus** (the task panel's *Ask AI* tab, or the Ask page's focus
+  picker) replaces the project-wide record selection with
+  `getTaskGroundingContext()`: the task itself, always `[T1]`, then its
+  dependencies, milestone, and *approved* requirements — the same source
+  builders as project chat, so a citation's snapshot has one shape. Retrieval
+  reads the task's linked documents, fetched fresh each turn so linking one
+  takes effect on the next question, or the whole project when it has none.
+  Official tasks only; comments are not evidence. `taskId` is `SET NULL`: a
+  deleted task's thread stays readable, `focus` stays `task`, and the route
+  refuses to continue it with a 409.
+- **Document focus** is document-only, like global chat. `focusDocumentIds`
+  is a filter, not a relation, and lives **inside** both retrieval SQL paths
+  (`retrieveChunks(…, documentIds)`) — filtered afterwards, the rest of the
+  project would fill the LIMIT and the focus would return nothing.
+
+**Task threads may propose edits; they never make them.** `TASK_SYSTEM_PROMPT`
+lets the model return `proposals` (description, priority, estimate, dates),
+and `validateProposals()` in `src/lib/rag/proposals.ts` runs them through the
+task fill's validator — a citation per field, dates and effort checked against
+the cited text — so chat and "Fill blanks with AI" clear one bar. A refused
+answer offers nothing. Proposals are stored on `ChatMessage.proposals` so a
+replayed thread still shows them, and **Apply is the ordinary task PATCH**
+(`proposalPatch()`), carrying only document citations since a live record has
+no chunk to store. "Applied" is derived from the task's current value, not
+remembered. Task threads skip project chat's intent gate and mixed-heading
+rule: nearly every question in one says "task" and `[T1]` is always supplied,
+so those rules would refuse ordinary answers that cite a document.
+
+Both surfaces read the stream through `streamAnswer()` in
+`src/components/chat/ask-stream.ts`, so a guard error, a dropped stream, and a
+superseded question are handled once.

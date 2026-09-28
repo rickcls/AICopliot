@@ -25,6 +25,10 @@ interface LexicalRow extends RawCandidate {
  * afterwards. Filtering after the fact would let another workspace's chunks
  * consume the LIMIT and silently degrade recall — and would be one refactor
  * away from leaking them.
+ *
+ * `documentIds` narrows a focused thread to chosen documents, and lives inside
+ * both queries for the same reason: filtered afterwards, the rest of the
+ * project would fill the LIMIT and the focus would silently return nothing.
  */
 export async function retrieveChunks(
   workspaceId: string,
@@ -32,6 +36,7 @@ export async function retrieveChunks(
   query: string,
   topK: number,
   projectId: string | null = null,
+  documentIds: string[] | null = null,
 ): Promise<RetrievedChunk[]> {
   const literal = toVectorLiteral(queryEmbedding);
   const candidateLimit = Math.min(Math.max(topK * 4, topK), 200);
@@ -52,6 +57,7 @@ export async function retrieveChunks(
       WHERE c."workspaceId" = ${workspaceId}
         AND d."workspaceId" = ${workspaceId}
         AND (${projectId}::text IS NULL OR d."projectId" = ${projectId})
+        AND (${documentIds}::text[] IS NULL OR c."documentId" = ANY(${documentIds}::text[]))
         AND d."status" = 'ready'
         AND c."embedding" IS NOT NULL
       ORDER BY c."embedding" <=> ${literal}::vector
@@ -76,6 +82,7 @@ export async function retrieveChunks(
       WHERE c."workspaceId" = ${workspaceId}
         AND d."workspaceId" = ${workspaceId}
         AND (${projectId}::text IS NULL OR d."projectId" = ${projectId})
+        AND (${documentIds}::text[] IS NULL OR c."documentId" = ANY(${documentIds}::text[]))
         AND d."status" = 'ready'
         AND query.value <> ''::tsquery
         AND to_tsvector('english', c."content") @@ query.value
