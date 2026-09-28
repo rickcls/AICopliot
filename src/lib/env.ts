@@ -43,6 +43,21 @@ export type Env = z.infer<typeof envSchema>;
 let cached: Env | null = null;
 
 /**
+ * Treat a blank variable as unset. Vercel keeps a variable whose value was
+ * cleared, and `z.coerce.number()` turns "" into 0: `.default()` never runs,
+ * so MAX_UPLOAD_BYTES fails `.positive()` and every route that reads the env
+ * breaks — worse, a blank RAG_MIN_SCORE passes as 0 and silently disables the
+ * refusal threshold.
+ */
+export function withoutBlankValues(
+  source: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(source).filter(([, value]) => value?.trim()),
+  );
+}
+
+/**
  * Neon’s Vercel integration stores the pooled URL under Storage_DATABASE_URL
  * when the resource is named Storage. Copy it onto DATABASE_URL so the rest
  * of this schema can keep a single required field.
@@ -58,7 +73,9 @@ function withPooledDatabaseUrl(
 export function getEnv(): Env {
   if (cached) return cached;
 
-  const parsed = envSchema.safeParse(withPooledDatabaseUrl(process.env));
+  const parsed = envSchema.safeParse(
+    withPooledDatabaseUrl(withoutBlankValues(process.env)),
+  );
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
@@ -77,10 +94,12 @@ export function __setEnvForTesting(env: Partial<Env> | null): void {
   cached = env
     ? ({
         ...envSchema.parse(
-          withPooledDatabaseUrl({
-            ...process.env,
-            ...(env as Record<string, string | undefined>),
-          }),
+          withPooledDatabaseUrl(
+            withoutBlankValues({
+              ...process.env,
+              ...(env as Record<string, string | undefined>),
+            }),
+          ),
         ),
       } as Env)
     : null;
