@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { LOCALES } from "@/lib/i18n/locales";
+import { isValidTimeZone } from "@/lib/time";
 
 /** Every API input and the model's JSON output are validated through this file. */
 
@@ -169,18 +171,76 @@ export const createProjectSchema = z.object({
 
 export const updateProjectSchema = createProjectSchema
   .partial()
-  .extend({ deliveryEnabled: z.boolean().optional() })
+  .extend({
+    deliveryEnabled: z.boolean().optional(),
+    discoveryEnabled: z.boolean().optional(),
+  })
   .refine(
     (value) =>
       value.name !== undefined ||
       value.description !== undefined ||
-      value.deliveryEnabled !== undefined,
-    "Provide a name, description, or delivery setting",
+      value.deliveryEnabled !== undefined ||
+      value.discoveryEnabled !== undefined,
+    "Provide a name, description, or section setting",
+  );
+
+/**
+ * One person's own preferences. The locale list and time-zone check live in
+ * their own modules; this only says both are optional and at least one is
+ * present, with no defaults — a PATCH must never reset the field it omits.
+ */
+export const updatePreferencesSchema = z
+  .object({
+    locale: z.enum(LOCALES).optional(),
+    timeZone: z
+      .string()
+      .trim()
+      .max(64)
+      .refine(isValidTimeZone, "Unknown time zone")
+      .optional(),
+  })
+  .refine(
+    (value) => value.locale !== undefined || value.timeZone !== undefined,
+    "Provide a language or time zone",
   );
 
 export const assignDocumentProjectSchema = z.object({
   projectId: z.string().min(1).nullable(),
 });
+
+/**
+ * A document's project and filing labels. Every field is optional with no
+ * default, so a PATCH changes only what it names; editing a label marks the
+ * labels as the person's own, which a later AI pass will not overwrite.
+ */
+export const updateDocumentSchema = z
+  .object({
+    projectId: z.string().min(1).nullable().optional(),
+    title: z.string().trim().max(120).nullable().optional(),
+    docType: z
+      .enum([
+        "contract",
+        "proposal",
+        "quotation",
+        "invoice",
+        "report",
+        "minutes",
+        "email",
+        "specification",
+        "policy",
+        "plan",
+        "presentation",
+        "form",
+        "other",
+      ])
+      .nullable()
+      .optional(),
+    tags: z.array(z.string().trim().min(1).max(30)).max(6).optional(),
+  })
+  .refine(
+    (value) => Object.values(value).some((field) => field !== undefined),
+    "Provide a project or a label to change",
+  );
 
 // --- Project management ----------------------------------------------------
 
@@ -497,6 +557,75 @@ export const registerSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
+});
+
+// --- Team workspaces ---------------------------------------------------------
+
+export const workspaceRoleSchema = z.enum(["admin", "member"]);
+
+export const switchWorkspaceSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+});
+
+export const createInviteSchema = z.object({
+  role: workspaceRoleSchema.optional(),
+});
+
+/** A base64url token of 32 bytes is 43 characters; anything far off is not one. */
+export const acceptInviteSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+});
+
+export const updateMemberSchema = z.object({
+  role: workspaceRoleSchema,
+});
+
+// --- Today ------------------------------------------------------------------
+
+export const CHECK_IN_ACTIONS = ["done", "progress", "blocked", "snooze"] as const;
+
+/** A one-click report on a task from Today, with an optional note. */
+export const checkInSchema = z.object({
+  action: z.enum(CHECK_IN_ACTIONS),
+  note: z.string().trim().max(4000).optional(),
+  /** Snooze only: how many days to stop asking. */
+  days: z.number().int().min(1).max(30).optional(),
+});
+
+export const dayPlanRequestSchema = z.object({
+  availableHours: z.number().min(0.5).max(14),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const createTasksFromStepsSchema = z.object({
+  stepIndexes: z.array(z.number().int().min(0).max(29)).min(1).max(10),
+});
+
+// --- Email drafts -------------------------------------------------------------
+
+export const writingStyleSchema = z
+  .object({
+    samples: z.array(z.string().trim().min(1).max(4000)).max(10).optional(),
+    profile: z.string().trim().max(2000).nullable().optional(),
+    signature: z.string().trim().max(500).nullable().optional(),
+  })
+  .refine(
+    (value) => Object.values(value).some((field) => field !== undefined),
+    "Provide samples, a profile, or a signature",
+  );
+
+export const emailDraftRequestSchema = z.object({
+  purpose: z.enum(["reply", "follow_up", "update", "request", "thanks", "other"]),
+  recipient: z.string().trim().max(200).optional(),
+  keyPoints: z.string().trim().min(1, "Say what the email should say").max(2000),
+  incoming: z.string().trim().max(8000).optional(),
+  taskId: z.string().trim().min(1).optional(),
+  language: z.enum(["auto", "zh-Hant", "en"]).default("auto"),
+});
+
+export const assistantQuestionSchema = z.object({
+  threadId: z.string().trim().min(1).optional(),
+  question: z.string().trim().min(1, "Ask something first").max(2000),
 });
 
 export const loginSchema = z.object({

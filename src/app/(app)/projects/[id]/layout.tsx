@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { requireWorkspace } from "@/lib/auth-guard";
+import { getT } from "@/lib/i18n/server";
 import { getScopedProject } from "@/lib/pm/project";
 import { ProjectTabs } from "@/components/project-tabs";
 
@@ -29,12 +30,13 @@ export default async function ProjectLayout({
 
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
+  const t = await getT();
 
   return (
     <div>
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link href="/projects" className="text-slate-500 hover:text-slate-900">
-          Projects
+          {t("project.breadcrumb")}
         </Link>
         <span className="mx-1.5 text-slate-300">/</span>
         <span className="text-slate-900">{project.name}</span>
@@ -56,13 +58,14 @@ export default async function ProjectLayout({
           className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 text-sm font-medium text-white transition-colors hover:bg-slate-700"
         >
           <MessageSquare className="size-4" aria-hidden />
-          Ask this project
+          {t("project.ask")}
         </Link>
       </div>
 
       <ProjectTabs
         projectId={project.id}
         deliveryEnabled={project.deliveryEnabled}
+        discoveryEnabled={project.discoveryEnabled}
       />
 
       <div className="mt-6">{children}</div>

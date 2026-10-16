@@ -9,18 +9,22 @@ import {
 } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { getT } from "@/lib/i18n/server";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Workspace summary. Document administration lives at /documents so the
- * sidebar entry labelled "All Documents" leads to documents and nothing else.
+ * Workspace overview: a summary across every project and every member, reached
+ * from the Projects page. Home is /today, which answers the narrower question
+ * of what needs the viewer. Document administration lives at /documents.
  */
 export default async function DashboardPage() {
-  const { workspaceId, workspaceName } = await requireWorkspace();
+  const { workspaceId, workspaceName, userId } = await requireWorkspace();
+  const t = await getT();
 
   const [projectCount, documentCount] = await Promise.all([
-    prisma.project.count({ where: { workspaceId } }),
+    prisma.project.count({ where: visibleProjectWhere(workspaceId, userId) }),
     prisma.document.count({ where: { workspaceId } }),
   ]);
 
@@ -28,9 +32,10 @@ export default async function DashboardPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">
-          {workspaceName}
+          {t("dashboard.title")}
         </h1>
         <p className="mt-1 text-sm text-slate-600">
+          <span className="font-medium text-slate-900">{workspaceName}</span> ·{" "}
           {projectCount} project{projectCount === 1 ? "" : "s"} ·{" "}
           {documentCount} document{documentCount === 1 ? "" : "s"}
         </p>
@@ -48,7 +53,7 @@ export default async function DashboardPage() {
         // The summary is the slow half of the page (a dozen grouped reads), so
         // the heading streams first instead of waiting on all of it.
         <Suspense fallback={<SummarySkeleton />}>
-          <DashboardSummary workspaceId={workspaceId} />
+          <DashboardSummary workspaceId={workspaceId} viewerId={userId} />
         </Suspense>
       )}
     </div>

@@ -1,8 +1,11 @@
 "use client";
 
-import { matchesQuery } from "@/lib/pm/filters";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FileUp, Sparkles } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { useToast } from "@/components/toast";
 import {
   Badge,
   Button,
@@ -14,22 +17,12 @@ import {
   Select,
   Spinner,
 } from "@/components/ui";
-import { useConfirm } from "@/components/confirm-dialog";
-import { useToast } from "@/components/toast";
+import type { DocumentRow } from "@/lib/documents/select";
+import { intlLocale } from "@/lib/i18n/locales";
+import type { MessageKey } from "@/lib/i18n/translate";
 import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
-import { formatBytes, formatDate } from "@/lib/utils";
-
-interface DocumentRow {
-  id: string;
-  originalFilename: string;
-  sizeBytes: number;
-  status: "uploaded" | "processing" | "ready" | "failed";
-  errorMessage: string | null;
-  chunkCount: number;
-  createdAt: string;
-  projectId: string | null;
-  project: { name: string } | null;
-}
+import { matchesQuery } from "@/lib/pm/filters";
+import { cn, formatBytes, formatDay } from "@/lib/utils";
 
 interface ProjectOption {
   id: string;
@@ -43,13 +36,20 @@ const STATUS_TONE = {
   failed: "danger",
 } as const;
 
-const STATUS_LABEL = {
-  uploaded: "Uploaded",
-  processing: "Processing",
-  ready: "Ready",
-  failed: "Failed",
-} as const;
+/** Two at a time: fast enough for a handful of files, gentle on a 60s server. */
+const UPLOAD_CONCURRENCY = 2;
+const MAX_UPLOAD_MB = 10;
 
+/**
+ * The document library, for the whole workspace or one project.
+ *
+ * House pattern: one line per document — its name (the AI or person-written
+ * title when there is one), the facts that identify it, and only the
+ * exceptions badged (not ready, failed, filed somewhere it seems not to
+ * belong). Files can be dropped in several at a time; each is uploaded,
+ * indexed, then labelled by the assistant, through the same routes as before,
+ * so every one is validated and stored the same way.
+ */
 export function DocumentsPanel({
   initialDocuments,
   projects,
@@ -61,21 +61,24 @@ export function DocumentsPanel({
   initialProjectFilter?: string;
   fixedProject?: ProjectOption;
 }) {
+  const t = useT();
+  const locale = useLocale();
+  const dateLocale = intlLocale(locale);
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [uploadProjectId, setUploadProjectId] = useState(
     fixedProject
       ? fixedProject.id
       : initialProjectFilter !== "all" && initialProjectFilter !== "unassigned"
-      ? initialProjectFilter
-      : "",
+        ? initialProjectFilter
+        : "",
   );
-  const [projectFilter, setProjectFilter] = useState(
-    fixedProject?.id ?? initialProjectFilter,
-  );
-  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [projectFilter, setProjectFilter] = useState(fixedProject?.id ?? initialProjectFilter);
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<"move" | "label" | null>(null);
   const [query, setQuery] = useState("");
   const confirm = useConfirm();
   const toast = useToast();
@@ -91,20 +94,18 @@ export function DocumentsPanel({
           ? `/api/documents?projectId=${encodeURIComponent(fixedProjectId)}`
           : "/api/documents",
       );
-      if (!response.ok) throw new Error("Could not load documents");
+      if (!response.ok) throw new Error();
       const data = await response.json();
       setDocuments(data.documents);
       setLoadError(null);
-    } catch (error) {
-      setLoadError((error as Error).message);
+    } catch {
+      setLoadError(t("common.couldNotReach"));
     }
-  }, [fixedProjectId]);
+  }, [fixedProjectId, t]);
 
   // Poll while anything is mid-ingestion. When ingestion moves to a queue this
   // is already the right UI shape — nothing here needs to change.
-  const hasPending = documents.some(
-    (d) => d.status === "uploaded" || d.status === "processing",
-  );
+  const hasPending = documents.some((d) => d.status === "uploaded" || d.status === "processing");
 
   // Quick at first, when a small file is about to finish, then slower: a
   // document stuck in `uploaded` would otherwise be polled every two seconds
@@ -128,64 +129,81 @@ export function DocumentsPanel({
     };
   }, [hasPending, load]);
 
-  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  function markBusy(id: string, busy: boolean) {
+    setBusyIds((current) => {
+      const next = new Set(current);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
 
-    setUploading(true);
-    setUploadError(null);
-
+  async function label(id: string): Promise<boolean> {
+    markBusy(id, true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      if (uploadProjectId) formData.append("projectId", uploadProjectId);
-
-      const response = await fetch("/api/documents", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        setUploadError(data.error ?? "Upload failed");
-        return;
-      }
-
-      await load();
-
-      // Kick off ingestion. The dashboard polls for the outcome, so we don't
-      // block the UI on it — and errors still surface via the document's status.
-      void fetch(`/api/documents/${data.id}/process`, { method: "POST" })
-        .catch(() => undefined)
-        .finally(() => void load());
+      const response = await fetch(`/api/documents/${id}/label`, { method: "POST" });
+      return response.ok;
     } catch {
-      setUploadError("Upload failed. Please try again.");
+      return false;
     } finally {
-      setUploading(false);
-      if (fileInput.current) fileInput.current.value = "";
+      markBusy(id, false);
     }
   }
 
-  /**
-   * Re-runs ingestion for a document that failed. runIngestion clears any
-   * partial chunks before retrying, so this is safe to click repeatedly.
-   */
+  /** Upload → index → label, for one file. Errors are collected, not thrown. */
+  async function uploadOne(file: File): Promise<string | null> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (uploadProjectId) formData.append("projectId", uploadProjectId);
+    try {
+      const response = await fetch("/api/documents", { method: "POST", body: formData });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return t("documents.uploadFailed", { name: file.name, error: data.error ?? response.status });
+      await load();
+      const processed = await fetch(`/api/documents/${data.id}/process`, { method: "POST" });
+      if (processed.ok) await label(data.id);
+      await load();
+      return null;
+    } catch {
+      return t("documents.uploadFailed", { name: file.name, error: t("common.couldNotReach") });
+    }
+  }
+
+  async function uploadAll(files: File[]) {
+    if (files.length === 0) return;
+    setUploadErrors([]);
+    setProgress({ done: 0, total: files.length });
+    const queue = [...files];
+    const errors: string[] = [];
+    let done = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, async () => {
+        for (let file = queue.shift(); file; file = queue.shift()) {
+          const error = await uploadOne(file);
+          if (error) errors.push(error);
+          done += 1;
+          setProgress({ done, total: files.length });
+        }
+      }),
+    );
+    setProgress(null);
+    setUploadErrors(errors);
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
+  /** Re-runs ingestion; runIngestion clears partial chunks, so this is safe to repeat. */
   async function handleRetry(id: string) {
     setLoadError(null);
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.id === id ? { ...d, status: "processing", errorMessage: null } : d,
-      ),
+    setDocuments((previous) =>
+      previous.map((d) => (d.id === id ? { ...d, status: "processing", errorMessage: null } : d)),
     );
-
-    await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(
-      () => undefined,
-    );
+    const processed = await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(() => null);
+    if (processed?.ok) await label(id);
     await load();
   }
 
-  async function assignProject(documentId: string, projectId: string) {
-    setAssigningId(documentId);
+  async function assignProject(documentId: string, projectId: string): Promise<boolean> {
+    markBusy(documentId, true);
     setLoadError(null);
     try {
       const response = await fetch(`/api/documents/${documentId}`, {
@@ -195,8 +213,8 @@ export function DocumentsPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setLoadError(data.error ?? "Could not update the document project.");
-        return;
+        setLoadError(data.error ?? t("documents.moveFailed"));
+        return false;
       }
       setDocuments((previous) =>
         previous.map((document) =>
@@ -205,71 +223,116 @@ export function DocumentsPanel({
                 ...document,
                 projectId: data.document.projectId,
                 project: data.document.project,
+                suggestedProjectId: null,
+                suggestedProject: null,
               }
             : document,
         ),
       );
+      return true;
     } catch {
-      setLoadError("Could not update the document project.");
+      setLoadError(t("documents.moveFailed"));
+      return false;
     } finally {
-      setAssigningId(null);
+      markBusy(documentId, false);
     }
   }
 
-  const visibleDocuments = documents.filter((document) => {
-    if (!matchesQuery(query, [document.originalFilename])) return false;
-    if (projectFilter === "all") return true;
-    if (projectFilter === "unassigned") return document.projectId === null;
-    return document.projectId === projectFilter;
-  });
-
-  async function handleDelete(id: string, filename: string) {
+  async function handleDelete(doc: DocumentRow) {
+    const name = doc.title ?? doc.originalFilename;
     const confirmed = await confirm({
-      title: `Delete “${filename}”?`,
-      body: "This also removes its indexed text, so it will no longer be available as evidence for answers.",
-      confirmLabel: "Delete document",
+      title: t("documents.deleteTitle", { name }),
+      body: t("documents.deleteBody"),
+      confirmLabel: t("documents.delete"),
       tone: "danger",
     });
     if (!confirmed) return;
 
-    const response = await fetch(`/api/documents/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/documents/${doc.id}`, { method: "DELETE" });
     if (response.ok) {
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
-      toast.success(`Deleted “${filename}”`);
+      setDocuments((previous) => previous.filter((d) => d.id !== doc.id));
+      toast.success(t("documents.deleted", { name }));
     } else {
-      setLoadError("Could not delete that document.");
+      setLoadError(t("documents.deleteFailed"));
     }
+  }
+
+  const visibleDocuments = documents.filter((document) => {
+    if (!matchesQuery(query, [document.originalFilename, document.title ?? "", ...document.tags])) {
+      return false;
+    }
+    if (projectFilter === "all") return true;
+    if (projectFilter === "unassigned") return document.projectId === null;
+    return document.projectId === projectFilter;
+  });
+  const withSuggestion = visibleDocuments.filter((doc) => doc.suggestedProjectId);
+  const unlabelled = visibleDocuments.filter((doc) => doc.status === "ready" && !doc.labelledAt);
+
+  async function moveAllSuggested() {
+    setBulk("move");
+    for (const doc of withSuggestion) {
+      if (doc.suggestedProjectId) await assignProject(doc.id, doc.suggestedProjectId);
+    }
+    setBulk(null);
+  }
+
+  async function labelAll() {
+    setBulk("label");
+    for (const doc of unlabelled) {
+      if (!(await label(doc.id))) {
+        toast.error(t("documents.labelFailed", { name: doc.originalFilename }));
+      }
+    }
+    await load();
+    setBulk(null);
   }
 
   return (
     <div className="space-y-4">
-      <Card className="flex flex-wrap items-end justify-between gap-4 p-4">
-        <div>
+      <Card
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          if (!progress) void uploadAll([...event.dataTransfer.files]);
+        }}
+        className={cn(
+          "flex flex-wrap items-end justify-between gap-4 border-dashed p-4 transition-colors",
+          dragging ? "border-slate-900 bg-slate-100" : undefined,
+        )}
+      >
+        <div className="min-w-0">
           <p className="text-sm font-medium">
-            {fixedProject
-              ? `Upload to ${fixedProject.name}`
-              : "Upload a document"}
+            {dragging
+              ? t("documents.dropHere")
+              : fixedProject
+                ? t("documents.uploadTo", { project: fixedProject.name })
+                : t("documents.uploadTitle")}
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
-            {SUPPORTED_EXTENSIONS.join(", ")} · up to 10 MB
+            {t("documents.uploadHint", {
+              types: SUPPORTED_EXTENSIONS.join(", "),
+              size: MAX_UPLOAD_MB,
+            })}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
           {!fixedProject ? (
             <div>
-              <label
-                htmlFor="upload-project"
-                className="mb-1 block text-xs text-slate-500"
-              >
-                Project
+              <label htmlFor="upload-project" className="mb-1 block text-xs text-slate-500">
+                {t("documents.project")}
               </label>
               <Select
                 id="upload-project"
                 value={uploadProjectId}
                 onChange={(event) => setUploadProjectId(event.target.value)}
-                disabled={uploading}
+                disabled={progress !== null}
               >
-                <option value="">Unassigned</option>
+                <option value="">{t("documents.unassigned")}</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
@@ -281,41 +344,41 @@ export function DocumentsPanel({
           <input
             ref={fileInput}
             type="file"
-            id="file-upload"
+            multiple
             className="sr-only"
+            tabIndex={-1}
             accept={SUPPORTED_EXTENSIONS.join(",")}
-            onChange={handleUpload}
-            disabled={uploading}
+            onChange={(event) => void uploadAll([...(event.target.files ?? [])])}
+            disabled={progress !== null}
           />
-          <Button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? (
+          <Button type="button" onClick={() => fileInput.current?.click()} disabled={progress !== null}>
+            {progress ? (
               <>
                 <Spinner className="border-white/40 border-t-white" />
-                Uploading…
+                {t("documents.uploading", progress)}
               </>
             ) : (
-              "Choose file"
+              <>
+                <FileUp className="size-4" aria-hidden />
+                {t("documents.choose")}
+              </>
             )}
           </Button>
         </div>
       </Card>
 
       <SectionHeader
-        title={fixedProject ? "Documents in this project" : "Document library"}
+        title={fixedProject ? t("documents.projectLibraryTitle") : t("documents.libraryTitle")}
         description={
           fixedProject
-            ? "Only these documents are used when asking within this project."
-            : `${documents.length} document${documents.length === 1 ? "" : "s"} across every project.`
+            ? t("documents.projectLibraryLead")
+            : t("documents.libraryLead", { count: documents.length })
         }
       >
         {documents.length > 0 ? (
           <SearchField
-            label="Search documents by filename"
-            placeholder="Search filenames"
+            label={t("documents.quickFilter")}
+            placeholder={t("documents.quickFilterPlaceholder")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="w-full sm:w-56"
@@ -324,15 +387,15 @@ export function DocumentsPanel({
         {!fixedProject ? (
           <div className="flex items-center gap-2">
             <label htmlFor="project-filter" className="text-xs text-slate-500">
-              Filter
+              {t("documents.filterLabel")}
             </label>
             <Select
               id="project-filter"
               value={projectFilter}
               onChange={(event) => setProjectFilter(event.target.value)}
             >
-              <option value="all">All projects</option>
-              <option value="unassigned">Unassigned</option>
+              <option value="all">{t("documents.allProjects")}</option>
+              <option value="unassigned">{t("documents.unassigned")}</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -343,113 +406,150 @@ export function DocumentsPanel({
         ) : null}
       </SectionHeader>
 
-      {uploadError ? <ErrorState message={uploadError} /> : null}
+      {uploadErrors.map((error) => (
+        <ErrorState key={error} message={error} />
+      ))}
       {loadError ? <ErrorState message={loadError} /> : null}
+
+      {withSuggestion.length > 0 || unlabelled.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {withSuggestion.length > 0 && !fixedProject ? (
+            <Button type="button" size="sm" variant="secondary" disabled={bulk !== null} onClick={() => void moveAllSuggested()}>
+              {bulk === "move" ? <Spinner /> : null}
+              {t("documents.moveAllSuggested", { count: withSuggestion.length })}
+            </Button>
+          ) : null}
+          {unlabelled.length > 0 ? (
+            <Button type="button" size="sm" variant="secondary" disabled={bulk !== null} onClick={() => void labelAll()}>
+              {bulk === "label" ? <Spinner /> : <Sparkles className="size-3.5" aria-hidden />}
+              {t("documents.labelAll", { count: unlabelled.length })}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       {documents.length === 0 ? (
         <EmptyState
-          title={fixedProject ? "This project has no documents" : "No documents yet"}
-          description={
-            fixedProject
-              ? "Upload the first document for this project. Questions asked here will use only this project's documents."
-              : "Upload a runbook, incident report, or policy document to start asking questions about it."
-          }
+          title={fixedProject ? t("documents.emptyProjectTitle") : t("documents.emptyTitle")}
+          description={fixedProject ? t("documents.emptyProjectBody") : t("documents.emptyBody")}
           action={
             <Button type="button" onClick={() => fileInput.current?.click()}>
-              Upload your first document
+              {t("documents.uploadFirst")}
             </Button>
           }
         />
       ) : visibleDocuments.length === 0 ? (
         query.trim() ? (
           <EmptyState
-            title="No filenames match"
-            description={`Nothing here is named like “${query.trim()}”.`}
+            title={t("documents.noMatchTitle")}
+            description={t("documents.noMatchBody", { query: query.trim() })}
           />
         ) : (
-          <EmptyState
-            title="No documents in this project"
-            description="Assign an existing document or upload a new one using the selected project."
-          />
+          <EmptyState title={t("documents.noneInProject")} description={t("documents.noneInProjectBody")} />
         )
       ) : (
         <Card className="divide-y divide-slate-100">
-          {visibleDocuments.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/documents/${doc.id}`}
-                  className="block truncate text-sm font-medium hover:underline"
-                >
-                  {doc.originalFilename}
-                </Link>
-                {/* The project is not repeated here: on a project tab every
-                    row would say the same thing, and in the library the
-                    assignment select beside the row already names it. */}
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {formatBytes(doc.sizeBytes)} · {formatDate(doc.createdAt)}
-                  {doc.status === "ready"
-                    ? ` · ${doc.chunkCount} chunks indexed`
-                    : ""}
-                </p>
-                {doc.status === "failed" && doc.errorMessage ? (
-                  <p className="mt-1 text-xs text-red-700">{doc.errorMessage}</p>
-                ) : null}
-              </div>
+          {visibleDocuments.map((doc) => {
+            const busy = busyIds.has(doc.id);
+            const meta = [
+              doc.docType ? t(`documents.docType.${doc.docType}` as MessageKey) : null,
+              doc.title ? doc.originalFilename : null,
+              formatBytes(doc.sizeBytes),
+              formatDay(doc.createdAt, dateLocale),
+              doc.status === "ready" ? t("documents.passages", { count: doc.chunkCount }) : null,
+            ].filter(Boolean);
 
-              {/* Ready is the normal state, so only the exceptions are badged;
-                  the chunk count in the metadata line already says it is
-                  indexed. */}
-              {doc.status !== "ready" ? (
-                <Badge tone={STATUS_TONE[doc.status]}>
-                  {doc.status === "processing" ? (
-                    <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-current" />
+            return (
+              <div key={doc.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/documents/${doc.id}`}
+                    className="block truncate text-sm font-medium hover:underline"
+                  >
+                    {doc.title ?? doc.originalFilename}
+                  </Link>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {meta.join(" · ")}
+                    {doc.tags.length > 0 ? (
+                      <span className="ml-2 text-slate-400">
+                        {doc.tags.slice(0, 4).map((tag) => `#${tag}`).join(" ")}
+                      </span>
+                    ) : null}
+                  </p>
+                  {doc.status === "failed" && doc.errorMessage ? (
+                    <p className="mt-1 text-xs text-red-700">{doc.errorMessage}</p>
                   ) : null}
-                  {STATUS_LABEL[doc.status]}
-                </Badge>
-              ) : null}
+                  {doc.suggestedProjectId && doc.suggestedProject && !fixedProject ? (
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-amber-800">
+                      {t("documents.suggested", { project: doc.suggestedProject.name })}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void assignProject(doc.id, doc.suggestedProjectId!)}
+                        className="font-medium underline underline-offset-2 hover:text-amber-950 disabled:opacity-50"
+                      >
+                        {t("documents.moveToSuggested")}
+                      </button>
+                    </p>
+                  ) : null}
+                </div>
 
-              {doc.status === "failed" ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleRetry(doc.id)}
-                >
-                  Retry
+                {/* Ready is the normal state, so only the exceptions are badged. */}
+                {doc.status !== "ready" ? (
+                  <Badge tone={STATUS_TONE[doc.status]}>
+                    {doc.status === "processing" ? (
+                      <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-current" />
+                    ) : null}
+                    {t(`documents.status.${doc.status}`)}
+                  </Badge>
+                ) : null}
+
+                {doc.status === "failed" ? (
+                  <Button variant="secondary" size="sm" onClick={() => void handleRetry(doc.id)}>
+                    {t("documents.retry")}
+                  </Button>
+                ) : null}
+
+                {doc.status === "ready" && !doc.labelledAt ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (!(await label(doc.id))) {
+                        toast.error(t("documents.labelFailed", { name: doc.originalFilename }));
+                      }
+                      await load();
+                    }}
+                  >
+                    {busy ? <Spinner /> : <Sparkles className="size-3.5" aria-hidden />}
+                    {busy ? t("documents.labelling") : t("documents.label")}
+                  </Button>
+                ) : null}
+
+                {!fixedProject ? (
+                  <Select
+                    aria-label={t("documents.projectFor", { name: doc.originalFilename })}
+                    value={doc.projectId ?? ""}
+                    onChange={(event) => void assignProject(doc.id, event.target.value)}
+                    disabled={busy}
+                    className="h-8 max-w-44 text-xs"
+                  >
+                    <option value="">{t("documents.unassigned")}</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </Select>
+                ) : null}
+
+                <Button variant="ghost" size="sm" onClick={() => void handleDelete(doc)}>
+                  {t("documents.delete")}
                 </Button>
-              ) : null}
-
-              {!fixedProject ? (
-                <Select
-                  aria-label={`Project for ${doc.originalFilename}`}
-                  value={doc.projectId ?? ""}
-                  onChange={(event) =>
-                    void assignProject(doc.id, event.target.value)
-                  }
-                  disabled={assigningId === doc.id}
-                  className="h-8 max-w-44 text-xs"
-                >
-                  <option value="">Unassigned</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </Select>
-              ) : null}
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDelete(doc.id, doc.originalFilename)}
-              >
-                Delete
-              </Button>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </Card>
       )}
     </div>

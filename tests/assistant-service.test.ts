@@ -1,0 +1,221 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * The assistant's loop against a scripted fake model. What is under test is
+ * the fence: a step cap and a time limit after which the model must answer,
+ * malformed output that ends in an honest fallback, private threads, and a
+ * prompt without database ids.
+ */
+
+const tx = {
+  assistantMessage: { create: vi.fn() },
+  assistantProposal: { createMany: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
+  assistantThread: { update: vi.fn() },
+};
+const mockPrisma = {
+  assistantThread: { findFirst: vi.fn(), create: vi.fn() },
+  assistantMessage: { findMany: vi.fn(), create: vi.fn() },
+  assistantProposal: { findFirst: vi.fn() },
+  project: { findMany: vi.fn() },
+  emailDraft: { findMany: vi.fn() },
+  $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+};
+vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/auth-guard", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth-guard")>()),
+  getUserPreferences: vi.fn(async () => ({ locale: "en", timeZone: "Asia/Hong_Kong" })),
+}));
+const mockRunTool = vi.fn();
+vi.mock("@/lib/assistant/tools", () => ({ runTool: mockRunTool }));
+const mockApplyChange = vi.fn();
+vi.mock("@/lib/capture/apply-change", () => ({ applyChange: mockApplyChange }));
+
+const service = await import("@/lib/assistant/service");
+const { MAX_TOOL_STEPS } = await import("@/lib/assistant/protocol");
+
+const access = {
+  workspaceId: "ws-1",
+  workspaceName: "Ops",
+  userId: "u-1",
+  role: "member" as const,
+  user: { id: "u-1", email: "rick@example.com", name: "Rick" },
+};
+const NOW = new Date("2026-10-16T02:00:00Z");
+
+/** A fake model that replays `replies` and records each prompt as it was sent. */
+function scriptedChat(...replies: string[]) {
+  const seen: { role: string; content: string }[][] = [];
+  const complete = vi.fn(async (messages: { role: string; content: string }[]) => {
+    seen.push(messages.map((message) => ({ ...message })));
+    return replies.shift() ?? replies.at(-1) ?? "";
+  });
+  return { modelName: "fake", complete, seen };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockPrisma.assistantThread.create.mockResolvedValue({ id: "thread-1" });
+  mockPrisma.assistantMessage.findMany.mockResolvedValue([]);
+  mockPrisma.project.findMany.mockResolvedValue([{ id: "project-secret", name: "Sales", personalOwnerId: null }]);
+  mockPrisma.emailDraft.findMany.mockResolvedValue([]);
+  tx.assistantMessage.create.mockImplementation(async ({ data }) => ({ id: "msg-1", ...data }));
+  mockRunTool.mockImplementation(async (_tool, _input, ctx) => {
+    const source = ctx.registry.add("T", "task:task-secret", (label: string) => ({
+      label,
+      kind: "task",
+      taskId: "task-secret",
+      projectId: "project-secret",
+      title: "Send quote",
+      category: "open",
+      dueDate: "2026-10-20",
+      priority: "high",
+      facts: "Send quote | due 2026-10-20",
+    }));
+    return { text: `${source.label}: Send quote | due 2026-10-20`, summary: "1" };
+  });
+});
+
+describe("runAssistantTurn", () => {
+  it("looks something up, then answers with what it found", async () => {
+    const chat = scriptedChat(
+      '{"action":"list_my_tasks","input":{"filter":"week"}}',
+      '{"action":"answer","answer":"Send the quote by 20 Oct [T1].","citations":["T1"],"general":false,"proposals":[]}',
+    );
+
+    await service.runAssistantTurn(access, { question: "What is due this week?" }, { chat, now: NOW });
+
+    expect(mockRunTool).toHaveBeenCalledTimes(1);
+    const saved = tx.assistantMessage.create.mock.calls[0][0].data;
+    expect(saved).toMatchObject({ role: "assistant", content: "Send the quote by 20 Oct [T1].", general: false });
+    expect(saved.sources).toEqual([
+      { label: "T1", kind: "task", taskId: "task-secret", projectId: "project-secret", title: "Send quote" },
+    ]);
+    expect(saved.steps).toEqual([{ tool: "list_my_tasks", input: "week", summary: "1" }]);
+  });
+
+  it("never sends a database id to the model", async () => {
+    const chat = scriptedChat(
+      '{"action":"list_my_tasks","input":{"filter":"open"}}',
+      '{"action":"answer","answer":"Done [T1]","citations":["T1"]}',
+    );
+    await service.runAssistantTurn(access, { question: "What's open?" }, { chat, now: NOW });
+
+    const everything = JSON.stringify(chat.seen);
+    expect(everything).not.toContain("task-secret");
+    expect(everything).not.toContain("project-secret");
+    expect(everything).toContain("P1: Sales");
+  });
+
+  it("stops after the step cap and makes the model answer", async () => {
+    const chat = scriptedChat(
+      ...Array.from({ length: MAX_TOOL_STEPS + 3 }, () => '{"action":"list_my_tasks","input":{"filter":"open"}}'),
+    );
+    await service.runAssistantTurn(access, { question: "loop forever" }, { chat, now: NOW });
+
+    expect(mockRunTool).toHaveBeenCalledTimes(MAX_TOOL_STEPS);
+    expect(chat.complete).toHaveBeenCalledTimes(MAX_TOOL_STEPS + 1);
+    expect(chat.seen.at(-1)!.at(-1)!.content).toContain("No more tools");
+    // It never answered, so the stored reply is the honest fallback.
+    expect(tx.assistantMessage.create.mock.calls[0][0].data).toMatchObject({ general: true });
+  });
+
+  it("makes the model answer once the time limit has passed", async () => {
+    let now = 0;
+    const clock = () => now;
+    const chat = scriptedChat(
+      '{"action":"list_my_tasks","input":{"filter":"open"}}',
+      '{"action":"answer","answer":"Here is what I found [T1].","citations":["T1"]}',
+    );
+    mockRunTool.mockImplementationOnce(async (_t, _i, ctx) => {
+      now = 45_000;
+      ctx.registry.add("T", "task:x", (label: string) => ({ label, kind: "task", taskId: "x", projectId: "p", title: "x", category: "open", dueDate: null, priority: "low", facts: "x" }));
+      return { text: "T1: x", summary: "1" };
+    });
+
+    await service.runAssistantTurn(access, { question: "slow" }, { chat, now: NOW, clock });
+
+    expect(chat.seen[1].at(-1)!.content).toContain("No more tools");
+    expect(mockRunTool).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back honestly after two malformed replies", async () => {
+    const chat = scriptedChat("not json", "still not json");
+    await service.runAssistantTurn(access, { question: "?" }, { chat, now: NOW });
+    expect(chat.complete).toHaveBeenCalledTimes(2);
+    expect(tx.assistantMessage.create.mock.calls[0][0].data.content).toContain("could not finish");
+  });
+
+  it("refuses to continue someone else's conversation", async () => {
+    mockPrisma.assistantThread.findFirst.mockResolvedValue(null);
+    await expect(
+      service.runAssistantTurn(access, { threadId: "thread-other", question: "hi" }, { chat: scriptedChat("{}"), now: NOW }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(mockPrisma.assistantThread.findFirst.mock.calls[0][0].where).toEqual({
+      id: "thread-other",
+      workspaceId: "ws-1",
+      userId: "u-1",
+    });
+  });
+
+  it("stores proposals that clear the capture validator, and drops the rest", async () => {
+    const chat = scriptedChat(
+      JSON.stringify({
+        action: "answer",
+        answer: "I suggest a task.",
+        citations: [],
+        proposals: [
+          { kind: "create_task", title: "Send quote", description: null, project: "P1", priority: null, due: null, estimatedHours: null, citations: ["U1"] },
+          { kind: "create_task", title: "Uncited", description: null, project: null, priority: null, due: null, estimatedHours: null, citations: [] },
+        ],
+      }),
+    );
+    await service.runAssistantTurn(access, { question: "Add a task to send the quote" }, { chat, now: NOW });
+
+    const rows = tx.assistantProposal.createMany.mock.calls[0][0].data;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "create_task", userId: "u-1", messageId: "msg-1" });
+    expect(rows[0].payload.projectId).toBe("project-secret");
+  });
+});
+
+describe("applyAssistantProposals", () => {
+  it("applies through the shared write path, claiming the caller's own pending proposal", async () => {
+    mockPrisma.assistantProposal.findFirst.mockResolvedValue({
+      id: "prop-1",
+      kind: "create_task",
+      state: "pending",
+      payload: { title: "Send quote" },
+      taskId: null,
+    });
+    mockApplyChange.mockImplementation(async (_access, _change, _overrides, hooks) => {
+      tx.assistantProposal.updateMany.mockResolvedValue({ count: 1 });
+      expect(await hooks.claim(tx)).toBe(true);
+      return { ok: true, taskId: "task-new", commentId: null };
+    });
+
+    const [result] = await service.applyAssistantProposals(access, "msg-1", [{ proposalId: "prop-1" }], NOW);
+
+    expect(result).toEqual({ proposalId: "prop-1", ok: true, taskId: "task-new", commentId: null });
+    expect(mockPrisma.assistantProposal.findFirst.mock.calls[0][0].where).toEqual({
+      id: "prop-1",
+      messageId: "msg-1",
+      workspaceId: "ws-1",
+      userId: "u-1",
+    });
+    expect(tx.assistantProposal.updateMany.mock.calls[0][0].where).toEqual({
+      id: "prop-1",
+      workspaceId: "ws-1",
+      userId: "u-1",
+      state: "pending",
+    });
+  });
+
+  it("refuses a proposal already decided", async () => {
+    mockPrisma.assistantProposal.findFirst.mockResolvedValue({ id: "prop-1", kind: "add_note", state: "applied", payload: {}, taskId: "t" });
+    const [result] = await service.applyAssistantProposals(access, "msg-1", [{ proposalId: "prop-1" }], NOW);
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    expect(mockApplyChange).not.toHaveBeenCalled();
+  });
+});

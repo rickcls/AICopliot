@@ -4,6 +4,7 @@ import type {
   ChatMessageInput,
   ChatProvider,
   EmbeddingProvider,
+  TranscriptionProvider,
 } from "./types";
 import { ProviderError } from "./types";
 
@@ -156,5 +157,45 @@ export class OpenRouterChatProvider implements ChatProvider {
       );
     }
     return content;
+  }
+}
+
+/**
+ * Transcription through an audio-capable chat model: OpenRouter takes audio as
+ * an `input_audio` content part, base64-encoded (no URLs). The formats it
+ * documents are wav, mp3, aiff, aac, ogg, flac, m4a, pcm16, and pcm24 — not
+ * webm, which is why the browser converts a recording to WAV first.
+ */
+export class OpenRouterTranscriptionProvider implements TranscriptionProvider {
+  readonly modelName: string;
+
+  constructor(private readonly config: OpenRouterConfig) {
+    this.modelName = config.model;
+  }
+
+  async transcribe(audio: Buffer, format: "wav", instructions: string): Promise<string> {
+    const json = await postJson<ChatResponse>(
+      `${this.config.baseUrl}/chat/completions`,
+      this.config.apiKey,
+      {
+        model: this.config.model,
+        temperature: 0,
+        max_tokens: 2000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: instructions },
+              { type: "input_audio", input_audio: { data: audio.toString("base64"), format } },
+            ],
+          },
+        ],
+      },
+    );
+    const content = json.choices?.[0]?.message?.content;
+    if (typeof content !== "string") {
+      throw new ProviderError("Transcription returned no text");
+    }
+    return content.trim();
   }
 }

@@ -4,29 +4,41 @@ Guidance for working in this repository.
 
 ## What this project is
 
-**ScopePilot — AI Requirements-to-Delivery Copilot** — for project managers and
-business analysts (consultants and small teams) who turn client documents into
-agreed scope. **The core product is requirements discovery:** upload client
-documents → extract cited draft requirements → review them → take open questions
-back to the client → agree → hand over a sign-off document. Grounded Q&A over
-the documents supports every step.
+**ScopePilot — AI work assistant** for one person or a small team (Hong Kong
+first: the UI defaults to Traditional Chinese). It turns the raw material of a
+working week — documents, notes, and later emails and voice memos — into cited
+tasks, a clear view of what needs you today, and answers grounded in your own
+files. **Home is `/today`:** the viewer's open tasks across every project,
+bucketed by the viewer's own calendar day. The roadmap (captures, check-ins,
+day plans, document labelling, task approaches, email drafts in the user's tone,
+read-only Gmail) is in `PLANNING.md`.
 
-**Delivery is an optional layer, off by default per project**
-(`Project.deliveryEnabled`): tasks, timeline, risks, AI draft plans, and weekly
-reports. It exists for teams who run delivery here; everyone else exports the
-agreed requirements to the tool they already use. **Do not grow the delivery
-layer into a Jira/Asana competitor** — new work should make the discovery loop
-better, and anything that is not part of it belongs behind the switch.
+**A project holds work and files; two layers are optional per project.** Every
+project has Overview, Tasks, and Documents. **Requirements discovery**
+(`Project.discoveryEnabled`) — extract cited requirements, review, take
+questions to the client, sign off — is for projects that start from a client
+brief. **Delivery tools** (`Project.deliveryEnabled`) — timeline, risks, AI
+draft plans, weekly reports — are for projects tracked in depth. Both are off for
+new projects. Do not grow either into a Jira/Asana competitor: new work should
+make the assistant loop (capture → review → act → check in) better.
 
-**`deliveryEnabled` gates navigation, never data or security.** It decides which
-tabs show and which delivery widgets render. Hidden routes still resolve (with a
-notice and a way to turn the tools on), still enforce workspace scoping, and
-project chat still grounds on official records whatever the switch says.
+**Both switches gate navigation, never data or security.** They decide which
+tabs show and which widgets render. Hidden routes still resolve (with a notice
+and a way to turn the layer on), still enforce workspace scoping, and project
+chat still grounds on official records whatever the switches say.
 
-**This is a RAG workflow, not an autonomous agent.** Do not add multi-agent
-orchestration, autonomous loops, external tool calling, ServiceNow (or similar)
-integrations, or anything that modifies external systems. Every LLM call is a
-single request/response inside a user-initiated action.
+**A RAG workflow with one supervised agent — never an autonomous one.** Every
+model call happens inside a request a person started, and the model only ever
+proposes — a person's click is what writes. The single exception to "one call
+per action" is the Assistant (`/assistant`, invariant 24): inside one request
+it may take up to five read-only tool steps before answering, and it is fenced
+by a step cap, a time limit, read-only tools, and the same proposal path as
+everything else. Do not add multi-agent orchestration, background jobs, loops
+that outlive a request, or tools that write. External systems are read-only
+and read only when the user asks (Gmail is listed when "Check Gmail" is
+pressed, never on a schedule). The app never sends email and never writes to
+another system: email drafts leave through copy, `mailto:`, or a compose link
+the user opens.
 
 ## Stack
 
@@ -76,11 +88,16 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    labelled `S1..Sn` in the prompt; **real database IDs are never sent to the
    model.** Returned IDs are resolved through a server-side map and dropped if
    absent. An answer left with zero valid citations is downgraded to a refusal.
+   Every prompt follows the same rule with its own label family — capture lines
+   are `C`, a capture's candidate tasks `T` and projects `P`.
 
 4. **Refuse before spending a model call.** A chunk must either clear the
    semantic `RAG_MIN_SCORE` or match the PostgreSQL full-text query. If neither
    retrieval path supplies evidence, `answerQuestion` returns the refusal
-   without invoking the chat provider.
+   without invoking the chat provider. A capture is not a question: its
+   evidence is the person's own note, which is always present, so there is no
+   retrieval gate — but every proposal must still cite a `C` line or it is
+   dropped.
 
 5. **Secrets stay server-side.** Everything touching the DB or a provider
    imports `server-only`. No `NEXT_PUBLIC_` variable exists, and none should.
@@ -165,6 +182,109 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    reads that omit the official predicate, and `PATCH /api/requirements/[id]` is
    the only item route that resolves rows without it. Every operational read
    still uses `baselinedRequirementWhere()`.
+
+15. **"Today" is the viewer's local day, and it is a date anchor, not an
+   instant.** Date-only values stay at UTC midnight and every rule in `rules.ts`
+   still compares at UTC-day granularity. What the rules receive is
+   `getViewerToday()` (`src/lib/viewer.ts`) — UTC midnight of the viewer's local
+   date from `localToday(User.timeZone, now)` in `src/lib/time.ts`. Every page
+   that decides overdue / due today / due soon passes it (Today, dashboard,
+   Overview, the board's `nowIso`, the timeline), so the pages cannot disagree
+   between 00:00 and 08:00 in Hong Kong. Never pass it where an instant belongs —
+   `completedAt`, `reviewedAt`, report windows, chat snapshots' `observedAt`.
+
+16. **UI language is a preference; Chinese is Traditional only.** `User.locale`
+   (`zh-Hant` default, `en`) is read by `getLocale()` in `src/lib/i18n/server.ts`
+   (user row → `locale` cookie → Accept-Language, where every `zh*` maps to
+   `zh-Hant`). Copy lives in `src/lib/i18n/dictionaries/`; `en.ts` defines the
+   keys and `zh-Hant.ts` must `satisfies Dictionary`, so a missing key fails the
+   type-check, and `tests/i18n-dictionaries.test.ts` fails on any Simplified
+   character (`containsSimplified` in `src/lib/language.ts`). Model output
+   follows the *input's* language by a deterministic `detectReplyLanguage()` —
+   Hong Kong code-mixing counts as Chinese — never by asking the model to match.
+
+17. **A personal project is hidden, not private.** `Project.personalOwnerId`
+   marks each person's own project (one per person per workspace, by
+   `@@unique([workspaceId, personalOwnerId])`). `visibleProjectWhere(workspaceId,
+   viewerId)` in `src/lib/pm/visibility.ts` keeps colleagues' personal projects
+   out of *navigation and lists* — the sidebar, Projects, the chat and document
+   pickers, the dashboard — and nothing else. Their tasks and documents still
+   resolve by id for any member and still ground workspace chat, because the
+   workspace is the security boundary (invariant 1). Content that must be
+   private belongs in a per-user table read with `(id, workspaceId, userId)`.
+   The visibility filter carries an `OR`, so it is combined with `AND`, never
+   spread (`inVisibleProjects`).
+
+18. **An invite link is a bearer token, stored only as a hash.** Tokens are 32
+   random bytes, returned once by `POST /api/workspace/invites`, and kept as
+   `sha256` in `WorkspaceInvite.tokenHash`; every lookup is by hash. Accepting
+   claims the invite with a conditional `updateMany` in the same transaction as
+   the membership insert, so a link admits exactly one person. The page that
+   accepts (`/invite/[token]`) lives outside `(app)`, whose layout would
+   otherwise provision a workspace for the invitee before they join; accepting
+   is a POST, never a side effect of opening the link.
+
+19. **A capture is private, and its proposals are never silent writes.**
+   `Capture` and `CaptureProposal` are read and written only with
+   `(id, workspaceId, userId)` — a colleague's id matches nothing. The note is
+   stored before the model is called and kept if it fails. Applying a proposal
+   is an ordinary manual write through `src/lib/pm/task-write.ts` — the same
+   functions the task routes call — and the proposal is claimed
+   (`pending → applied`, conditional `updateMany`) in the **same transaction**
+   as that write, so a double click creates one task. A task applied from a
+   capture is a manual record assigned to the person; its provenance is
+   `CaptureProposal.appliedTaskId`, not `source = ai_suggested`.
+
+20. **Code resolves dates; the model only quotes them.** The model returns
+   `{ phrase, date }`. `validateCaptureProposals` keeps the date only if the
+   phrase appears in the cited lines (or their neighbours) and
+   `resolveDateExpression(phrase, Capture.localDate)` in
+   `src/lib/capture/dates.ts` can read it; the computed date wins, and a
+   disagreement with the model's adds a `date_check` flag shown before Apply.
+   Vague timing ("下星期", "遲啲", "ASAP") is null, never a guess.
+
+21. **Traditional characters are enforced after validation, on generated prose
+   only.** `toTraditional()` (`src/lib/language-convert.ts`, OpenCC `cn → hk`)
+   runs on titles, descriptions, and notes the model wrote, after every check
+   that compares against the source. Quoted lines and excerpts are never
+   converted — they must stay the source's own characters.
+
+22. **General knowledge is labelled, never blended — and only one feature may
+   use it.** "How to tackle it" on a task (`src/lib/approach/`) is the single
+   place the model is asked even when retrieval finds no evidence, because a
+   person stuck on a task wants practical steps their files may not contain.
+   `validateApproach()` decides each step's basis from its citations alone: a
+   step is `document` only if it cites a passage the model was actually given,
+   and everything else is `general` — stored and shown with an explicit "AI
+   suggestion (not from your files)" marker and no source chip, and prefixed
+   with that marker when copied into a description or a new task. Every other
+   answering feature keeps invariant 4.
+
+23. **Outside accounts are read-only, read on request, and their secrets stay
+   sealed.** Gmail uses one scope, `gmail.readonly`, through an OAuth code flow
+   with state and PKCE in short-lived httpOnly cookies. Only the refresh token
+   is kept, AES-256-GCM-encrypted with `INTEGRATION_ENCRYPTION_KEY`
+   (`src/lib/crypto/secretbox.ts`); access tokens are fetched per request and
+   never stored or sent to the browser. Mail is listed only when the person
+   presses "Check Gmail" — no cron, no background sync — and only an email they
+   pick is read in full, becoming a private capture (`externalId:
+   gmail:{id}`, once per person). Email text is someone else's words: it
+   reaches the model only as capture lines marked as data, and nothing it says
+   is applied without a click. The app never sends mail or writes to Gmail.
+
+24. **The assistant is a fenced loop inside one request.** `runAssistantTurn`
+   (`src/lib/assistant/service.ts`) lets the model choose tools step by step,
+   and that is all it may do: at most `MAX_TOOL_STEPS` (5) tools, then — or
+   once `DEADLINE_MS` (40 s) has passed — it is told to answer and gets no
+   more tools. Its tools only read inside the workspace (notes: the caller's
+   own) or save a private email draft; none writes a task, sends, or calls
+   out. Every source a tool returns gets an opaque label (S, T, N, D, P; U1 is
+   the question) through `SourceRegistry`; `finalizeAnswer` strips labels the
+   run never issued and marks an answer `general` when it cites no source,
+   whatever the model claimed. Changes it suggests go through
+   `validateCaptureProposals` (citations, server-resolved dates) and are
+   applied only by Apply, through `applyChange` and a claim on
+   `AssistantProposal`. History carries wording only, with labels stripped.
 
 ## ⚠️ Prisma drops the pgvector index on every migration
 
@@ -252,7 +372,9 @@ reports export `maxDuration = 60`, the Hobby ceiling. A large PDF needs a
 higher limit on Pro. The upload screen already polls and can retry a document
 left `failed`.
 
-Signed-in `/` redirects to `/dashboard`. It opens on the **discovery inbox** —
+Signed-in `/` redirects to `/today` (see "Personal work notes" below). The
+workspace-wide summary lives at `/dashboard`, titled **Workspace overview** and
+reached from the Projects page rather than the sidebar. It opens on the **discovery inbox** —
 requirements to review and questions for clients, per project — and renders its
 delivery half only when some project has delivery tools on, listing only those
 projects. The delivery half lists overdue, due-within-7-days
@@ -505,12 +627,263 @@ scale, and both levels stay named in the chip and again in the expansion.
 Wherever colour replaces a word, the word goes to `sr-only` — see the flag on
 `task-card.tsx`.
 
+## Personal work notes
+
+`/today` (`src/app/(app)/today/page.tsx`) answers one question — what needs me
+now — across every project. `getMyOpenTasks()` in `src/lib/pm/my-work.ts` reads
+the viewer's open official tasks through `assignedTo()` from `rules.ts`, and the
+pure `bucketMyTasks()` in `src/lib/pm/today.ts` puts each in exactly one bucket,
+earliest rule first: overdue, due today, blocked, due in 7 days, later. A
+blocked task due today is "due today" — the deadline is the fact that needs
+attention — and the row still says it is blocked. Empty buckets are not drawn.
+
+**Work that has gone quiet asks for a check-in.** `isStale()` in `rules.ts`
+is the only definition: open, and no task write or comment by anyone for
+`STALE_DAYS` (5) days, unless the viewer snoozed it through today.
+`getMyOpenTasks` carries the newest comment and the viewer's own snooze so the
+rule runs on loaded rows. A quiet task is badged where it already appears and
+listed under "Needs an update" only if no other bucket shows it. Each Today
+row's Update strip posts to `POST /api/tasks/[id]/check-in`
+(`src/lib/today/check-in.ts`): done and blocked move the task by category
+through `task-write`; "still working" moves a blocked task back to an open
+column, or on an open task only sets `Task.checkedInAt` — which moves
+`updatedAt` and so clears the reminder; a note becomes the person's comment in
+the same transaction. **Snooze is a separate `TaskSnooze` row, never a task
+write**, because writing to the task would make it look worked on.
+
+**The day plan is a suggestion that changes nothing.** `POST /api/today/plan`
+ranks the viewer's open tasks with the pure `rankTasks()` (deadlines first,
+priority within, blocked sinks, quiet rises a little), sends the top 40 as `T`
+labels with relative due facts, and `validateDayPlan()` keeps known labels
+once each, uses the person's own estimate over the model's, clamps blocks, and
+cuts from the end at the first block that would overrun the hours given. It is
+stored per person per local day (`DailyPlan`, re-planning replaces it) and read
+back joined with each task's live status, so a finished task is ticked without
+the plan remembering anything.
+
+**"Mine" depends on the workspace.** In a workspace of one, every task is that
+person's, set assignee or not (`isSoloWorkspace`), so unassigned tasks are
+included. With colleagues, only tasks assigned to the viewer count.
+`assignedTo(userId, where, { includeUnassigned })` widens with an `AND` of the
+whole filter, never a spread, because the official-record `OR` and the
+"me-or-nobody" `OR` would otherwise overwrite each other.
+
+`/settings` holds per-person preferences (language, time zone) and saves each
+control as it changes through `PATCH /api/me/preferences`, which writes only the
+session user's row and mirrors the language into a cookie for signed-out pages.
+`getUserPreferences()` rides on the same cached user lookup `getSessionUser()`
+already makes, so pages pay no extra query for it.
+
+**i18n is being applied page by page.** The shell, Today, Settings, the project
+tabs and layout, the error pages, and the landing page read `t()`; older panels
+still render English until they are migrated. New UI must use the dictionaries
+from the start. Seeded task-column labels are data and are translated only when
+untouched (`displayStatusLabel`); a renamed column is shown as typed. Date-only
+values are formatted with `formatDay(value, intlLocale(locale))` so the server
+and the browser cannot pick different formats.
+
+## Capture notes
+
+`/capture` and the box at the top of `/today` are where a person tells the
+assistant something — typed, pasted, dictated, or from a file. One model call
+(plus the usual single repair) turns it into proposals of three kinds:
+`create_task`, `update_task` (status by category, due date, priority), and
+`add_note` (a progress note written as a `TaskComment` by the person).
+
+- **The pipeline is `src/lib/capture/`:** `lines.ts` splits the note into `C`
+  lines (per newline and sentence, hard-splitting long unpunctuated dictation);
+  `context.ts` loads the person's open tasks as `T` candidates
+  (`rankTaskCandidates` — shared words first, Chinese by character pairs) and
+  visible projects as `P`; `prompt.ts` (`capture-v1`); `schemas.ts` parses each
+  proposal separately so one bad item costs only itself; `validate.ts` is the
+  deterministic gate; `service.ts` stores, calls, validates, and applies.
+- **Updates must change something.** A status the task already has, or its
+  current due date, is dropped as a no-op rather than offered as an Apply that
+  does nothing. A new task matching an open title is *flagged*
+  `possible_duplicate`, never dropped.
+- **Status goes by category, never by label.** `pickStatusForCategory()` picks
+  the first column of that category in board order, preferring the seeded
+  `in_progress` for "still going". A project with no blocked column refuses
+  the update with a message instead of inventing one.
+- **New tasks land in the personal project** unless the person (or a
+  confident `P` label) names another, and are assigned to the person applying.
+  "Apply all" skips flagged proposals; each item applies in its own
+  transaction so one refusal does not undo the rest.
+- **Files:** `.txt`/`.md` are read in the browser into the box. PDF and Word go
+  through the ordinary upload route into the personal project, are indexed,
+  and are captured from `Document.extractedText` (first 12,000 characters); a
+  task applied into the same project links the document.
+- **Dictation is the browser's Web Speech API** — no server of ours, but the
+  browser sends audio to its vendor, and the button says so. Language tags
+  differ by browser (`yue-Hant-HK` in Chrome, `zh-HK` in Safari), so each
+  language lists fallbacks tried on `language-not-supported`.
+- **The capture is never evidence** unless the person chooses to keep it:
+  "Save as document" (`saveCaptureAsDocument`) writes the note as a Markdown
+  document into their personal project through `storeDocument` and indexes it.
+  That is the one deliberate path from private to workspace-visible, and the
+  confirmation says so; the capture records the document so it is saved once.
+
+## Document filing notes
+
+**Every file becomes a Document through `storeDocument()`**
+(`src/lib/documents/store.ts`): three-way validation, the row first, then the
+bytes under `{workspaceId}/{documentId}.{ext}`, and the row removed if storage
+fails. The upload route and "save a capture as a document" both call it.
+
+**Labels are written after indexing, in their own request.** The panel
+uploads up to two files at a time, then calls `/process`, then
+`POST /api/documents/[id]/label` (`label-service.ts`), so indexing keeps its
+60-second budget. Labelling reads up to 12 passages as `S` labels and the
+viewer's visible projects as `P` labels. `validateDocumentLabel()` keeps a
+summary only if it cites a real passage, files an unknown type as `other`,
+cleans and caps tags at six, and suggests a project only when it differs from
+where the document is. **A person's edit wins:** `PATCH /api/documents/[id]`
+with a title, type, or tags sets `labelSource = "manual"`, after which an AI
+pass refreshes only the summary and suggestion. Moving a document anywhere
+clears its suggestion.
+
+**Search is not grounding.** `searchDocuments()` combines `ILIKE` over every
+indexed passage and the labels — which works for Chinese, because a phrase
+either appears or it does not — with the chat's hybrid retrieval held to the
+same `hasGroundingEvidence` bar, and quietly drops the meaning half if
+embeddings are unavailable. Results are links to read, never model input, so
+the lexical grounding path (and its `english` configuration) is unchanged.
+`/documents?q=` is a GET form, so a search is a link.
+
+**Citations open the passage.** Passages carry `id="chunk-{id}"`, and
+`/documents/[id]/chunks?chunk={id}` opens the page holding that passage and
+outlines it. Chat source cards and search results link there. A ready
+document's page offers "Ask about this document" (`/chat?docs={id}`).
+
+## Assistant notes
+
+`/assistant` is the agent; `/chat` ("Ask documents") stays the strictly
+grounded, scope-pinned Q&A. Both are in the sidebar under those names.
+
+- **The protocol is JSON steps, not native tool calling.** Each model reply is
+  one object — `{"action":"<tool>","input":{…}}` or `{"action":"answer",…}` —
+  parsed by `parseStep`. Any model with a JSON mode can run it, and tests
+  drive the loop with a scripted fake. An unknown tool is reported back, not
+  run; two malformed replies end the turn with an honest fallback answer.
+- **Tools** (`tools.ts`): `search_documents` (the chat's hybrid retrieval at
+  the same evidence bar, falling back to a literal match without
+  embeddings), `list_my_tasks` (Today's buckets, staleness, and ranking),
+  `get_task` (description, recent notes, linked documents — by label only),
+  `search_notes` (the caller's own captures), and `draft_email` (saves a
+  private draft through the email service; never sends). Bad input returns
+  text the model can correct.
+- **What a turn stores:** the answer, the public form of each cited source
+  (enough to link — passage, task, note, draft, project), the tool trace shown
+  as "What it looked up", the general flag, draft ids, and proposals.
+- **Proposals render through `ProposalList`** (`components/capture/
+  proposal-list.tsx`), shared with captures; only the apply and decide
+  endpoints differ. Applying both kinds goes through
+  `src/lib/capture/apply-change.ts`, which takes the claim as a hook.
+- A turn is one request (`maxDuration` 60), so the page waits for the answer
+  rather than streaming steps. Threads are private, like chat threads.
+
+## Gmail and voice notes
+
+**Gmail** (`src/lib/gmail/`) is offered only when `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, and a 32-byte `INTEGRATION_ENCRYPTION_KEY` are all set;
+otherwise the panel simply does not render. `APP_URL` fixes the redirect URI
+(`/api/integrations/google/callback`), which must match the one registered
+with Google. When Google answers a refresh with `invalid_grant` — a revoked
+grant, or the seven-day expiry of an app still in Testing — the account is
+marked `needsReconnect` and the page asks for a reconnect instead of failing
+on every press. `listRecentMail` reads headers only (`format=metadata`) for
+the last three days of inbox mail outside Promotions and Social; `captureEmail`
+reads one message (`format=full`), keeps plain text over HTML, cuts the quoted
+history (`stripQuotedReply`), and hands it to `createCapture` with a `SOURCE`
+line telling the model these are a received email's words. An email capture
+links to `/email?capture={id}`, which opens a reply with that email as the
+incoming text.
+
+**Voice memos** are recorded in the browser, decoded and resampled to 16 kHz
+mono, and encoded as WAV (`src/lib/audio/wav.ts`) because OpenRouter's
+`input_audio` does not accept the browser's webm. Each ≤55-second segment is
+its own `POST /api/transcribe` (WAV bytes checked, ≤3 MB), well under Vercel's
+body and time limits. `TranscriptionProvider` is a separate interface so the
+text `ChatProvider` contract stays a plain string; it uses
+`OPENROUTER_TRANSCRIBE_MODEL` (default `google/gemini-2.5-flash`, the model
+OpenRouter's audio docs use). Audio is never stored; Chinese transcripts pass
+through `toTraditional`, and the text lands in the capture box for the person
+to read before anything is proposed from it. Live dictation (Web Speech) and
+recorded memos share one language picker.
+
+## Email draft notes
+
+`/email` drafts emails in the person's own voice; **nothing is ever sent.** A
+draft leaves only by Copy, Gmail's compose window (`gmailComposeUrl`, which
+fills `view=cm` and waits for the person), or `mailto:` — all in
+`src/lib/email/links.ts`, and a name is never put in "to" unless it is an
+address.
+
+- **Tone is per person, across workspaces.** `WritingStyle` (unique on
+  `userId`) holds up to ten of their own emails, a signature, and a tone
+  description derived from the samples by one call (`deriveStyleProfile`, at
+  least two samples) and editable by them. Drafts use up to three samples *in
+  the target language* as examples.
+- **Facts come only from what the person gave.** The prompt says so, and
+  `findUnsupportedFacts()` (`src/lib/email/facts.ts`, pure) checks: every
+  date, time, weekday, amount, percentage, two-digit-plus number, address,
+  and link in the draft must appear in the key points, the email being
+  answered, the recipient, the task's own facts, or the signature — otherwise
+  it is flagged above the draft. The example emails are deliberately *not*
+  in that list: they shape tone, never facts. Bracketed placeholders are
+  flagged as "fill in". The draft text is never altered by the check.
+- **Task facts** come from the official task (workspace-scoped) and its three
+  newest comments — this is the person's own outgoing message, not a cited
+  answer, so comments are fair context here.
+- **Model:** `getWritingProvider()` uses `OPENROUTER_WRITING_MODEL` when set,
+  otherwise the chat model, so tone can get a stronger model without moving
+  every feature. Chinese drafts pass through `toTraditional`.
+- `EmailDraft` keeps the last drafts per person (private, triple-scoped), so a
+  reload does not lose one. The task panel's approach tab links to
+  `/email?task={id}`.
+
+## Team workspace notes
+
+A person may belong to several workspaces. `getOrCreateDefaultWorkspace()`
+resolves which one a request acts in: `User.activeWorkspaceId` while they are
+still a member of it, else their earliest membership, else a new workspace.
+The column is a preference, membership is the permission — a stale choice is
+ignored, never trusted. `PUT /api/me/workspace` checks membership before saving
+a choice, and accepting an invite sets it, so an existing user who joins a team
+lands in the team's workspace. The sidebar shows a switcher only with two or
+more memberships; switching lands on `/today`, because the open project belongs
+to the old workspace.
+
+Member rules live in the pure `canChangeMember()` (`src/lib/workspace/invites.ts`):
+only admins change other people, anyone may leave, the owner is never removed
+or demoted (deleting the owner's user row is what deletes the workspace), and
+the last admin is never removed or demoted. Removing someone clears
+`personalOwnerId` on their personal project in that workspace, so their work
+becomes an ordinary project the team can see instead of one hidden from
+everyone. The service is `src/lib/workspace/service.ts`; Settings renders it
+through `members-panel.tsx`.
+
+The sign-in page takes `?callbackUrl=`, validated once on the server by
+`safeCallbackUrl()` (`src/lib/auth/callback-url.ts`) — `//host` and `/\host`
+are protocol-relative to a browser, so "starts with /" is not enough. That is
+how an invite link survives sign-in or sign-up.
+
+Every person gets a personal project in each workspace, created by the `(app)`
+layout on first visit (`getOrCreatePersonalProject`, which re-reads on a
+concurrent create and adds the email on a name clash) and pinned first in the
+sidebar with a person mark. New tasks default their assignee to the creator
+(`emptyDraft(statusId, currentUserId)`), so a task you write down appears on
+your own Today in a team workspace.
+
 ## Project management notes
 
-`/projects/[id]` has three core sections in workflow order — **Overview,
-Documents, Requirements** — and, when `deliveryEnabled`, five delivery sections:
-**Tasks, Timeline, Risks, Plan** (route `/review`; renamed because the tab is
-where a plan is generated, not merely reviewed) **and Reports**. They are nested
+`/projects/[id]` has three core sections — **Overview, Tasks, Documents** — then
+**Requirements** when `discoveryEnabled`, then four delivery sections when
+`deliveryEnabled`: **Timeline, Risks, Plan** (route `/review`; renamed because
+the tab is where a plan is generated, not merely reviewed) **and Reports**. The
+Overview follows the same layers: the discovery strip only with discovery on,
+task stats always, milestones/risks/reports only with delivery on, and one card
+offering whichever layers are off. They are nested
 routes under a shared `layout.tsx`. Each
 is its own server page fetching only its own data. Layouts cannot pass data to
 children and do not re-render, so the project lookup goes through `getScopedProject` in
@@ -549,10 +922,12 @@ The app shell is full width; the old `max-w-5xl` cap is what squeezed five board
 columns into ~180px each. Prose pages (`/chat`, `/documents/[id]`) opt back out
 with their own `max-w-*`, because text gets harder to read as it widens.
 
-**Routes:** `/dashboard` is the morning inbox (overdue, due soon, blocked) plus
-the workspace counts, and `/documents` is cross-project document
-administration. They were one page; splitting them is why
-the sidebar entry labelled "All Documents" leads to documents and nothing else.
+**Routes:** `/today` is home — the viewer's own work. `/dashboard` is the
+workspace overview (every project and member) and `/documents` is cross-project
+document administration. The sidebar's global links are Today, Projects,
+Documents, Capture, Assistant, Ask documents, and Email, with Settings in the
+footer; the workspace overview is reached from Projects, so each question has
+one entry.
 `/projects/[id]/documents` remains the project-scoped library.
 
 **The Overview leads somewhere.** Each stat card opens the filtered rows it
@@ -569,7 +944,10 @@ filter bar serves both board and list, so switching view keeps the same rows.
 `?filter=` is parsed by `parseTaskQuickFilter` / `parseRegisterFilter`, which
 live in that module rather than in the client panels: a server page cannot call
 a function exported from a `"use client"` file. `TaskBoard` takes `nowIso` from
-the server for the same hydration reason `ProjectTimeline` does. Risks default
+the server for the same hydration reason `ProjectTimeline` does — and it is the
+viewer's day anchor (invariant 15), threaded down to `isTaskOverdue(task,
+todayIso)` on cards, list rows, and the detail panel rather than read from the
+browser clock. Risks default
 to highest exposure first (`sortRisks`); exposure orders the list and is never
 shown as a number, so it does not become a severity scale of its own.
 
@@ -751,6 +1129,18 @@ its own PATCHing instead of reporting changes upward. Its rules:
   arrow orphaned between them.
 - **There is no Save button, because there is nothing to submit.** The footer
   reports save state instead.
+
+**"How to tackle it" is the task panel's third tab** (`task-approach.tsx`).
+Evidence is the task's linked documents (`selectDocumentContext`, 12
+passages), else the project's documents held to the chat's evidence bar, else
+none — and then every step is general (invariant 22). A suggestion is a
+private `TaskSuggestion` per person and is never applied by itself: "Add steps
+to the description" goes through the panel's own `save()`, and "Create tasks"
+(`POST /api/task-suggestions/[id]/create-tasks`) goes through `task-write`,
+claiming each step index on `createdSteps` in the same transaction as its
+task so a second click creates nothing. The step formatter lives in
+`approach/format.ts`, apart from the validator, so the browser bundle never
+pulls in OpenCC.
 
 **`TaskComment` is human discussion, and deliberately outside every other model
 here.** It has no `source`/`generationStatus`, so it is not a proposal awaiting

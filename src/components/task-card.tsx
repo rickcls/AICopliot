@@ -63,6 +63,7 @@ function Chip({
 
 export function TaskCard({
   task,
+  todayIso,
   dragging,
   busy,
   onOpen,
@@ -70,13 +71,14 @@ export function TaskCard({
   onDragEnd,
 }: {
   task: TaskRow;
+  todayIso: string;
   dragging: boolean;
   busy: boolean;
   onOpen: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
-  const overdue = isTaskOverdue(task);
+  const overdue = isTaskOverdue(task, todayIso);
 
   return (
     <article

@@ -1,21 +1,42 @@
 # PLANNING.md
 
-Living plan and decision log for ScopePilot — AI Project Delivery Copilot.
+Living plan and decision log for ScopePilot — AI work assistant.
 
 ---
 
 ## Goal
 
-A secure, single-workspace requirements-discovery and delivery assistant: create
-project workspaces, upload source documents, extract reviewable cited
-requirements and reviewable cited plans, trace agreed scope to the work that
-delivers it, and ask questions grounded in documents and approved live project
-records.
+An AI work assistant for one person or a small team, Hong Kong first. It
+removes the bookkeeping from a working week: turn notes, documents, and (later)
+emails and voice memos into cited tasks and progress updates the user approves
+with a click; show what needs the user today across every project; find files
+and answers grounded in the user's own documents; suggest how to tackle a task;
+and draft emails in the user's own tone. Requirements discovery and delivery
+tracking remain, as optional layers per project.
 
 **Explicitly out of scope**, now and later unless deliberately revisited:
-multi-agent orchestration, autonomous loops, external tool calling, ServiceNow
-integration, or any action that modifies an external system. This is retrieval
-and generation — it answers questions, it does not act.
+multi-agent orchestration, loops that outlive a request, background jobs or
+schedules, tools that write, and any action that writes to an external system.
+The model proposes; a click writes. The one agent (P7) is fenced inside a
+single request with read-only tools. External systems are read-only and read
+only inside a user-initiated action (Gmail, P6). The app never sends email.
+
+### Assistant roadmap (pivot approved 2026-10-16)
+
+Each phase is one branch and PR, usable on its own.
+
+| Phase | Pain point | Scope | Status |
+|---|---|---|---|
+| P0a | Foundation | Product docs, i18n (zh-Hant default + en), `User.locale`/`timeZone`, viewer-local "today", Today page, Settings, Tasks as a core tab, `discoveryEnabled` | **Built on `feat/assistant-foundation`** |
+| P0b | Team | Invite links, member roles, workspace switcher, personal project hidden from colleagues' navigation, new tasks assigned to their creator | **Built on `feat/assistant-foundation`** |
+| P1 | Lazy / inaccurate records, forgotten progress | Capture box (paste, browser dictation, file) → cited proposals (create task, update status/date, progress note) applied by click; server-resolved relative dates (聽日, 下星期五) | **Built on `feat/assistant-foundation`** |
+| P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | **Built on `feat/assistant-foundation`** |
+| P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | **Built on `feat/assistant-foundation`** |
+| P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | **Built on `feat/assistant-foundation`** |
+| P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | **Built on `feat/assistant-foundation`** |
+| P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | **Built on `feat/assistant-foundation`** |
+| P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | **Agent built on `feat/assistant-foundation`**; the remaining-page translation moves to P8 |
+| P8 | Finish the Chinese UI | Translate the older panels still in English (task board and detail, requirements, timeline, risks, plan review, reports, chat, projects, dashboard), and the status labels in `labels.ts` | Next |
 
 ---
 
@@ -158,6 +179,32 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 33 | `sequence Int` rather than a stored `REQ-001` string | Traceability needs stable human-readable keys, but a stored string sorts wrong past 999 and freezes the format forever. The integer sorts correctly and `formatRequirementCode()` is the single place the rendering lives. |
 | 34 | A new `GenerationRunType` value gets its own migration file | Postgres refuses to use an enum value in the transaction that added it, and Prisma wraps each migration file in one. The partial unique index for active requirement runs references `'requirements'`, so the `ALTER TYPE` had to ship separately. The earlier `GenerationRunStatus` addition survived in one file only because nothing referenced its new value — not precedent. |
 | 35 | Extraction reuses the plan pipeline instead of forking it | Citation resolution, the S-label context builder, the audit lifecycle, and the single JSON repair attempt were already correct and tested. The only flow-specific part was the retrieval probes, so `selectDocumentContext` takes its queries as an argument — the second implementation that justifies the parameter. |
+| 36 | Pivot to a personal work assistant; discovery and delivery become optional layers | The user's pain points are personal workload (recording, priorities, files, progress, email), not scope agreement. Tasks moved into the core tabs; `discoveryEnabled` was added beside `deliveryEnabled` and backfilled to `true` for every existing project, so nobody lost a tab they worked in. Both still gate navigation only. |
+| 37 | "Today" is UTC midnight of the viewer's local date, passed where `now` was | Every rule already compares UTC days, so changing the anchor instead of the rules keeps one definition of overdue. Applied to every page that counts overdue work at once — Today alone would disagree with the board between 00:00 and 08:00 HKT. Instants keep the real clock. |
+| 38 | No i18n library; typed dictionaries, locale as a user preference | Every page is behind sign-in, so a locale URL segment buys nothing. `satisfies Dictionary` makes a missing key a type error; a test rejects Simplified characters, the error a reviewer is most likely to miss. |
+| 39 | In a workspace of one, unassigned tasks are "mine" | Existing tasks mostly have no assignee. Requiring one would have opened Today empty for the only user; with colleagues, unassigned work is nobody's yet and stays out. |
+| 40 | Personal project per person, hidden from colleagues' navigation rather than private | A captured task needs a home when no project is named, and statuses are per project, so a nullable `Task.projectId` would have touched every query. Real privacy would need project-level ACLs everywhere; hiding keeps the workspace as the single security boundary and puts private data (captures, Gmail text) in per-user tables instead. |
+| 41 | `User.activeWorkspaceId` instead of "earliest membership" | With invites, an existing user who joins a team would otherwise never see the team workspace. The column is only a preference; membership is re-checked on every request. |
+| 42 | Invite tokens hashed, single-use, accepted by POST | A link is a bearer credential. Hashing makes a leaked row useless, the conditional claim admits one person, and a POST means a mail client's link preview cannot join anyone. |
+| 43 | Capture proposals are rows applied through the manual write path, not AI draft records | Draft AI records need a project-scoped `GenerationRun`, are invisible to every operational read, and cannot express "mark that task done" or "add a note". A proposal row can, and a conditional claim in the write's transaction makes Apply idempotent. Extracting `task-write.ts` keeps one validation path for typed and captured tasks. |
+| 44 | The date phrase, not the date, is what the model returns | "聽日" and "下星期五" are where models slip — off by a day, or a guessed year. A pure resolver anchored on the capture's stored local date is testable and stable across retries; the model's own date only raises a flag. |
+| 45 | A capture is not stored as a document | A document is workspace-visible and chat evidence; a person's notes (and later their email) are private, and unreviewed notes behind a citation would be the problem `TaskComment` already avoids. Ingestion would also spend the 60-second budget before the model call. |
+| 46 | OpenCC (`opencc-js@1.4.2`) converts model prose to Hong Kong Traditional | A prompt rule makes Simplified rare, not impossible. Conversion runs after validation and never touches quotes; the Simplified detector excludes the forms OpenCC's HK standard itself produces (户, 脱), so the two agree. |
+| 47 | Staleness is computed from loaded rows, not a query builder | Today already loads every open task of the viewer's, so one pure `isStale()` over those rows gives the badge, the section, and the planner's "quiet" fact from a single definition. A `*Where` twin would be a second definition to keep in step. |
+| 48 | Snooze is its own table; "still working" writes `checkedInAt` | A snooze says nothing happened, so it must not move `updatedAt`; a check-in says something did, so it should. Keeping the two apart is what stops the reminder from being silenced by accident. |
+| 49 | The day plan is stored but never writes to tasks | Re-opening Today should not pay for another model call, and finished work should tick off as the day goes; both come from saving the order and joining live status on read. Ordering is advice, so it stays out of the task records entirely. |
+| 50 | Document search uses `ILIKE` over passages, not the full-text index | The `english` text-search configuration cannot segment Chinese, so a Chinese phrase would never match lexically. A substring match needs no segmentation. It scans the workspace's passages; add a `pg_trgm` GIN index when a workspace grows large enough to feel it. The grounding path is unchanged. |
+| 51 | Labelling is a separate request after indexing, and a person's edit is final | Indexing must fit the 60-second limit on its own. A summary that states facts is held to the citation rule; a title and tags are filing aids. Overwriting a person's correction with the next AI pass would teach them not to correct anything. |
+| 52 | `storeDocument()` is the only way bytes become a Document | A second, server-side path (saving a capture) appeared; keeping validation and the id-based storage key in one function means it cannot skip either (invariant 6). |
+| 53 | Task approaches may answer without evidence; nothing else may | Refusing "how do I tackle this?" whenever the files are silent would leave the person exactly as stuck as before. The guard moves from refusing to labelling: a step's basis is computed from valid citations, never taken from the model, and general steps stay visibly marked wherever they are copied. |
+| 54 | A step becomes a task at most once | `createdSteps` is claimed with `NOT has` + `push` in the task's transaction — the same conditional-claim idea as capture proposals and invite links, without a table per step. |
+| 55 | Email drafts never send, and facts are checked rather than trusted | Sending from the app would make it a system that acts on the outside world, which it is not. The fact check flags rather than strips, because the person may know a date the inputs omitted — the goal is that nothing reaches a client unread. |
+| 56 | Writing style is per person, not per workspace | A voice belongs to the person and follows them between workspaces; nobody else's drafts may borrow it. |
+| 57 | Gmail through our own OAuth flow, not Auth.js | Sign-in stays Credentials; Gmail is a separate, revocable, read-only grant. A table of our own (`IntegrationAccount`) keeps the encrypted refresh token out of Auth.js's `Account` table, which would collide if Google sign-in is ever added. |
+| 58 | Voice memos become WAV in the browser | OpenRouter's audio input lists wav, mp3, aac, ogg, flac, m4a, and PCM, not webm — and webm is what Chrome records. Decoding and resampling client-side also shrinks a minute to ~1.9 MB, so segments fit Vercel's limits without a server-side encoder. |
+| 59 | One supervised agent, fenced inside a request (user decision, 2026-10-16) | The person asked for help that takes several look-ups ("prepare me for tomorrow's meeting"). A bounded loop inside one request gives that without the risks of an autonomous agent: a step cap and a time limit, tools that only read or save a draft, opaque labels, and every change returned as a proposal through the capture validator and the shared write path. |
+| 60 | JSON steps instead of native tool calling | Works with any JSON-mode model (the configured model may not support tools well), keeps the provider contract a plain string, and makes the loop replayable in tests with a scripted fake. |
+| 61 | `applyChange` takes the claim as a hook | Capture and assistant proposals live in different tables but must write identically; the claim-and-record hooks are the only difference, so there is one write path to keep correct. |
 
 ### Deviations from the original spec (approved)
 
@@ -195,13 +242,28 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
    the quality gain, but it is the obvious thing to cache if cost matters.
 4. **No OCR.** Scanned/image-only PDFs produce no text and fail with a clear
    message rather than silently indexing nothing.
-5. **Single workspace per user**, auto-provisioned. `WorkspaceMember` and roles
-   are modelled, but there is no invite flow yet.
+5. **Invites are links, not emails.** An admin copies a single-use link and
+   sends it themselves; the app sends no mail. There is no per-document or
+   per-project access control inside a workspace — a personal project is only
+   hidden from navigation.
 6. **No chat history UI.** Conversations and messages are persisted, and
    follow-ups now work within a session, but the chat page shows only the
    current session and there is no way to reopen a past conversation.
 7. **`next-auth@5.0.0-beta.32`** is beta-tagged. Verified compatible with Next 16
    and React 19; the risk is API churn on upgrade, not breakage today.
+8. **Chinese retrieval is semantic-only, and the threshold is unmeasured for
+   it.** The lexical path uses the `english` text-search configuration, which
+   does not segment Chinese, so a Chinese question is grounded only if its
+   cosine similarity clears `RAG_MIN_SCORE` — a value calibrated on one English
+   corpus. Add Traditional Chinese answerable/unanswerable evaluation cases and
+   record a baseline before changing either (P3 adds `ILIKE` *search*, which is
+   not the grounding path).
+9. **Gmail needs a Google Cloud OAuth client, and a personal account expires
+   weekly.** A gmail.com account can only use an app in Testing mode, whose
+   grants Google ends after 7 days; the page then asks for a reconnect. A
+   Google Workspace organisation can mark the app Internal and avoid both the
+   expiry and Google's verification. Public use would need restricted-scope
+   verification.
 
 ---
 

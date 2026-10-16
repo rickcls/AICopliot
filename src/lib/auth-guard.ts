@@ -37,17 +37,35 @@ export interface SessionUser {
  * reached workspace provisioning and crashed every page on a foreign-key
  * violation; treated as signed out, they land on the sign-in form, whose next
  * sign-in replaces the cookie. Cached so a request pays for one lookup.
+ *
+ * The same read carries the person's preferences, so the language and time
+ * zone every page needs cost no second query.
  */
-const userExists = cache(async function userExists(id: string) {
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true } });
-  return user !== null;
+const getUserRow = cache(async function getUserRow(id: string) {
+  return prisma.user.findUnique({
+    where: { id },
+    select: { id: true, locale: true, timeZone: true, activeWorkspaceId: true },
+  });
 });
+
+export interface UserPreferences {
+  locale: string;
+  timeZone: string;
+}
+
+/** The signed-in person's saved language and time zone, or null if no such user. */
+export async function getUserPreferences(
+  id: string,
+): Promise<UserPreferences | null> {
+  const user = await getUserRow(id);
+  return user ? { locale: user.locale, timeZone: user.timeZone } : null;
+}
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) return null;
-  if (!(await userExists(id))) return null;
+  if (!(await getUserRow(id))) return null;
   return {
     id,
     email: session.user?.email ?? "",
@@ -104,8 +122,16 @@ export function requireAdmin(access: WorkspaceAccess): WorkspaceAccess {
 }
 
 /**
- * Single-workspace MVP: every user gets one workspace, created on first use.
- * Returns the caller's existing membership if there is one.
+ * The workspace a request acts in. In order:
+ *
+ * 1. The one the person last chose (`User.activeWorkspaceId`) — but only while
+ *    they are still a member of it. A stale choice is ignored, never trusted:
+ *    the column is a preference, membership is the permission.
+ * 2. Their earliest membership.
+ * 3. A new workspace with them as admin, created on first use.
+ *
+ * Accepting an invite sets (1), so someone who already had a workspace lands
+ * in the team's instead of the one they created on sign-up.
  *
  * The app layout, the project layout, and the page each resolve the workspace,
  * and layouts cannot hand it down. React `cache` makes that one lookup per
@@ -123,6 +149,23 @@ const defaultWorkspaceFor = cache(async function defaultWorkspaceFor(
   userName: string | null,
 ): Promise<WorkspaceAccess> {
   const user = { id: userId, name: userName };
+
+  const activeWorkspaceId = (await getUserRow(userId))?.activeWorkspaceId;
+  if (activeWorkspaceId) {
+    const active = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: activeWorkspaceId, userId } },
+      include: { workspace: { select: { name: true } } },
+    });
+    if (active) {
+      return {
+        workspaceId: active.workspaceId,
+        workspaceName: active.workspace.name,
+        userId,
+        role: active.role,
+      };
+    }
+  }
+
   const existing = await prisma.workspaceMember.findFirst({
     where: { userId: user.id },
     include: { workspace: { select: { name: true } } },
@@ -202,4 +245,18 @@ export async function requireWorkspace(): Promise<
   const user = await requireUser();
   const access = await getOrCreateDefaultWorkspace(user);
   return { ...access, user };
+}
+
+/** Every workspace the person belongs to, for the workspace switcher. */
+export async function listMemberships(userId: string) {
+  const memberships = await prisma.workspaceMember.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { role: true, workspace: { select: { id: true, name: true } } },
+  });
+  return memberships.map((membership) => ({
+    id: membership.workspace.id,
+    name: membership.workspace.name,
+    role: membership.role,
+  }));
 }

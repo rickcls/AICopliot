@@ -98,7 +98,8 @@ export function SourceCard({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {citation.label ? <LabelChip label={citation.label} /> : null}
         <Link
-          href={`/documents/${citation.documentId}`}
+          // Opens the cited passage itself, not the top of the document.
+          href={`/documents/${citation.documentId}/chunks?chunk=${citation.chunkId}#chunk-${citation.chunkId}`}
           className="text-xs font-medium text-slate-900 hover:underline"
         >
           {citation.filename}

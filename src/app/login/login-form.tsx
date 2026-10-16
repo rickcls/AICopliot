@@ -3,13 +3,28 @@
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { useT } from "@/components/i18n-provider";
 import { Button, Card, ErrorState, Input, Spinner } from "@/components/ui";
 
 type Mode = "signin" | "signup";
 
-export function LoginForm() {
+/**
+ * `callbackUrl` has already been checked by `safeCallbackUrl` on the server,
+ * so it is always a path on this site. An invite link sends people here and
+ * back again, which is why sign-up says what happens next when `invited`.
+ */
+export function LoginForm({
+  callbackUrl,
+  initialMode,
+  invited,
+}: {
+  callbackUrl: string;
+  initialMode: Mode;
+  invited: boolean;
+}) {
+  const t = useT();
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +46,11 @@ export function LoginForm() {
 
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
-          setError(data.error ?? "Could not create your account");
+          setError(
+            response.status === 409
+              ? t("auth.emailTaken")
+              : (data.error ?? t("auth.createFailed")),
+          );
           return;
         }
       }
@@ -43,14 +62,14 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        setError("Incorrect email or password");
+        setError(t("auth.wrongPassword"));
         return;
       }
 
-      router.push("/dashboard");
+      router.push(callbackUrl);
       router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("auth.genericError"));
     } finally {
       setPending(false);
     }
@@ -59,19 +78,21 @@ export function LoginForm() {
   return (
     <Card className="p-6">
       <h1 className="text-lg font-semibold">
-        {mode === "signin" ? "Sign in" : "Create an account"}
+        {mode === "signin" ? t("auth.signInTitle") : t("auth.signUpTitle")}
       </h1>
       <p className="mt-1 text-sm text-slate-500">
-        {mode === "signin"
-          ? "Access your workspace and documents."
-          : "Your workspace is created automatically."}
+        {invited
+          ? t("auth.invitedLead")
+          : mode === "signin"
+            ? t("auth.signInLead")
+            : t("auth.signUpLead")}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         {mode === "signup" ? (
           <div>
             <label htmlFor="name" className="mb-1.5 block text-sm font-medium">
-              Name
+              {t("auth.name")}
             </label>
             <Input
               id="name"
@@ -85,7 +106,7 @@ export function LoginForm() {
 
         <div>
           <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
-            Email
+            {t("auth.email")}
           </label>
           <Input
             id="email"
@@ -99,7 +120,7 @@ export function LoginForm() {
 
         <div>
           <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
-            Password
+            {t("auth.password")}
           </label>
           <Input
             id="password"
@@ -114,7 +135,7 @@ export function LoginForm() {
           />
           {mode === "signup" ? (
             <p className="mt-1.5 text-xs text-slate-500">
-              At least 8 characters.
+              {t("auth.passwordHint")}
             </p>
           ) : null}
         </div>
@@ -123,12 +144,12 @@ export function LoginForm() {
 
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? <Spinner className="border-white/40 border-t-white" /> : null}
-          {mode === "signin" ? "Sign in" : "Create account"}
+          {mode === "signin" ? t("auth.submitSignIn") : t("auth.submitSignUp")}
         </Button>
       </form>
 
       <p className="mt-5 text-center text-sm text-slate-500">
-        {mode === "signin" ? "No account yet?" : "Already have an account?"}{" "}
+        {mode === "signin" ? t("auth.noAccount") : t("auth.haveAccount")}{" "}
         <button
           type="button"
           onClick={() => {
@@ -137,7 +158,7 @@ export function LoginForm() {
           }}
           className="font-medium text-slate-900 underline underline-offset-2"
         >
-          {mode === "signin" ? "Create one" : "Sign in"}
+          {mode === "signin" ? t("auth.createOne") : t("auth.signInLink")}
         </button>
       </p>
     </Card>

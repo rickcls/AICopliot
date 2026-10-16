@@ -6,6 +6,7 @@ import { listConversations, loadConversation } from "@/lib/chat/history";
 import { prisma } from "@/lib/db";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { MAX_FOCUS_DOCUMENTS } from "@/lib/schemas";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 /**
  * `/chat` and `/chat/<conversationId>` are one route segment on purpose.
@@ -40,7 +41,7 @@ export default async function ChatPage({
   const [readyCount, projects, threads, conversation] = await Promise.all([
     prisma.document.count({ where: { workspaceId, status: "ready" } }),
     prisma.project.findMany({
-      where: { workspaceId },
+      where: visibleProjectWhere(workspaceId, user.id),
       orderBy: { name: "asc" },
       select: {
         id: true,

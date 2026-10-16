@@ -35,6 +35,21 @@ export interface ChatProvider {
   ): Promise<string>;
 }
 
+/**
+ * Speech to text. A separate interface rather than a multimodal ChatProvider,
+ * so every text feature keeps its plain-string contract and only one call
+ * site ever sends audio.
+ */
+export interface TranscriptionProvider {
+  readonly modelName: string;
+  /** `audio` is the raw file; `format` names it for the provider ("wav"). */
+  transcribe(
+    audio: Buffer,
+    format: "wav",
+    instructions: string,
+  ): Promise<string>;
+}
+
 export class ProviderError extends Error {
   constructor(
     message: string,

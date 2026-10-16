@@ -46,6 +46,7 @@ export type ListEditField =
  */
 export function TaskListRow({
   task,
+  todayIso,
   members,
   selected,
   selectedCount,
@@ -59,6 +60,7 @@ export function TaskListRow({
   onDragEnd,
 }: {
   task: TaskRow;
+  todayIso: string;
   members: MemberOption[];
   selected: boolean;
   selectedCount: number;
@@ -83,7 +85,7 @@ export function TaskListRow({
   const priorityRef = useRef<HTMLSelectElement>(null);
   const dueRef = useRef<HTMLInputElement>(null);
 
-  const overdue = isTaskOverdue(task);
+  const overdue = isTaskOverdue(task, todayIso);
   const rowTone = statusColorToken(task.status);
   const disabled = busy || saving;
 

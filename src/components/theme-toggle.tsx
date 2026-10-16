@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
 import { FOCUS_RING } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -41,24 +42,27 @@ function applyChoice(choice: ThemeChoice) {
 }
 
 const OPTIONS = [
-  { value: "system", label: "Match system", Icon: Monitor },
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", labelKey: "theme.system", Icon: Monitor },
+  { value: "light", labelKey: "theme.light", Icon: Sun },
+  { value: "dark", labelKey: "theme.dark", Icon: Moon },
 ] as const;
 
 export function ThemeToggle({ className }: { className?: string }) {
+  const t = useT();
   const choice = useSyncExternalStore(subscribe, readChoice, () => "system");
 
   return (
     <div
       role="group"
-      aria-label="Colour theme"
+      aria-label={t("theme.label")}
       className={cn(
         "inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5",
         className,
       )}
     >
-      {OPTIONS.map(({ value, label, Icon }) => (
+      {OPTIONS.map(({ value, labelKey, Icon }) => {
+        const label = t(labelKey);
+        return (
         <button
           key={value}
           type="button"
@@ -76,7 +80,8 @@ export function ThemeToggle({ className }: { className?: string }) {
           <Icon className="size-3.5" aria-hidden />
           <span className="sr-only">{label}</span>
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

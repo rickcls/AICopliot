@@ -118,6 +118,40 @@ describe("getOrCreateDefaultWorkspace", () => {
     expect(mockPrisma.workspace.create).not.toHaveBeenCalled();
   });
 
+  it("uses the workspace the person last chose while they are still a member", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user-1", activeWorkspaceId: "ws-team" });
+    mockPrisma.workspaceMember.findUnique.mockResolvedValue({
+      workspaceId: "ws-team",
+      role: "member",
+      workspace: { name: "Team" },
+    });
+
+    const access = await getOrCreateDefaultWorkspace(user);
+
+    expect(access).toMatchObject({ workspaceId: "ws-team", role: "member" });
+    expect(mockPrisma.workspaceMember.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { workspaceId_userId: { workspaceId: "ws-team", userId: "user-1" } },
+      }),
+    );
+    expect(mockPrisma.workspaceMember.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("ignores a chosen workspace the person no longer belongs to", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user-1", activeWorkspaceId: "ws-left" });
+    mockPrisma.workspaceMember.findUnique.mockResolvedValue(null);
+    mockPrisma.workspaceMember.findFirst.mockResolvedValue({
+      workspaceId: "ws-own",
+      role: "admin",
+      workspace: { name: "Own" },
+    });
+
+    const access = await getOrCreateDefaultWorkspace(user);
+
+    expect(access.workspaceId).toBe("ws-own");
+    expect(mockPrisma.workspace.create).not.toHaveBeenCalled();
+  });
+
   it("creates a workspace with the user as admin member on first use", async () => {
     mockPrisma.workspaceMember.findFirst.mockResolvedValue(null);
     mockPrisma.workspace.create.mockResolvedValue({

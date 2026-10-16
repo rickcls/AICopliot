@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
-import { assignDocumentProjectSchema } from "@/lib/schemas";
+import { updateDocumentSchema } from "@/lib/schemas";
 import { getStorage } from "@/lib/storage";
 
 interface Params {
@@ -35,7 +35,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const { workspaceId } = await requireWorkspace();
     const { id } = await params;
     const body = await request.json().catch(() => null);
-    const parsed = assignDocumentProjectSchema.safeParse(body);
+    const parsed = updateDocumentSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? "Invalid input" },
@@ -45,29 +45,47 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const document = await prisma.document.findFirst({
       where: { id, workspaceId },
-      select: { id: true },
+      select: { id: true, suggestedProjectId: true },
     });
     if (!document) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    if (parsed.data.projectId) {
+    const { projectId, title, docType, tags } = parsed.data;
+    if (projectId) {
       const project = await prisma.project.findFirst({
-        where: { id: parsed.data.projectId, workspaceId },
+        where: { id: projectId, workspaceId },
         select: { id: true },
       });
       if (!project) {
         return NextResponse.json({ error: "Project not found" }, { status: 404 });
       }
     }
+    const labelEdited = title !== undefined || docType !== undefined || tags !== undefined;
 
     const updated = await prisma.document.update({
       where: { id: document.id },
-      data: { projectId: parsed.data.projectId },
+      data: {
+        ...(projectId !== undefined
+          ? {
+              projectId,
+              // Moving it anywhere answers the suggestion, followed or not.
+              suggestedProjectId: null,
+            }
+          : {}),
+        ...(title !== undefined ? { title: title || null } : {}),
+        ...(docType !== undefined ? { docType } : {}),
+        ...(tags !== undefined ? { tags } : {}),
+        ...(labelEdited ? { labelSource: "manual" } : {}),
+      },
       select: {
         id: true,
         projectId: true,
         project: { select: { name: true } },
+        title: true,
+        docType: true,
+        tags: true,
+        suggestedProjectId: true,
       },
     });
 

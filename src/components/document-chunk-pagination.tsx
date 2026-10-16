@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { buttonClasses, LinkButton } from "@/components/ui";
+import type { Translate } from "@/lib/i18n/translate";
 import { cn } from "@/lib/utils";
 
 export function DocumentChunkPagination({
@@ -7,34 +8,32 @@ export function DocumentChunkPagination({
   page,
   totalPages,
   totalChunks,
+  t,
 }: {
   documentId: string;
   page: number;
   totalPages: number;
   totalChunks: number;
+  t: Translate;
 }) {
   const href = (nextPage: number) =>
     `/documents/${documentId}/chunks?page=${nextPage}`;
 
   return (
     <nav
-      aria-label="Chunk pages"
+      aria-label={t("documents.chunks.pages")}
       className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4"
     >
       <p className="text-sm text-slate-500">
-        {totalPages > 1 ? (
-          <>
-            Page {page} of {totalPages} ·{" "}
-          </>
-        ) : null}
-        {totalChunks} chunk{totalChunks === 1 ? "" : "s"}
+        {totalPages > 1 ? <>{t("documents.chunks.pageOf", { page, total: totalPages })} · </> : null}
+        {t("documents.chunks.count", { count: totalChunks })}
       </p>
 
       {totalPages > 1 ? (
         <div className="flex items-center gap-2">
           {page > 1 ? (
             <LinkButton href={href(page - 1)} variant="secondary" size="sm">
-              Previous
+              {t("documents.chunks.previous")}
             </LinkButton>
           ) : (
             <span
@@ -45,12 +44,12 @@ export function DocumentChunkPagination({
                 className: "pointer-events-none opacity-40",
               })}
             >
-              Previous
+              {t("documents.chunks.previous")}
             </span>
           )}
           {page < totalPages ? (
             <LinkButton href={href(page + 1)} variant="secondary" size="sm">
-              Next
+              {t("documents.chunks.next")}
             </LinkButton>
           ) : (
             <span
@@ -61,7 +60,7 @@ export function DocumentChunkPagination({
                 className: "pointer-events-none opacity-40",
               })}
             >
-              Next
+              {t("documents.chunks.next")}
             </span>
           )}
         </div>

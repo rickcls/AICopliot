@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flag, Maximize2, Sparkles, UserRound, X } from "lucide-react";
+import {
+  Flag,
+  Lightbulb,
+  Maximize2,
+  Sparkles,
+  UserRound,
+  X,
+} from "lucide-react";
 import {
   Avatar,
   Badge,
@@ -15,6 +22,8 @@ import {
   Spinner,
 } from "@/components/ui";
 import { proposalPatch } from "@/components/chat/proposal-card";
+import { useT } from "@/components/i18n-provider";
+import { TaskApproach } from "@/components/task-approach";
 import { TaskChat } from "@/components/task-chat";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDependencies } from "@/components/task-dependencies";
@@ -65,6 +74,7 @@ import { TracedRequirements } from "@/components/traced-requirements";
  */
 export function TaskDetail({
   task,
+  todayIso,
   allTasks,
   statuses,
   members,
@@ -80,6 +90,7 @@ export function TaskDetail({
   onError,
 }: {
   task: TaskRow;
+  todayIso: string;
   allTasks: TaskRow[];
   statuses: TaskStatusOption[];
   members: MemberOption[];
@@ -101,7 +112,8 @@ export function TaskDetail({
   const [draft, setDraft] = useState<TaskDraft>(() => draftFrom(task));
   const [saving, setSaving] = useState(false);
   const [filling, setFilling] = useState(false);
-  const [tab, setTab] = useState<"details" | "ai">("details");
+  const t = useT();
+  const [tab, setTab] = useState<"details" | "ai" | "approach">("details");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -312,6 +324,7 @@ export function TaskDetail({
               [
                 ["details", "Details"],
                 ["ai", "Ask AI"],
+                ["approach", t("approach.tab")],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -331,6 +344,8 @@ export function TaskDetail({
               >
                 {value === "ai" ? (
                   <Sparkles className="size-3.5 text-violet-600" aria-hidden />
+                ) : value === "approach" ? (
+                  <Lightbulb className="size-3.5 text-amber-500" aria-hidden />
                 ) : null}
                 {label}
               </button>
@@ -340,6 +355,25 @@ export function TaskDetail({
 
         {/* Details stays mounted while hidden, so a half-typed edit survives a
             look at the chat. */}
+        {tab === "approach" ? (
+          <div
+            role="tabpanel"
+            id="task-panel-approach"
+            aria-labelledby="task-tab-approach"
+            className="flex-1"
+          >
+            <TaskApproach
+              taskId={task.id}
+              onAppend={(text) =>
+                save({
+                  description: draft.description ? `${draft.description}\n\n${text}` : text,
+                })
+              }
+              onTasksCreated={(created) => created.forEach(onTaskChange)}
+            />
+          </div>
+        ) : null}
+
         {tab === "ai" ? (
           <div
             role="tabpanel"
@@ -513,7 +547,7 @@ export function TaskDetail({
                 className={cn(
                   QUIET_CONTROL,
                   "max-w-none px-2",
-                  isTaskOverdue(task) &&
+                  isTaskOverdue(task, todayIso) &&
                     "bg-red-50 text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
                 )}
                 value={draft.dueDate}
@@ -529,7 +563,7 @@ export function TaskDetail({
                   void save({ dueDate: event.target.value });
                 }}
               />
-              {isTaskOverdue(task) ? (
+              {isTaskOverdue(task, todayIso) ? (
                 <span className="text-xs font-medium text-red-700">overdue</span>
               ) : null}
             </div>

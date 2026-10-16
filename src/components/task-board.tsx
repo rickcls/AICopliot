@@ -109,8 +109,10 @@ export function TaskBoard({
   /** From `?filter=`, so an Overview card can land on the rows it counted. */
   initialQuickFilter?: TaskQuickFilter | null;
   /**
-   * From the server, like the timeline's: overdue computed from the client
-   * clock at hydration could disagree with the server render across midnight.
+   * The viewer's day anchor from the server (`getViewerToday`): UTC midnight of
+   * their local date. From the server, like the timeline's, because overdue
+   * computed from the client clock at hydration could disagree with the server
+   * render across midnight — and the browser's UTC day is not the viewer's.
    */
   nowIso: string;
 }) {
@@ -597,7 +599,7 @@ export function TaskBoard({
     if (!statusId) return;
     setEditingId(null);
     setDraftFill(null);
-    setDraft(emptyDraft(statusId));
+    setDraft(emptyDraft(statusId, currentUserId));
   }
 
   /** An upload made from a task joins the project list every picker reads. */
@@ -872,6 +874,7 @@ export function TaskBoard({
                     <TaskCard
                       key={task.id}
                       task={task}
+                      todayIso={nowIso}
                       dragging={draggingIds.includes(task.id)}
                       busy={busyIds.has(task.id)}
                       onOpen={() => setOpenTaskId(task.id)}
@@ -1126,6 +1129,7 @@ export function TaskBoard({
                             <TaskListRow
                               key={task.id}
                               task={task}
+                              todayIso={nowIso}
                               members={members}
                               selected={selectedIds.has(task.id)}
                               selectedCount={selectedIds.size}
@@ -1208,6 +1212,7 @@ export function TaskBoard({
         <TaskDetail
           key={openTask.id}
           task={openTask}
+          todayIso={nowIso}
           allTasks={tasks}
           statuses={statuses}
           members={members}

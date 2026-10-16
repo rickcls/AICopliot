@@ -1,48 +1,14 @@
 import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
-import {
-  requireProject,
-  requireWorkspace,
-  requireWorkspaceMember,
-} from "@/lib/auth-guard";
+import { requireProject, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
-import { findOfficialProjectMilestone } from "@/lib/pm/project";
-import {
-  completedAtOnCreate,
-  DONE_TASK_CATEGORY,
-  officialRecordWhere,
-} from "@/lib/pm/rules";
+import { officialRecordWhere } from "@/lib/pm/rules";
 import { taskSelect } from "@/lib/pm/select";
-import { resolveTaskRelations } from "@/lib/pm/task-relations";
+import { createTaskRecord, prepareTaskCreate } from "@/lib/pm/task-write";
 import { createTaskSchema } from "@/lib/schemas";
 
 interface Params {
   params: Promise<{ id: string }>;
-}
-
-async function resolveProjectStatus(
-  workspaceId: string,
-  projectId: string,
-  statusId: string | undefined,
-) {
-  if (statusId) {
-    return prisma.projectTaskStatus.findFirst({
-      where: { id: statusId, workspaceId, projectId },
-      select: { id: true, category: true },
-    });
-  }
-
-  const fallback = await prisma.projectTaskStatus.findFirst({
-    where: { workspaceId, projectId, isDefault: true },
-    select: { id: true, category: true },
-  });
-  if (fallback) return fallback;
-
-  return prisma.projectTaskStatus.findFirst({
-    where: { workspaceId, projectId },
-    orderBy: { position: "asc" },
-    select: { id: true, category: true },
-  });
 }
 
 export async function GET(_request: Request, { params }: Params) {
@@ -78,90 +44,14 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
-    if (parsed.data.assigneeId) {
-      await requireWorkspaceMember(workspaceId, parsed.data.assigneeId);
-    }
-    if (parsed.data.milestoneId) {
-      const milestone = await findOfficialProjectMilestone(
-        workspaceId,
-        project.id,
-        parsed.data.milestoneId,
-      );
-      if (!milestone) {
-        return NextResponse.json(
-          { error: "Milestone not found in this project" },
-          { status: 404 },
-        );
-      }
+    // Validation and the write live in task-write.ts, shared with Capture's
+    // Apply, so a captured task is checked exactly like a typed one.
+    const prepared = await prepareTaskCreate(workspaceId, project.id, parsed.data);
+    if (!prepared.ok) {
+      return NextResponse.json({ error: prepared.error }, { status: prepared.status });
     }
 
-    const status = await resolveProjectStatus(
-      workspaceId,
-      project.id,
-      parsed.data.statusId,
-    );
-    if (!status) {
-      return NextResponse.json(
-        { error: "Status not found in this project" },
-        { status: 404 },
-      );
-    }
-
-    const relations = await resolveTaskRelations(
-      workspaceId,
-      project.id,
-      parsed.data,
-    );
-    if (!relations.ok) {
-      return NextResponse.json({ error: relations.error }, { status: 404 });
-    }
-    const { documentIds = [], citations, requirementIds } = relations.value;
-
-    const now = new Date();
-
-    // One nested write, so a task never exists without the links it was
-    // created with.
-    const task = await prisma.task.create({
-      data: {
-        workspaceId,
-        projectId: project.id,
-        title: parsed.data.title,
-        description: parsed.data.description ?? null,
-        statusId: status.id,
-        priority: parsed.data.priority,
-        assigneeId: parsed.data.assigneeId ?? null,
-        milestoneId: parsed.data.milestoneId ?? null,
-        estimatedHours: parsed.data.estimatedHours ?? null,
-        startDate: parsed.data.startDate ?? null,
-        dueDate: parsed.data.dueDate ?? null,
-        completedAt: completedAtOnCreate(
-          status.category,
-          DONE_TASK_CATEGORY,
-          now,
-        ),
-        documents: {
-          create: documentIds.map((documentId) => ({ workspaceId, documentId })),
-        },
-        citations: {
-          create: citations.map((citation) => ({
-            workspaceId,
-            documentChunkId: citation.documentChunkId,
-            excerpt: citation.excerpt,
-            purpose: "proposal" as const,
-          })),
-        },
-        requirementLinks: {
-          create: requirementIds.map((requirementId) => ({
-            workspaceId,
-            requirementId,
-            targetType: "task" as const,
-            createdById: user.id,
-          })),
-        },
-      },
-      select: taskSelect,
-    });
-
+    const task = await createTaskRecord(prisma, prepared.value, user.id);
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
     return handleRouteError(error, "POST /api/projects/[id]/tasks");
