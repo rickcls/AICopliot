@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { FOCUS_RING } from "@/components/ui";
@@ -49,23 +49,32 @@ const noop = () => () => {};
 
 export type DictationLanguage = "yue" | "cmn" | "en";
 
+export const DICTATION_LANGUAGES: DictationLanguage[] = ["yue", "cmn", "en"];
+
 const LANGUAGE_TAGS: Record<DictationLanguage, string[]> = {
   yue: ["yue-Hant-HK", "zh-HK"],
   cmn: ["cmn-Hant-TW", "zh-TW"],
   en: ["en-GB", "en-US"],
 };
 
-const LANGUAGE_KEY = {
+export const LANGUAGE_KEY = {
   yue: "dictation.cantonese",
   cmn: "dictation.mandarin",
   en: "dictation.english",
 } as const;
 
+/** Whether this browser offers speech recognition; false on the server. */
+export function useDictationSupported(): boolean {
+  return useSyncExternalStore(noop, () => recognitionCtor() !== null, () => false);
+}
+
 export function DictationButton({
+  language,
   onText,
   onListeningChange,
   disabled,
 }: {
+  language: DictationLanguage;
   /** Called with each finished phrase, to append to the note. */
   onText: (text: string) => void;
   onListeningChange?: (listening: boolean) => void;
@@ -74,13 +83,11 @@ export function DictationButton({
   const t = useT();
   // Server snapshot is false, so the server render and hydration agree and the
   // button appears only once the browser is known to support it.
-  const supported = useSyncExternalStore(noop, () => recognitionCtor() !== null, () => false);
-  const [language, setLanguage] = useState<DictationLanguage>("yue");
+  const supported = useDictationSupported();
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
   const recognition = useRef<Recognition | null>(null);
-  const languageId = useId();
 
   function setActive(value: boolean) {
     setListening(value);
@@ -154,32 +161,11 @@ export function DictationButton({
         {listening ? <MicOff className="size-3.5" aria-hidden /> : <Mic className="size-3.5" aria-hidden />}
         {listening ? t("dictation.stop") : t("dictation.start")}
       </button>
-      <label className="sr-only" htmlFor={languageId}>
-        {t("dictation.language")}
-      </label>
-      <select
-        id={languageId}
-        value={language}
-        disabled={listening}
-        onChange={(event) => setLanguage(event.target.value as DictationLanguage)}
-        className={cn(
-          "h-8 rounded-lg border border-transparent bg-transparent px-1.5 text-xs text-slate-600 hover:bg-slate-100",
-          FOCUS_RING,
-        )}
-      >
-        {(Object.keys(LANGUAGE_TAGS) as DictationLanguage[]).map((option) => (
-          <option key={option} value={option}>
-            {t(LANGUAGE_KEY[option])}
-          </option>
-        ))}
-      </select>
       {listening ? (
         <span className="min-w-0 truncate text-xs text-slate-500" aria-live="polite">
           {interim || t("dictation.listening")}
         </span>
-      ) : (
-        <span className="text-xs text-slate-400">{t("dictation.privacy")}</span>
-      )}
+      ) : null}
       {error ? <span className="w-full text-xs text-red-700">{error}</span> : null}
     </div>
   );

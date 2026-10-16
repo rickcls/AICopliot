@@ -256,6 +256,18 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    with that marker when copied into a description or a new task. Every other
    answering feature keeps invariant 4.
 
+23. **Outside accounts are read-only, read on request, and their secrets stay
+   sealed.** Gmail uses one scope, `gmail.readonly`, through an OAuth code flow
+   with state and PKCE in short-lived httpOnly cookies. Only the refresh token
+   is kept, AES-256-GCM-encrypted with `INTEGRATION_ENCRYPTION_KEY`
+   (`src/lib/crypto/secretbox.ts`); access tokens are fetched per request and
+   never stored or sent to the browser. Mail is listed only when the person
+   presses "Check Gmail" — no cron, no background sync — and only an email they
+   pick is read in full, becoming a private capture (`externalId:
+   gmail:{id}`, once per person). Email text is someone else's words: it
+   reaches the model only as capture lines marked as data, and nothing it says
+   is applied without a click. The app never sends mail or writes to Gmail.
+
 ## ⚠️ Prisma drops the pgvector index on every migration
 
 Prisma cannot see raw-SQL indexes on `Unsupported()` columns, so **every**
@@ -724,6 +736,35 @@ the lexical grounding path (and its `english` configuration) is unchanged.
 `/documents/[id]/chunks?chunk={id}` opens the page holding that passage and
 outlines it. Chat source cards and search results link there. A ready
 document's page offers "Ask about this document" (`/chat?docs={id}`).
+
+## Gmail and voice notes
+
+**Gmail** (`src/lib/gmail/`) is offered only when `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, and a 32-byte `INTEGRATION_ENCRYPTION_KEY` are all set;
+otherwise the panel simply does not render. `APP_URL` fixes the redirect URI
+(`/api/integrations/google/callback`), which must match the one registered
+with Google. When Google answers a refresh with `invalid_grant` — a revoked
+grant, or the seven-day expiry of an app still in Testing — the account is
+marked `needsReconnect` and the page asks for a reconnect instead of failing
+on every press. `listRecentMail` reads headers only (`format=metadata`) for
+the last three days of inbox mail outside Promotions and Social; `captureEmail`
+reads one message (`format=full`), keeps plain text over HTML, cuts the quoted
+history (`stripQuotedReply`), and hands it to `createCapture` with a `SOURCE`
+line telling the model these are a received email's words. An email capture
+links to `/email?capture={id}`, which opens a reply with that email as the
+incoming text.
+
+**Voice memos** are recorded in the browser, decoded and resampled to 16 kHz
+mono, and encoded as WAV (`src/lib/audio/wav.ts`) because OpenRouter's
+`input_audio` does not accept the browser's webm. Each ≤55-second segment is
+its own `POST /api/transcribe` (WAV bytes checked, ≤3 MB), well under Vercel's
+body and time limits. `TranscriptionProvider` is a separate interface so the
+text `ChatProvider` contract stays a plain string; it uses
+`OPENROUTER_TRANSCRIBE_MODEL` (default `google/gemini-2.5-flash`, the model
+OpenRouter's audio docs use). Audio is never stored; Chinese transcripts pass
+through `toTraditional`, and the text lands in the capture box for the person
+to read before anything is proposed from it. Live dictation (Web Speech) and
+recorded memos share one language picker.
 
 ## Email draft notes
 

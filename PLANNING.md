@@ -33,7 +33,7 @@ Each phase is one branch and PR, usable on its own.
 | P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | **Built on `feat/assistant-foundation`** |
 | P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | **Built on `feat/assistant-foundation`** |
 | P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | **Built on `feat/assistant-foundation`** |
-| P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | Next |
+| P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | **Built on `feat/assistant-foundation`** |
 | P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | Planned (after P6, decided 2026-10-16) |
 
 ---
@@ -198,6 +198,8 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 54 | A step becomes a task at most once | `createdSteps` is claimed with `NOT has` + `push` in the task's transaction — the same conditional-claim idea as capture proposals and invite links, without a table per step. |
 | 55 | Email drafts never send, and facts are checked rather than trusted | Sending from the app would make it a system that acts on the outside world, which it is not. The fact check flags rather than strips, because the person may know a date the inputs omitted — the goal is that nothing reaches a client unread. |
 | 56 | Writing style is per person, not per workspace | A voice belongs to the person and follows them between workspaces; nobody else's drafts may borrow it. |
+| 57 | Gmail through our own OAuth flow, not Auth.js | Sign-in stays Credentials; Gmail is a separate, revocable, read-only grant. A table of our own (`IntegrationAccount`) keeps the encrypted refresh token out of Auth.js's `Account` table, which would collide if Google sign-in is ever added. |
+| 58 | Voice memos become WAV in the browser | OpenRouter's audio input lists wav, mp3, aac, ogg, flac, m4a, and PCM, not webm — and webm is what Chrome records. Decoding and resampling client-side also shrinks a minute to ~1.9 MB, so segments fit Vercel's limits without a server-side encoder. |
 
 ### Deviations from the original spec (approved)
 
@@ -251,6 +253,12 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
    corpus. Add Traditional Chinese answerable/unanswerable evaluation cases and
    record a baseline before changing either (P3 adds `ILIKE` *search*, which is
    not the grounding path).
+9. **Gmail needs a Google Cloud OAuth client, and a personal account expires
+   weekly.** A gmail.com account can only use an app in Testing mode, whose
+   grants Google ends after 7 days; the page then asks for a reconnect. A
+   Google Workspace organisation can mark the app Internal and avoid both the
+   expiry and Google's verification. Public use would need restricted-scope
+   verification.
 
 ---
 

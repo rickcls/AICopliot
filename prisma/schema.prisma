@@ -45,10 +45,10 @@ model User {
   activeWorkspaceId String?
   createdAt         DateTime  @default(now())
 
-  activeWorkspace  Workspace?        @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
-  personalProjects Project[]         @relation("PersonalProjectOwner")
-  createdInvites   WorkspaceInvite[] @relation("InviteCreator")
-  acceptedInvites  WorkspaceInvite[] @relation("InviteAcceptor")
+  activeWorkspace  Workspace?           @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
+  personalProjects Project[]            @relation("PersonalProjectOwner")
+  createdInvites   WorkspaceInvite[]    @relation("InviteCreator")
+  acceptedInvites  WorkspaceInvite[]    @relation("InviteAcceptor")
   captures         Capture[]
   captureProposals CaptureProposal[]
   taskSnoozes      TaskSnooze[]
@@ -56,6 +56,7 @@ model User {
   taskSuggestions  TaskSuggestion[]
   writingStyle     WritingStyle?
   emailDrafts      EmailDraft[]
+  integrations     IntegrationAccount[]
 
   accounts                 Account[]
   ownedWorkspaces          Workspace[]
@@ -1264,4 +1265,30 @@ model EmailDraft {
   task      Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, userId, createdAt(sort: Desc)])
+}
+
+/// A person's connection to an outside account — today only Google, read-only
+/// Gmail. The refresh token is stored encrypted (AES-256-GCM, key in
+/// INTEGRATION_ENCRYPTION_KEY) and never leaves the server; access tokens are
+/// fetched per request and not stored. Mail is read only when the person asks.
+model IntegrationAccount {
+  id             String    @id @default(cuid())
+  userId         String
+  provider       String
+  /// The account's own address, shown so the person knows which mailbox.
+  email          String
+  scopes         String
+  encryptedToken String
+  iv             String
+  authTag        String
+  /// Set when Google refuses the refresh token (revoked, or a test app's
+  /// seven-day expiry); the page then asks the person to reconnect.
+  needsReconnect Boolean   @default(false)
+  connectedAt    DateTime  @default(now())
+  lastCheckedAt  DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
 }

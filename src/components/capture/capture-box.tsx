@@ -2,7 +2,14 @@
 
 import { useId, useRef, useState } from "react";
 import { Paperclip, Sparkles } from "lucide-react";
-import { DictationButton } from "@/components/capture/dictation-button";
+import {
+  DICTATION_LANGUAGES,
+  DictationButton,
+  LANGUAGE_KEY,
+  useDictationSupported,
+  type DictationLanguage,
+} from "@/components/capture/dictation-button";
+import { VoiceRecorder } from "@/components/capture/voice-recorder";
 import { useT } from "@/components/i18n-provider";
 import { Button, ErrorState, Spinner, Textarea } from "@/components/ui";
 import type { CaptureView } from "@/lib/capture/view";
@@ -34,8 +41,16 @@ export function CaptureBox({
   const [text, setText] = useState("");
   const [dictated, setDictated] = useState(false);
   const [listening, setListening] = useState(false);
+  const [speechLanguage, setSpeechLanguage] = useState<DictationLanguage>("yue");
+  const languageId = useId();
+  const dictationSupported = useDictationSupported();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function appendSpoken(spoken: string) {
+    setDictated(true);
+    setText((current) => (current ? `${current}${/\s$/.test(current) ? "" : " "}${spoken}` : spoken));
+  }
 
   async function send(payload: { text: string; source: "text" | "voice" } | { documentId: string }) {
     const response = await fetch("/api/captures", {
@@ -130,13 +145,33 @@ export function CaptureBox({
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <label htmlFor={languageId} className="sr-only">
+            {t("voice.language")}
+          </label>
+          <select
+            id={languageId}
+            value={speechLanguage}
+            disabled={listening}
+            onChange={(event) => setSpeechLanguage(event.target.value as DictationLanguage)}
+            className="h-8 rounded-lg border border-transparent bg-transparent px-1.5 text-xs text-slate-600 hover:bg-slate-100"
+          >
+            {DICTATION_LANGUAGES.map((option) => (
+              <option key={option} value={option}>
+                {t(LANGUAGE_KEY[option])}
+              </option>
+            ))}
+          </select>
           <DictationButton
+            language={speechLanguage}
             disabled={busy !== null}
             onListeningChange={setListening}
-            onText={(spoken) => {
-              setDictated(true);
-              setText((current) => (current ? `${current}${/\s$/.test(current) ? "" : " "}${spoken}` : spoken));
-            }}
+            onText={appendSpoken}
+          />
+          <VoiceRecorder
+            language={speechLanguage}
+            disabled={busy !== null || listening}
+            onActiveChange={setListening}
+            onText={appendSpoken}
           />
           <input
             ref={fileInput}
@@ -170,6 +205,10 @@ export function CaptureBox({
           </Button>
         </div>
       </div>
+
+      {dictationSupported ? (
+        <p className="mt-2 text-xs text-slate-400">{t("voice.privacy")}</p>
+      ) : null}
 
       {error ? (
         <div className="mt-3">

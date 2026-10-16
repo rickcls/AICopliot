@@ -23,6 +23,19 @@ const envSchema = z.object({
   // Optional: a stronger model for writing in the person's own voice (email
   // drafts). Unset, the chat model writes them too.
   OPENROUTER_WRITING_MODEL: z.string().optional(),
+  // Voice memos need a model that accepts audio input. The default is the
+  // model OpenRouter's own audio documentation uses in its examples.
+  OPENROUTER_TRANSCRIBE_MODEL: z.string().default("google/gemini-2.5-flash"),
+
+  // Read-only Gmail. All three must be set, or Gmail is simply not offered.
+  // The key is 32 random bytes, base64 (openssl rand -base64 32).
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  INTEGRATION_ENCRYPTION_KEY: z.string().optional(),
+  // The public origin Google redirects back to. Unset, the request's own
+  // origin is used — fine for one domain, but every preview URL would need
+  // registering with Google.
+  APP_URL: z.string().url().optional(),
 
   EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
 

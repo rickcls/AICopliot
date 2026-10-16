@@ -5,8 +5,10 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { CaptureBox } from "@/components/capture/capture-box";
 import { CaptureCard, type ProjectOption } from "@/components/capture/capture-card";
+import { GmailPanel } from "@/components/capture/gmail-panel";
 import { useT } from "@/components/i18n-provider";
 import type { CaptureView } from "@/lib/capture/view";
+import type { GmailStatus } from "@/lib/gmail/service";
 
 /**
  * The capture box with the notes beneath it. On /capture it lists recent
@@ -18,11 +20,14 @@ export function CaptureWorkspace({
   projects,
   personalProjectId,
   compact = false,
+  gmail,
 }: {
   initialCaptures: CaptureView[];
   projects: ProjectOption[];
   personalProjectId: string;
   compact?: boolean;
+  /** Offered on the Capture page; Today keeps to the box. */
+  gmail?: GmailStatus;
 }) {
   const t = useT();
   const [captures, setCaptures] = useState(initialCaptures);
@@ -37,6 +42,15 @@ export function CaptureWorkspace({
         personalProjectId={personalProjectId}
         onCaptured={(capture) => setCaptures((current) => [capture, ...current])}
       />
+
+      {gmail ? (
+        <GmailPanel
+          status={gmail}
+          onCaptured={(capture) =>
+            setCaptures((current) => [capture, ...current.filter((row) => row.id !== capture.id)])
+          }
+        />
+      ) : null}
 
       {captures.map((capture) => (
         <CaptureCard

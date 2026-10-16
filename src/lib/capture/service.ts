@@ -148,7 +148,13 @@ export async function deleteCapture(access: CaptureAccess, captureId: string) {
  */
 export async function createCapture(
   access: CaptureAccess,
-  input: { text?: string; documentId?: string; source: "text" | "voice" },
+  input: {
+    text?: string;
+    documentId?: string;
+    source: "text" | "voice" | "email";
+    /** An email's id, so it is captured once per person (`@@unique([userId, externalId])`). */
+    externalId?: string;
+  },
   deps: CaptureDeps = {},
 ) {
   const now = deps.now ?? new Date();
@@ -177,6 +183,7 @@ export async function createCapture(
       source: documentId ? "document" : input.source,
       body,
       documentId,
+      externalId: input.externalId ?? null,
       localDate: new Date(`${localDateString(timeZone, now)}T00:00:00.000Z`),
       timeZone,
       replyLanguage: detectReplyLanguage(body, fallbackLanguage),
@@ -210,7 +217,7 @@ export async function proposeForCapture(
 ) {
   const capture = await prisma.capture.findFirst({
     where: { id: captureId, ...scope(access) },
-    select: { id: true, body: true, localDate: true, timeZone: true, replyLanguage: true },
+    select: { id: true, body: true, localDate: true, timeZone: true, replyLanguage: true, source: true },
   });
   if (!capture) throw new CaptureError("Capture not found", 404);
 
@@ -239,6 +246,7 @@ export async function proposeForCapture(
           tasks: context.promptTasks,
           projects: context.promptProjects,
           language,
+          fromEmail: capture.source === "email",
         }),
       },
     ];

@@ -42,19 +42,22 @@ export function EmailComposer({
   tasks,
   initialTaskId,
   initialDrafts,
+  initialIncoming = null,
 }: {
   tasks: EmailTaskOption[];
   initialTaskId: string | null;
   initialDrafts: EmailDraftView[];
+  /** An email to reply to, from a Gmail capture. */
+  initialIncoming?: string | null;
 }) {
   const t = useT();
   const locale = useLocale();
   const toast = useToast();
   const ids = useId();
-  const [purpose, setPurpose] = useState<Purpose>("follow_up");
+  const [purpose, setPurpose] = useState<Purpose>(initialIncoming ? "reply" : "follow_up");
   const [recipient, setRecipient] = useState("");
   const [keyPoints, setKeyPoints] = useState("");
-  const [incoming, setIncoming] = useState("");
+  const [incoming, setIncoming] = useState(initialIncoming ?? "");
   const [taskId, setTaskId] = useState(initialTaskId ?? "");
   const [language, setLanguage] = useState<"auto" | "zh-Hant" | "en">("auto");
   const [busy, setBusy] = useState(false);

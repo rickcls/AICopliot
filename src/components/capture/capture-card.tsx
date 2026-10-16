@@ -270,6 +270,14 @@ export function CaptureCard({
           <Badge tone="info">{t("capture.pendingCount", { count: pending.length })}</Badge>
         ) : null}
         <span className="flex-1" />
+        {capture.source === "email" ? (
+          <Link
+            href={`/email?capture=${capture.id}`}
+            className="text-xs font-medium text-slate-500 hover:text-slate-900"
+          >
+            {t("capture.replyToEmail")}
+          </Link>
+        ) : null}
         {capture.documentId ? (
           <Link
             href={`/documents/${capture.documentId}`}

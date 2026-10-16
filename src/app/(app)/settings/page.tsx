@@ -1,7 +1,9 @@
+import { ConnectedAccounts } from "@/components/connected-accounts";
 import { MembersPanel } from "@/components/members-panel";
 import { SettingsPanel } from "@/components/settings-panel";
 import { requireWorkspace, getUserPreferences } from "@/lib/auth-guard";
 import { getLocale, getT } from "@/lib/i18n/server";
+import { getGmailStatus } from "@/lib/gmail/service";
 import { DEFAULT_TIME_ZONE } from "@/lib/time";
 import { listMembers, listPendingInvites } from "@/lib/workspace/service";
 
@@ -22,12 +24,13 @@ function timeZoneOptions(current: string): string[] {
 export default async function SettingsPage() {
   const access = await requireWorkspace();
   const { userId, workspaceId, workspaceName, role } = access;
-  const [t, locale, preferences, members, invites] = await Promise.all([
+  const [t, locale, preferences, members, invites, gmail] = await Promise.all([
     getT(),
     getLocale(),
     getUserPreferences(userId),
     listMembers(workspaceId),
     role === "admin" ? listPendingInvites(access) : Promise.resolve([]),
+    getGmailStatus(userId),
   ]);
   const timeZone = preferences?.timeZone ?? DEFAULT_TIME_ZONE;
 
@@ -42,6 +45,9 @@ export default async function SettingsPage() {
         timeZone={timeZone}
         timeZones={timeZoneOptions(timeZone)}
       />
+      <div className="mt-10">
+        <ConnectedAccounts gmail={gmail} />
+      </div>
       <div className="mt-10">
         {/* Keyed on the workspace so switching workspaces remounts the panel
             with that workspace's members rather than keeping stale state. */}
