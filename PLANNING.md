@@ -31,8 +31,8 @@ Each phase is one branch and PR, usable on its own.
 | P1 | Lazy / inaccurate records, forgotten progress | Capture box (paste, browser dictation, file) → cited proposals (create task, update status/date, progress note) applied by click; server-resolved relative dates (聽日, 下星期五) | **Built on `feat/assistant-foundation`** |
 | P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | **Built on `feat/assistant-foundation`** |
 | P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | **Built on `feat/assistant-foundation`** |
-| P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | Next |
-| P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | Planned |
+| P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | **Built on `feat/assistant-foundation`** |
+| P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | Next |
 | P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | Planned |
 | P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | Planned (after P6, decided 2026-10-16) |
 
@@ -194,6 +194,8 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 50 | Document search uses `ILIKE` over passages, not the full-text index | The `english` text-search configuration cannot segment Chinese, so a Chinese phrase would never match lexically. A substring match needs no segmentation. It scans the workspace's passages; add a `pg_trgm` GIN index when a workspace grows large enough to feel it. The grounding path is unchanged. |
 | 51 | Labelling is a separate request after indexing, and a person's edit is final | Indexing must fit the 60-second limit on its own. A summary that states facts is held to the citation rule; a title and tags are filing aids. Overwriting a person's correction with the next AI pass would teach them not to correct anything. |
 | 52 | `storeDocument()` is the only way bytes become a Document | A second, server-side path (saving a capture) appeared; keeping validation and the id-based storage key in one function means it cannot skip either (invariant 6). |
+| 53 | Task approaches may answer without evidence; nothing else may | Refusing "how do I tackle this?" whenever the files are silent would leave the person exactly as stuck as before. The guard moves from refusing to labelling: a step's basis is computed from valid citations, never taken from the model, and general steps stay visibly marked wherever they are copied. |
+| 54 | A step becomes a task at most once | `createdSteps` is claimed with `NOT has` + `push` in the task's transaction — the same conditional-claim idea as capture proposals and invite links, without a table per step. |
 
 ### Deviations from the original spec (approved)
 

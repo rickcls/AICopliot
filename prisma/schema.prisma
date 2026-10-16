@@ -53,6 +53,7 @@ model User {
   captureProposals CaptureProposal[]
   taskSnoozes      TaskSnooze[]
   dailyPlans       DailyPlan[]
+  taskSuggestions  TaskSuggestion[]
 
   accounts                 Account[]
   ownedWorkspaces          Workspace[]
@@ -133,6 +134,7 @@ model Workspace {
   captureProposals        CaptureProposal[]
   taskSnoozes             TaskSnooze[]
   dailyPlans              DailyPlan[]
+  taskSuggestions         TaskSuggestion[]
 
   @@index([ownerId])
 }
@@ -635,6 +637,8 @@ model Task {
   captureApplied CaptureProposal[] @relation("CaptureProposalTask")
 
   snoozes TaskSnooze[]
+
+  suggestions TaskSuggestion[]
 
   @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])
@@ -1180,4 +1184,34 @@ model DailyPlan {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId, localDate])
+}
+
+/// "How could I tackle this?" for one task, asked by one person. Private to
+/// them, like a capture. Steps that rest on the person's documents carry
+/// sources; steps from general practice are stored — and shown — as the
+/// model's own suggestion. Nothing here changes the task: adding the steps to
+/// its description or creating tasks from them are ordinary writes.
+model TaskSuggestion {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  userId        String
+  taskId        String
+  /// [{ text, basis: "document" | "general", citations: ["S1"] }]
+  steps         Json
+  /// [{ label, chunkId, documentId, filename, pageNumber, excerpt }]
+  sources       Json
+  note          String?
+  /// linked | project | none — what evidence the suggestion could draw on.
+  evidence      String
+  /// Step indexes already turned into tasks, so a second click creates none.
+  createdSteps  Int[]    @default([])
+  modelName     String
+  promptVersion String
+  createdAt     DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId, taskId, createdAt(sort: Desc)])
 }

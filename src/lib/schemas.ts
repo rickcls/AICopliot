@@ -597,6 +597,10 @@ export const dayPlanRequestSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+export const createTasksFromStepsSchema = z.object({
+  stepIndexes: z.array(z.number().int().min(0).max(29)).min(1).max(10),
+});
+
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),

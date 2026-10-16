@@ -245,6 +245,17 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    that compares against the source. Quoted lines and excerpts are never
    converted — they must stay the source's own characters.
 
+22. **General knowledge is labelled, never blended — and only one feature may
+   use it.** "How to tackle it" on a task (`src/lib/approach/`) is the single
+   place the model is asked even when retrieval finds no evidence, because a
+   person stuck on a task wants practical steps their files may not contain.
+   `validateApproach()` decides each step's basis from its citations alone: a
+   step is `document` only if it cites a passage the model was actually given,
+   and everything else is `general` — stored and shown with an explicit "AI
+   suggestion (not from your files)" marker and no source chip, and prefixed
+   with that marker when copied into a description or a new task. Every other
+   answering feature keeps invariant 4.
+
 ## ⚠️ Prisma drops the pgvector index on every migration
 
 Prisma cannot see raw-SQL indexes on `Unsupported()` columns, so **every**
@@ -1000,6 +1011,18 @@ its own PATCHing instead of reporting changes upward. Its rules:
   arrow orphaned between them.
 - **There is no Save button, because there is nothing to submit.** The footer
   reports save state instead.
+
+**"How to tackle it" is the task panel's third tab** (`task-approach.tsx`).
+Evidence is the task's linked documents (`selectDocumentContext`, 12
+passages), else the project's documents held to the chat's evidence bar, else
+none — and then every step is general (invariant 22). A suggestion is a
+private `TaskSuggestion` per person and is never applied by itself: "Add steps
+to the description" goes through the panel's own `save()`, and "Create tasks"
+(`POST /api/task-suggestions/[id]/create-tasks`) goes through `task-write`,
+claiming each step index on `createdSteps` in the same transaction as its
+task so a second click creates nothing. The step formatter lives in
+`approach/format.ts`, apart from the validator, so the browser bundle never
+pulls in OpenCC.
 
 **`TaskComment` is human discussion, and deliberately outside every other model
 here.** It has no `source`/`generationStatus`, so it is not a proposal awaiting
