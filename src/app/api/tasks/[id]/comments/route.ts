@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import {
+  COMMENT_SELECT,
+  createTaskCommentRecord,
+  findCommentableTask,
+} from "@/lib/pm/task-write";
 import { createTaskCommentSchema } from "@/lib/schemas";
 
 /**
@@ -20,22 +25,12 @@ interface Params {
   params: Promise<{ id: string }>;
 }
 
-export const COMMENT_SELECT = {
-  id: true,
-  body: true,
-  createdAt: true,
-  author: { select: { id: true, name: true, email: true } },
-} as const;
-
 export async function GET(_request: Request, { params }: Params) {
   try {
     const { workspaceId } = await requireWorkspace();
     const { id } = await params;
 
-    const task = await prisma.task.findFirst({
-      where: { id, workspaceId },
-      select: { id: true },
-    });
+    const task = await findCommentableTask(workspaceId, id);
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
@@ -66,24 +61,17 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
-    const task = await prisma.task.findFirst({
-      where: { id, workspaceId },
-      select: { id: true },
-    });
+    const task = await findCommentableTask(workspaceId, id);
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    const comment = await prisma.taskComment.create({
-      // The author is the session user, never a value from the request body:
-      // otherwise a caller could post in somebody else's name.
-      data: {
-        workspaceId,
-        taskId: task.id,
-        authorId: user.id,
-        body: parsed.data.body,
-      },
-      select: COMMENT_SELECT,
+    // The author is the session user, never a value from the request body.
+    const comment = await createTaskCommentRecord(prisma, {
+      workspaceId,
+      taskId: task.id,
+      authorId: user.id,
+      body: parsed.data.body,
     });
 
     return NextResponse.json({ comment }, { status: 201 });

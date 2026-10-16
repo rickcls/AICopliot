@@ -1,15 +1,23 @@
 import { redirect } from "next/navigation";
-import { getSessionUser, getOrCreateDefaultWorkspace } from "@/lib/auth-guard";
+import {
+  getOrCreateDefaultWorkspace,
+  getSessionUser,
+  listMemberships,
+} from "@/lib/auth-guard";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { ToastProvider } from "@/components/toast";
 import { prisma } from "@/lib/db";
-import { getT } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { getOrCreatePersonalProject } from "@/lib/pm/personal-project";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 /**
  * Auth boundary for every signed-in page. Unauthenticated visitors are
- * redirected here rather than in each page, and the workspace is provisioned
- * on first visit.
+ * redirected here rather than in each page, and the workspace — and the
+ * person's personal project inside it — is provisioned on first visit. The
+ * personal project costs no extra query once it exists: the project list read
+ * below already shows whether it is there.
  *
  * The shell is full width: the board and Gantt need the room, and the previous
  * max-w-5xl cap was what squeezed five board columns into ~180px each.
@@ -23,13 +31,33 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   const workspace = await getOrCreateDefaultWorkspace(user);
-  const t = await getT();
+  const [t, locale, memberships, listed] = await Promise.all([
+    getT(),
+    getLocale(),
+    listMemberships(user.id),
+    prisma.project.findMany({
+      where: visibleProjectWhere(workspace.workspaceId, user.id),
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, personalOwnerId: true },
+    }),
+  ]);
 
-  const projects = await prisma.project.findMany({
-    where: { workspaceId: workspace.workspaceId },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
+  let personal = listed.find((project) => project.personalOwnerId === user.id);
+  if (!personal) {
+    const created = await getOrCreatePersonalProject(
+      workspace.workspaceId,
+      user,
+      locale,
+    );
+    personal = { ...created, personalOwnerId: user.id };
+  }
+  // The personal project is pinned first; the rest stay alphabetical.
+  const projects = [
+    { id: personal.id, name: personal.name, personal: true },
+    ...listed
+      .filter((project) => project.id !== personal.id)
+      .map((project) => ({ id: project.id, name: project.name, personal: false })),
+  ];
 
   return (
     // Providers wrap the shell rather than each panel: a confirmation is modal
@@ -54,7 +82,9 @@ export default async function AppLayout({
         <div className="flex min-h-dvh">
           <AppSidebar
             projects={projects}
+            workspaceId={workspace.workspaceId}
             workspaceName={workspace.workspaceName}
+            workspaces={memberships}
             userEmail={user.email}
             isAdmin={workspace.role === "admin"}
           />

@@ -4,14 +4,15 @@ import { LinkButton } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getT } from "@/lib/i18n/server";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const { workspaceId } = await requireWorkspace();
+  const { workspaceId, userId } = await requireWorkspace();
   const t = await getT();
   const projects = await prisma.project.findMany({
-    where: { workspaceId },
+    where: visibleProjectWhere(workspaceId, userId),
     orderBy: { name: "asc" },
     select: {
       id: true,

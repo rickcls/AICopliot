@@ -1,7 +1,9 @@
+import { MembersPanel } from "@/components/members-panel";
 import { SettingsPanel } from "@/components/settings-panel";
 import { requireWorkspace, getUserPreferences } from "@/lib/auth-guard";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { DEFAULT_TIME_ZONE } from "@/lib/time";
+import { listMembers, listPendingInvites } from "@/lib/workspace/service";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +20,14 @@ function timeZoneOptions(current: string): string[] {
 }
 
 export default async function SettingsPage() {
-  const { userId } = await requireWorkspace();
-  const [t, locale, preferences] = await Promise.all([
+  const access = await requireWorkspace();
+  const { userId, workspaceId, workspaceName, role } = access;
+  const [t, locale, preferences, members, invites] = await Promise.all([
     getT(),
     getLocale(),
     getUserPreferences(userId),
+    listMembers(workspaceId),
+    role === "admin" ? listPendingInvites(access) : Promise.resolve([]),
   ]);
   const timeZone = preferences?.timeZone ?? DEFAULT_TIME_ZONE;
 
@@ -37,6 +42,28 @@ export default async function SettingsPage() {
         timeZone={timeZone}
         timeZones={timeZoneOptions(timeZone)}
       />
+      <div className="mt-10">
+        {/* Keyed on the workspace so switching workspaces remounts the panel
+            with that workspace's members rather than keeping stale state. */}
+        <MembersPanel
+          key={workspaceId}
+          workspaceName={workspaceName}
+          viewerId={userId}
+          viewerRole={role}
+          initialMembers={members.map((member) => ({
+            userId: member.userId,
+            name: member.name,
+            email: member.email,
+            role: member.role,
+            isOwner: member.isOwner,
+          }))}
+          initialInvites={invites.map((invite) => ({
+            id: invite.id,
+            role: invite.role,
+            expiresAt: invite.expiresAt.toISOString(),
+          }))}
+        />
+      </div>
     </div>
   );
 }

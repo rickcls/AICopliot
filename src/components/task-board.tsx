@@ -599,7 +599,7 @@ export function TaskBoard({
     if (!statusId) return;
     setEditingId(null);
     setDraftFill(null);
-    setDraft(emptyDraft(statusId));
+    setDraft(emptyDraft(statusId, currentUserId));
   }
 
   /** An upload made from a task joins the project list every picker reads. */

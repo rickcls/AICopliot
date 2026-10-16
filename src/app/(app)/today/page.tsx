@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Flag } from "lucide-react";
+import { CaptureWorkspace } from "@/components/capture/capture-workspace";
 import { PRIORITY_FLAG } from "@/components/task-types";
 import { Card, EmptyState, LinkButton, SectionHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
+import { getCaptureProjectOptions, listCaptures } from "@/lib/capture/service";
+import { toCaptureView } from "@/lib/capture/view";
 import { intlLocale } from "@/lib/i18n/locales";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { displayStatusLabel } from "@/lib/i18n/status-labels";
@@ -21,15 +24,22 @@ export const dynamic = "force-dynamic";
  *
  * Only buckets with something in them are drawn: four headings over "nothing
  * here" would be the page shouting about good news.
+ *
+ * The capture box sits on top because telling the assistant what happened is
+ * the first thing done here, and notes with suggestions still waiting stay
+ * beneath it until they are applied or dismissed.
  */
 export default async function TodayPage() {
-  const { workspaceId, userId } = await requireWorkspace();
-  const [t, locale, today, solo, tasks] = await Promise.all([
+  const access = await requireWorkspace();
+  const { workspaceId, userId } = access;
+  const [t, locale, today, solo, tasks, waiting, captureOptions] = await Promise.all([
     getT(),
     getLocale(),
     getViewerToday(),
     isSoloWorkspace(workspaceId),
     getMyOpenTasks(workspaceId, userId),
+    listCaptures(access, { pendingOnly: true, limit: 3 }),
+    getCaptureProjectOptions(access),
   ]);
 
   const dateLocale = intlLocale(locale);
@@ -58,6 +68,15 @@ export default async function TodayPage() {
           <span className="mx-1.5 text-slate-300">·</span>
           {solo ? t("today.soloLead") : t("today.lead")}
         </p>
+      </div>
+
+      <div className="mb-8">
+        <CaptureWorkspace
+          compact
+          initialCaptures={waiting.map(toCaptureView)}
+          projects={captureOptions.projects}
+          personalProjectId={captureOptions.personalProjectId}
+        />
       </div>
 
       {tasks.length === 0 ? (

@@ -2,6 +2,7 @@ import { EvaluationsPanel } from "@/components/evaluations-panel";
 import { requireAdmin, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { computeMetrics } from "@/lib/evaluation/scoring";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function EvaluationsPage() {
       include: { project: { select: { name: true } } },
     }),
     prisma.project.findMany({
-      where: { workspaceId: access.workspaceId },
+      where: visibleProjectWhere(access.workspaceId, access.userId),
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),

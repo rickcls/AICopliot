@@ -50,13 +50,18 @@ export interface TaskDraft {
   requirementIds: string[];
 }
 
-export function emptyDraft(statusId: string): TaskDraft {
+/**
+ * A new task starts assigned to the person creating it. Most tasks are
+ * written down by the person who will do them, and an unassigned task in a
+ * team workspace appears on nobody's Today.
+ */
+export function emptyDraft(statusId: string, assigneeId = ""): TaskDraft {
   return {
     title: "",
     description: "",
     statusId,
     priority: "medium",
-    assigneeId: "",
+    assigneeId,
     milestoneId: "",
     estimatedHours: "",
     startDate: "",

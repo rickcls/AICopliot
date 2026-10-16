@@ -4,12 +4,13 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { defaultTaskStatusRows } from "@/lib/pm/task-statuses";
 import { createProjectSchema } from "@/lib/schemas";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 export async function GET() {
   try {
-    const { workspaceId } = await requireWorkspace();
+    const { workspaceId, userId } = await requireWorkspace();
     const projects = await prisma.project.findMany({
-      where: { workspaceId },
+      where: visibleProjectWhere(workspaceId, userId),
       orderBy: { name: "asc" },
       include: {
         _count: {

@@ -192,13 +192,19 @@ function DiscoveryList({ rows }: { rows: ProjectHealthRow[] }) {
   );
 }
 
-export async function DashboardSummary({ workspaceId }: { workspaceId: string }) {
+export async function DashboardSummary({
+  workspaceId,
+  viewerId,
+}: {
+  workspaceId: string;
+  viewerId: string;
+}) {
   // The viewer's day: every use below is a day comparison, and Today must
   // agree with this page between 00:00 and 08:00 in Hong Kong.
   const now = await getViewerToday();
   const [summary, projects] = await Promise.all([
-    getDashboardSummary(workspaceId, now),
-    getProjectHealthRows(workspaceId, now),
+    getDashboardSummary(workspaceId, viewerId, now),
+    getProjectHealthRows(workspaceId, viewerId, now),
   ]);
 
   const total = (key: "toReview" | "askClient" | "agreed") =>

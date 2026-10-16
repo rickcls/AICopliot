@@ -17,6 +17,7 @@ import {
   DONE_TASK_CATEGORY,
   officialRecordWhere,
 } from "./rules";
+import { inVisibleProjects, visibleProjectWhere } from "@/lib/pm/visibility";
 
 /**
  * Dashboard and project-overview counts.
@@ -58,10 +59,19 @@ export interface DashboardSummary {
   }>;
 }
 
+/**
+ * Workspace-wide counts and lists, limited to the projects the viewer sees —
+ * a colleague's personal project is theirs to manage, so its work is left out
+ * of everyone else's overview.
+ */
 export async function getDashboardSummary(
   workspaceId: string,
+  viewerId: string,
   now: Date = new Date(),
 ): Promise<DashboardSummary> {
+  const visible = <T extends object>(where: T) =>
+    inVisibleProjects(workspaceId, viewerId, where);
+
   const [
     activeProjects,
     overdueTasks,
@@ -72,30 +82,36 @@ export async function getDashboardSummary(
     blockedTaskList,
     upcomingMilestoneList,
   ] = await Promise.all([
-    prisma.project.count({ where: activeProjectWhere(workspaceId) }),
-    prisma.task.count({ where: overdueTaskWhere(workspaceId, now) }),
-    prisma.task.count({ where: blockedTaskWhere(workspaceId) }),
-    prisma.milestone.count({ where: upcomingMilestoneWhere(workspaceId, now) }),
+    prisma.project.count({
+      where: {
+        AND: [activeProjectWhere(workspaceId), visibleProjectWhere(workspaceId, viewerId)],
+      },
+    }),
+    prisma.task.count({ where: visible(overdueTaskWhere(workspaceId, now)) }),
+    prisma.task.count({ where: visible(blockedTaskWhere(workspaceId)) }),
+    prisma.milestone.count({
+      where: visible(upcomingMilestoneWhere(workspaceId, now)),
+    }),
     prisma.task.findMany({
-      where: overdueTaskWhere(workspaceId, now),
+      where: visible(overdueTaskWhere(workspaceId, now)),
       orderBy: { dueDate: "asc" },
       take: LIST_LIMIT,
       select: dashboardTaskSelect,
     }),
     prisma.task.findMany({
-      where: dueSoonTaskWhere(workspaceId, now),
+      where: visible(dueSoonTaskWhere(workspaceId, now)),
       orderBy: { dueDate: "asc" },
       take: LIST_LIMIT,
       select: dashboardTaskSelect,
     }),
     prisma.task.findMany({
-      where: blockedTaskWhere(workspaceId),
+      where: visible(blockedTaskWhere(workspaceId)),
       orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
       take: LIST_LIMIT,
       select: dashboardTaskSelect,
     }),
     prisma.milestone.findMany({
-      where: upcomingMilestoneWhere(workspaceId, now),
+      where: visible(upcomingMilestoneWhere(workspaceId, now)),
       orderBy: { targetDate: "asc" },
       take: LIST_LIMIT,
       select: {
@@ -297,12 +313,15 @@ export interface ProjectHealthRow {
  */
 export async function getProjectHealthRows(
   workspaceId: string,
+  viewerId: string,
   now: Date = new Date(),
 ): Promise<ProjectHealthRow[]> {
   const [projects, open, done, overdue, blocked, uncovered, pending, statuses] =
     await Promise.all([
+      // Only the project list is narrowed: the grouped counts below are keyed
+      // by project and read only for the projects listed here.
       prisma.project.findMany({
-        where: { workspaceId },
+        where: visibleProjectWhere(workspaceId, viewerId),
         orderBy: { updatedAt: "desc" },
         select: { id: true, name: true, deliveryEnabled: true },
       }),

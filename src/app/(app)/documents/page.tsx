@@ -1,6 +1,7 @@
 import { DocumentsPanel } from "@/components/documents-panel";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function AllDocumentsPage({
 }: {
   searchParams: Promise<{ project?: string }>;
 }) {
-  const { workspaceId } = await requireWorkspace();
+  const { workspaceId, userId } = await requireWorkspace();
   const requestedProjectId = (await searchParams).project;
 
   // Loaded server-side so the client component renders with data on first
@@ -37,7 +38,7 @@ export default async function AllDocumentsPage({
       },
     }),
     prisma.project.findMany({
-      where: { workspaceId },
+      where: visibleProjectWhere(workspaceId, userId),
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),

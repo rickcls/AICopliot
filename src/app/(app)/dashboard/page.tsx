@@ -10,6 +10,7 @@ import {
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getT } from "@/lib/i18n/server";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,11 @@ export const dynamic = "force-dynamic";
  * of what needs the viewer. Document administration lives at /documents.
  */
 export default async function DashboardPage() {
-  const { workspaceId, workspaceName } = await requireWorkspace();
+  const { workspaceId, workspaceName, userId } = await requireWorkspace();
   const t = await getT();
 
   const [projectCount, documentCount] = await Promise.all([
-    prisma.project.count({ where: { workspaceId } }),
+    prisma.project.count({ where: visibleProjectWhere(workspaceId, userId) }),
     prisma.document.count({ where: { workspaceId } }),
   ]);
 
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
         // The summary is the slow half of the page (a dozen grouped reads), so
         // the heading streams first instead of waiting on all of it.
         <Suspense fallback={<SummarySkeleton />}>
-          <DashboardSummary workspaceId={workspaceId} />
+          <DashboardSummary workspaceId={workspaceId} viewerId={userId} />
         </Suspense>
       )}
     </div>

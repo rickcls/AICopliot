@@ -10,12 +10,18 @@ import {
   FolderKanban,
   LogOut,
   MessageSquare,
+  NotebookPen,
   Settings,
+  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/components/i18n-provider";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  WorkspaceSwitcher,
+  type WorkspaceOption,
+} from "@/components/workspace-switcher";
 
 /**
  * Primary navigation. Always visible — never behind a toggle.
@@ -37,6 +43,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export interface SidebarProject {
   id: string;
   name: string;
+  /** The viewer's own personal project, pinned first with its own mark. */
+  personal: boolean;
 }
 
 // Today is first because it is home: the question this app answers first is
@@ -44,6 +52,7 @@ export interface SidebarProject {
 // as "Workspace overview" — one question, one entry.
 const GLOBAL_LINKS = [
   { href: "/today", labelKey: "nav.today", icon: CalendarCheck },
+  { href: "/capture", labelKey: "nav.capture", icon: NotebookPen },
   { href: "/projects", labelKey: "nav.projects", icon: FolderKanban },
   { href: "/documents", labelKey: "nav.documents", icon: FileText },
   // Ask keeps its highlight on /chat/<conversationId>, because a thread has no
@@ -92,12 +101,17 @@ function NavItem({
 
 export function AppSidebar({
   projects,
+  workspaceId,
   workspaceName,
+  workspaces,
   userEmail,
   isAdmin,
 }: {
   projects: SidebarProject[];
+  workspaceId: string;
   workspaceName: string;
+  /** Every workspace the viewer belongs to; a switcher appears with two or more. */
+  workspaces: WorkspaceOption[];
   userEmail: string;
   isAdmin: boolean;
 }) {
@@ -183,7 +197,9 @@ export function AppSidebar({
                       )}
                     >
                       {/* Initial stands in for the name on the rail, and gives
-                          the row a fixed anchor once labels appear. */}
+                          the row a fixed anchor once labels appear. The
+                          personal project carries a person mark instead, so
+                          it reads as "mine" even on the rail. */}
                       <span
                         aria-hidden
                         className={cn(
@@ -193,7 +209,11 @@ export function AppSidebar({
                             : "bg-slate-200 text-slate-600",
                         )}
                       >
-                        {project.name.charAt(0).toUpperCase()}
+                        {project.personal ? (
+                          <UserRound className="size-3.5" />
+                        ) : (
+                          project.name.charAt(0).toUpperCase()
+                        )}
                       </span>
                       <span className={cn(LABEL, "truncate")}>
                         {project.name}
@@ -209,9 +229,13 @@ export function AppSidebar({
 
       <div className="shrink-0 border-t border-slate-200 p-2 md:p-3">
         <div className="hidden md:block">
-          <p className="truncate px-1 text-xs font-medium text-slate-900">
-            {workspaceName}
-          </p>
+          {workspaces.length > 1 ? (
+            <WorkspaceSwitcher current={workspaceId} workspaces={workspaces} />
+          ) : (
+            <p className="truncate px-1 text-xs font-medium text-slate-900">
+              {workspaceName}
+            </p>
+          )}
           <p className="truncate px-1 text-xs text-slate-500">{userEmail}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <ThemeToggle />

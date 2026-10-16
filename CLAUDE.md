@@ -84,11 +84,16 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    labelled `S1..Sn` in the prompt; **real database IDs are never sent to the
    model.** Returned IDs are resolved through a server-side map and dropped if
    absent. An answer left with zero valid citations is downgraded to a refusal.
+   Every prompt follows the same rule with its own label family — capture lines
+   are `C`, a capture's candidate tasks `T` and projects `P`.
 
 4. **Refuse before spending a model call.** A chunk must either clear the
    semantic `RAG_MIN_SCORE` or match the PostgreSQL full-text query. If neither
    retrieval path supplies evidence, `answerQuestion` returns the refusal
-   without invoking the chat provider.
+   without invoking the chat provider. A capture is not a question: its
+   evidence is the person's own note, which is always present, so there is no
+   retrieval gate — but every proposal must still cite a `C` line or it is
+   dropped.
 
 5. **Secrets stay server-side.** Everything touching the DB or a provider
    imports `server-only`. No `NEXT_PUBLIC_` variable exists, and none should.
@@ -193,6 +198,52 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    character (`containsSimplified` in `src/lib/language.ts`). Model output
    follows the *input's* language by a deterministic `detectReplyLanguage()` —
    Hong Kong code-mixing counts as Chinese — never by asking the model to match.
+
+17. **A personal project is hidden, not private.** `Project.personalOwnerId`
+   marks each person's own project (one per person per workspace, by
+   `@@unique([workspaceId, personalOwnerId])`). `visibleProjectWhere(workspaceId,
+   viewerId)` in `src/lib/pm/visibility.ts` keeps colleagues' personal projects
+   out of *navigation and lists* — the sidebar, Projects, the chat and document
+   pickers, the dashboard — and nothing else. Their tasks and documents still
+   resolve by id for any member and still ground workspace chat, because the
+   workspace is the security boundary (invariant 1). Content that must be
+   private belongs in a per-user table read with `(id, workspaceId, userId)`.
+   The visibility filter carries an `OR`, so it is combined with `AND`, never
+   spread (`inVisibleProjects`).
+
+18. **An invite link is a bearer token, stored only as a hash.** Tokens are 32
+   random bytes, returned once by `POST /api/workspace/invites`, and kept as
+   `sha256` in `WorkspaceInvite.tokenHash`; every lookup is by hash. Accepting
+   claims the invite with a conditional `updateMany` in the same transaction as
+   the membership insert, so a link admits exactly one person. The page that
+   accepts (`/invite/[token]`) lives outside `(app)`, whose layout would
+   otherwise provision a workspace for the invitee before they join; accepting
+   is a POST, never a side effect of opening the link.
+
+19. **A capture is private, and its proposals are never silent writes.**
+   `Capture` and `CaptureProposal` are read and written only with
+   `(id, workspaceId, userId)` — a colleague's id matches nothing. The note is
+   stored before the model is called and kept if it fails. Applying a proposal
+   is an ordinary manual write through `src/lib/pm/task-write.ts` — the same
+   functions the task routes call — and the proposal is claimed
+   (`pending → applied`, conditional `updateMany`) in the **same transaction**
+   as that write, so a double click creates one task. A task applied from a
+   capture is a manual record assigned to the person; its provenance is
+   `CaptureProposal.appliedTaskId`, not `source = ai_suggested`.
+
+20. **Code resolves dates; the model only quotes them.** The model returns
+   `{ phrase, date }`. `validateCaptureProposals` keeps the date only if the
+   phrase appears in the cited lines (or their neighbours) and
+   `resolveDateExpression(phrase, Capture.localDate)` in
+   `src/lib/capture/dates.ts` can read it; the computed date wins, and a
+   disagreement with the model's adds a `date_check` flag shown before Apply.
+   Vague timing ("下星期", "遲啲", "ASAP") is null, never a guess.
+
+21. **Traditional characters are enforced after validation, on generated prose
+   only.** `toTraditional()` (`src/lib/language-convert.ts`, OpenCC `cn → hk`)
+   runs on titles, descriptions, and notes the model wrote, after every check
+   that compares against the source. Quoted lines and excerpts are never
+   converted — they must stay the source's own characters.
 
 ## ⚠️ Prisma drops the pgvector index on every migration
 
@@ -565,6 +616,77 @@ from the start. Seeded task-column labels are data and are translated only when
 untouched (`displayStatusLabel`); a renamed column is shown as typed. Date-only
 values are formatted with `formatDay(value, intlLocale(locale))` so the server
 and the browser cannot pick different formats.
+
+## Capture notes
+
+`/capture` and the box at the top of `/today` are where a person tells the
+assistant something — typed, pasted, dictated, or from a file. One model call
+(plus the usual single repair) turns it into proposals of three kinds:
+`create_task`, `update_task` (status by category, due date, priority), and
+`add_note` (a progress note written as a `TaskComment` by the person).
+
+- **The pipeline is `src/lib/capture/`:** `lines.ts` splits the note into `C`
+  lines (per newline and sentence, hard-splitting long unpunctuated dictation);
+  `context.ts` loads the person's open tasks as `T` candidates
+  (`rankTaskCandidates` — shared words first, Chinese by character pairs) and
+  visible projects as `P`; `prompt.ts` (`capture-v1`); `schemas.ts` parses each
+  proposal separately so one bad item costs only itself; `validate.ts` is the
+  deterministic gate; `service.ts` stores, calls, validates, and applies.
+- **Updates must change something.** A status the task already has, or its
+  current due date, is dropped as a no-op rather than offered as an Apply that
+  does nothing. A new task matching an open title is *flagged*
+  `possible_duplicate`, never dropped.
+- **Status goes by category, never by label.** `pickStatusForCategory()` picks
+  the first column of that category in board order, preferring the seeded
+  `in_progress` for "still going". A project with no blocked column refuses
+  the update with a message instead of inventing one.
+- **New tasks land in the personal project** unless the person (or a
+  confident `P` label) names another, and are assigned to the person applying.
+  "Apply all" skips flagged proposals; each item applies in its own
+  transaction so one refusal does not undo the rest.
+- **Files:** `.txt`/`.md` are read in the browser into the box. PDF and Word go
+  through the ordinary upload route into the personal project, are indexed,
+  and are captured from `Document.extractedText` (first 12,000 characters); a
+  task applied into the same project links the document.
+- **Dictation is the browser's Web Speech API** — no server of ours, but the
+  browser sends audio to its vendor, and the button says so. Language tags
+  differ by browser (`yue-Hant-HK` in Chrome, `zh-HK` in Safari), so each
+  language lists fallbacks tried on `language-not-supported`.
+- **The capture is never evidence.** It is not a document and is not searched
+  by chat; "save as document" is planned for P3.
+
+## Team workspace notes
+
+A person may belong to several workspaces. `getOrCreateDefaultWorkspace()`
+resolves which one a request acts in: `User.activeWorkspaceId` while they are
+still a member of it, else their earliest membership, else a new workspace.
+The column is a preference, membership is the permission — a stale choice is
+ignored, never trusted. `PUT /api/me/workspace` checks membership before saving
+a choice, and accepting an invite sets it, so an existing user who joins a team
+lands in the team's workspace. The sidebar shows a switcher only with two or
+more memberships; switching lands on `/today`, because the open project belongs
+to the old workspace.
+
+Member rules live in the pure `canChangeMember()` (`src/lib/workspace/invites.ts`):
+only admins change other people, anyone may leave, the owner is never removed
+or demoted (deleting the owner's user row is what deletes the workspace), and
+the last admin is never removed or demoted. Removing someone clears
+`personalOwnerId` on their personal project in that workspace, so their work
+becomes an ordinary project the team can see instead of one hidden from
+everyone. The service is `src/lib/workspace/service.ts`; Settings renders it
+through `members-panel.tsx`.
+
+The sign-in page takes `?callbackUrl=`, validated once on the server by
+`safeCallbackUrl()` (`src/lib/auth/callback-url.ts`) — `//host` and `/\host`
+are protocol-relative to a browser, so "starts with /" is not enough. That is
+how an invite link survives sign-in or sign-up.
+
+Every person gets a personal project in each workspace, created by the `(app)`
+layout on first visit (`getOrCreatePersonalProject`, which re-reads on a
+concurrent create and adds the email on a name clash) and pinned first in the
+sidebar with a person mark. New tasks default their assignee to the creator
+(`emptyDraft(statusId, currentUserId)`), so a task you write down appears on
+your own Today in a team workspace.
 
 ## Project management notes
 

@@ -24,23 +24,33 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
   // Credentials provider has no password store of its own, so the bcrypt hash
   // lives on the Auth.js user row. Never selected into any client payload.
-  passwordHash  String?
+  passwordHash      String?
   /// UI language. A string validated by Zod rather than an enum, so adding a
   /// locale needs no enum migration. Model output follows the input's language
   /// instead (src/lib/language.ts).
-  locale        String    @default("zh-Hant")
+  locale            String    @default("zh-Hant")
   /// IANA zone that decides which calendar day is "today" for this person.
   /// Date-only values stay at UTC midnight; this only moves the anchor they
   /// are compared against (src/lib/time.ts).
-  timeZone      String    @default("Asia/Hong_Kong")
-  createdAt     DateTime  @default(now())
+  timeZone          String    @default("Asia/Hong_Kong")
+  /// The workspace this person last chose. Honoured only while they are still a
+  /// member of it; otherwise their earliest membership applies.
+  activeWorkspaceId String?
+  createdAt         DateTime  @default(now())
+
+  activeWorkspace  Workspace?        @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
+  personalProjects Project[]         @relation("PersonalProjectOwner")
+  createdInvites   WorkspaceInvite[] @relation("InviteCreator")
+  acceptedInvites  WorkspaceInvite[] @relation("InviteAcceptor")
+  captures         Capture[]
+  captureProposals CaptureProposal[]
 
   accounts                 Account[]
   ownedWorkspaces          Workspace[]
@@ -94,6 +104,8 @@ model Workspace {
 
   owner         User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   members       WorkspaceMember[]
+  invites       WorkspaceInvite[]
+  activeFor     User[]             @relation("ActiveWorkspace")
   projects      Project[]
   documents     Document[]
   chunks        DocumentChunk[]
@@ -115,24 +127,31 @@ model Workspace {
   generationRuns          GenerationRun[]
   taskComments            TaskComment[]
   taskDocuments           TaskDocument[]
+  captures                Capture[]
+  captureProposals        CaptureProposal[]
 
   @@index([ownerId])
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  workspaceId String
-  name        String
-  description String?
+  id               String   @id @default(cuid())
+  workspaceId      String
+  name             String
+  description      String?
   /// Shows the delivery tabs (timeline, risks, plan, reports). Tasks are a
   /// core tab. Gates navigation only — never data access or grounding.
-  deliveryEnabled Boolean @default(false)
+  deliveryEnabled  Boolean  @default(false)
   /// Shows the Requirements tab. Same rule as deliveryEnabled: navigation only.
-  discoveryEnabled Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  discoveryEnabled Boolean  @default(false)
+  /// Set on one person's personal project: the default home for their own
+  /// work. Hidden from colleagues' navigation, *not* private — the workspace is
+  /// still the security boundary (see visibleProjectWhere).
+  personalOwnerId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  personalOwner User?              @relation("PersonalProjectOwner", fields: [personalOwnerId], references: [id], onDelete: SetNull)
   documents     Document[]
   conversations ChatConversation[]
   evaluations   EvaluationCase[]
@@ -148,6 +167,9 @@ model Project {
   generationRuns GenerationRun[]
 
   @@unique([workspaceId, name])
+  // One personal project per person per workspace. NULLs are distinct in a
+  // Postgres unique index, so ordinary projects are unaffected.
+  @@unique([workspaceId, personalOwnerId])
   @@index([workspaceId, createdAt])
 }
 
@@ -163,6 +185,28 @@ model WorkspaceMember {
 
   @@unique([workspaceId, userId])
   @@index([userId])
+}
+
+/// A single-use link that adds whoever opens it to a workspace. Only the
+/// SHA-256 of the token is stored: the token itself is shown once, to the admin
+/// who created it, and a database read cannot recover a working link.
+model WorkspaceInvite {
+  id           String        @id @default(cuid())
+  workspaceId  String
+  tokenHash    String        @unique
+  role         WorkspaceRole @default(member)
+  createdById  String?
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedById String?
+  revokedAt    DateTime?
+  createdAt    DateTime      @default(now())
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy  User?     @relation("InviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  acceptedBy User?     @relation("InviteAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +241,8 @@ model Document {
   project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   chunks    DocumentChunk[]
   tasks     TaskDocument[]
+
+  captures Capture[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, createdAt])
@@ -263,25 +309,25 @@ enum ChatFocus {
 }
 
 model ChatConversation {
-  id             String         @id @default(cuid())
-  workspaceId    String
-  projectId      String?
-  userId         String
-  title          String
-  groundingScope GroundingScope @default(documents)
-  focus          ChatFocus      @default(none)
+  id               String         @id @default(cuid())
+  workspaceId      String
+  projectId        String?
+  userId           String
+  title            String
+  groundingScope   GroundingScope @default(documents)
+  focus            ChatFocus      @default(none)
   // SET NULL, like projectId: a thread is answer history and outlives its
   // task. `focus` stays `task`, so the route can tell a thread whose task was
   // deleted from one that never had a task, and refuses to continue it.
-  taskId         String?
+  taskId           String?
   // A filter, not a relation: a deleted document simply stops matching, and
   // retrieval re-checks workspace and project for every id on every turn.
-  focusDocumentIds String[]     @default([])
-  createdAt      DateTime       @default(now())
+  focusDocumentIds String[]       @default([])
+  createdAt        DateTime       @default(now())
   // Not `updatedAt`: the row is never edited, only appended to, and Prisma's
   // @updatedAt fires only on a write to this model — it would never move for a
   // child ChatMessage insert. Written by hand in the same transaction.
-  lastMessageAt  DateTime       @default(now())
+  lastMessageAt    DateTime       @default(now())
 
   workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -547,22 +593,25 @@ model Task {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  status        ProjectTaskStatus  @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status        ProjectTaskStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
   // Removing a person unassigns their work rather than deleting it.
-  assignee      User?              @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  milestone     Milestone?         @relation("TaskMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
-  generationRun GenerationRun?     @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
-  reviewedBy    User?              @relation("TaskReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  assignee      User?             @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  milestone     Milestone?        @relation("TaskMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
+  generationRun GenerationRun?    @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
+  reviewedBy    User?             @relation("TaskReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
-  dependencies     TaskDependency[]  @relation("DependentTask")
-  dependents       TaskDependency[]  @relation("DependencyTask")
+  dependencies     TaskDependency[]   @relation("DependentTask")
+  dependents       TaskDependency[]   @relation("DependencyTask")
   citations        TaskCitation[]
   requirementLinks RequirementLink[]
   comments         TaskComment[]
   documents        TaskDocument[]
   conversations    ChatConversation[]
+
+  captureTargets CaptureProposal[] @relation("CaptureProposalTarget")
+  captureApplied CaptureProposal[] @relation("CaptureProposalTask")
 
   @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])
@@ -596,6 +645,8 @@ model TaskComment {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
   author    User?     @relation("TaskCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  captureProposals CaptureProposal[]
 
   @@index([workspaceId, taskId, createdAt])
   @@index([authorId])
@@ -648,10 +699,10 @@ model Milestone {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  workspace     Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  generationRun GenerationRun?      @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
-  reviewedBy    User?               @relation("MilestoneReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project          Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationRun    GenerationRun?      @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
+  reviewedBy       User?               @relation("MilestoneReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   citations        MilestoneCitation[]
   tasks            Task[]              @relation("TaskMilestone")
   risks            ProjectRisk[]       @relation("RiskMilestone")
@@ -956,4 +1007,107 @@ model GenerationRun {
   requirements     Requirement[]
 
   @@index([workspaceId, projectId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Capture: what a person tells the assistant, and what it proposes doing
+// ---------------------------------------------------------------------------
+
+enum CaptureSource {
+  text
+  voice
+  document
+  email
+}
+
+enum CaptureStatus {
+  processing
+  ready
+  failed
+}
+
+enum CaptureProposalKind {
+  create_task
+  update_task
+  add_note
+}
+
+enum CaptureProposalState {
+  pending
+  applied
+  dismissed
+}
+
+/// One thing a person told the assistant — pasted notes, dictation, a
+/// document, later an email. Private to that person: every read and write is
+/// scoped by (id, workspaceId, userId). The body is their own record and is
+/// kept whatever the model does with it.
+model Capture {
+  id            String        @id @default(cuid())
+  workspaceId   String
+  userId        String
+  source        CaptureSource @default(text)
+  body          String
+  /// The person's calendar day when they wrote it. Relative dates ("聽日",
+  /// "next Friday") resolve against this, so a retry next week still means
+  /// the same Friday.
+  localDate     DateTime      @db.Date
+  timeZone      String
+  /// zh-Hant | en, decided by code from the body (src/lib/language.ts).
+  replyLanguage String
+  documentId    String?
+  /// The message id of an email capture (P6), so one email is captured once.
+  externalId    String?
+  status        CaptureStatus @default(processing)
+  errorMessage  String?
+  modelName     String?
+  promptVersion String?
+  rawOutput     String?
+  latencyMs     Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document  Document?         @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  proposals CaptureProposal[]
+
+  @@unique([userId, externalId])
+  @@index([workspaceId, userId, createdAt(sort: Desc)])
+}
+
+/// One proposed change from a capture. Nothing is written until the person
+/// applies it; applying claims the row (pending → applied) in the same
+/// transaction as the write, so a double click cannot create two tasks.
+model CaptureProposal {
+  id               String               @id @default(cuid())
+  workspaceId      String
+  userId           String
+  captureId        String
+  position         Int
+  kind             CaptureProposalKind
+  /// Server-resolved values only — dates computed by code, ids resolved from
+  /// opaque labels. Never a model-supplied id.
+  payload          Json
+  /// [{ label: "C3", text: "…" }] — the capture lines this rests on.
+  citations        Json
+  /// possible_duplicate | date_check — exceptions shown before applying.
+  flags            String[]             @default([])
+  /// The existing task an update or note is for.
+  taskId           String?
+  state            CaptureProposalState @default(pending)
+  decidedAt        DateTime?
+  appliedTaskId    String?
+  appliedCommentId String?
+  createdAt        DateTime             @default(now())
+
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capture        Capture      @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  task           Task?        @relation("CaptureProposalTarget", fields: [taskId], references: [id], onDelete: SetNull)
+  appliedTask    Task?        @relation("CaptureProposalTask", fields: [appliedTaskId], references: [id], onDelete: SetNull)
+  appliedComment TaskComment? @relation(fields: [appliedCommentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, userId, state])
+  @@index([captureId, position])
 }

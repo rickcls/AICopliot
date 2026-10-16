@@ -525,6 +525,27 @@ export const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
 });
 
+// --- Team workspaces ---------------------------------------------------------
+
+export const workspaceRoleSchema = z.enum(["admin", "member"]);
+
+export const switchWorkspaceSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+});
+
+export const createInviteSchema = z.object({
+  role: workspaceRoleSchema.optional(),
+});
+
+/** A base64url token of 32 bytes is 43 characters; anything far off is not one. */
+export const acceptInviteSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+});
+
+export const updateMemberSchema = z.object({
+  role: workspaceRoleSchema,
+});
+
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),

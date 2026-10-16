@@ -26,10 +26,10 @@ Each phase is one branch and PR, usable on its own.
 
 | Phase | Pain point | Scope | Status |
 |---|---|---|---|
-| P0a | Foundation | Product docs, i18n (zh-Hant default + en), `User.locale`/`timeZone`, viewer-local "today", Today page, Settings, Tasks as a core tab, `discoveryEnabled` | **Shipped on `feat/assistant-foundation`** |
-| P0b | Team | Invite links, member roles, workspace switcher, personal project hidden from colleagues' navigation | Next |
-| P1 | Lazy / inaccurate records, forgotten progress | Capture box (paste, browser dictation, file) → cited proposals (create task, update status/date, progress note) applied by click; server-resolved relative dates (聽日, 下星期五) | Planned |
-| P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | Planned |
+| P0a | Foundation | Product docs, i18n (zh-Hant default + en), `User.locale`/`timeZone`, viewer-local "today", Today page, Settings, Tasks as a core tab, `discoveryEnabled` | **Built on `feat/assistant-foundation`** |
+| P0b | Team | Invite links, member roles, workspace switcher, personal project hidden from colleagues' navigation, new tasks assigned to their creator | **Built on `feat/assistant-foundation`** |
+| P1 | Lazy / inaccurate records, forgotten progress | Capture box (paste, browser dictation, file) → cited proposals (create task, update status/date, progress note) applied by click; server-resolved relative dates (聽日, 下星期五) | **Built on `feat/assistant-foundation`** |
+| P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | Next |
 | P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | Planned |
 | P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | Planned |
 | P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | Planned |
@@ -181,6 +181,13 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 37 | "Today" is UTC midnight of the viewer's local date, passed where `now` was | Every rule already compares UTC days, so changing the anchor instead of the rules keeps one definition of overdue. Applied to every page that counts overdue work at once — Today alone would disagree with the board between 00:00 and 08:00 HKT. Instants keep the real clock. |
 | 38 | No i18n library; typed dictionaries, locale as a user preference | Every page is behind sign-in, so a locale URL segment buys nothing. `satisfies Dictionary` makes a missing key a type error; a test rejects Simplified characters, the error a reviewer is most likely to miss. |
 | 39 | In a workspace of one, unassigned tasks are "mine" | Existing tasks mostly have no assignee. Requiring one would have opened Today empty for the only user; with colleagues, unassigned work is nobody's yet and stays out. |
+| 40 | Personal project per person, hidden from colleagues' navigation rather than private | A captured task needs a home when no project is named, and statuses are per project, so a nullable `Task.projectId` would have touched every query. Real privacy would need project-level ACLs everywhere; hiding keeps the workspace as the single security boundary and puts private data (captures, Gmail text) in per-user tables instead. |
+| 41 | `User.activeWorkspaceId` instead of "earliest membership" | With invites, an existing user who joins a team would otherwise never see the team workspace. The column is only a preference; membership is re-checked on every request. |
+| 42 | Invite tokens hashed, single-use, accepted by POST | A link is a bearer credential. Hashing makes a leaked row useless, the conditional claim admits one person, and a POST means a mail client's link preview cannot join anyone. |
+| 43 | Capture proposals are rows applied through the manual write path, not AI draft records | Draft AI records need a project-scoped `GenerationRun`, are invisible to every operational read, and cannot express "mark that task done" or "add a note". A proposal row can, and a conditional claim in the write's transaction makes Apply idempotent. Extracting `task-write.ts` keeps one validation path for typed and captured tasks. |
+| 44 | The date phrase, not the date, is what the model returns | "聽日" and "下星期五" are where models slip — off by a day, or a guessed year. A pure resolver anchored on the capture's stored local date is testable and stable across retries; the model's own date only raises a flag. |
+| 45 | A capture is not stored as a document | A document is workspace-visible and chat evidence; a person's notes (and later their email) are private, and unreviewed notes behind a citation would be the problem `TaskComment` already avoids. Ingestion would also spend the 60-second budget before the model call. |
+| 46 | OpenCC (`opencc-js@1.4.2`) converts model prose to Hong Kong Traditional | A prompt rule makes Simplified rare, not impossible. Conversion runs after validation and never touches quotes; the Simplified detector excludes the forms OpenCC's HK standard itself produces (户, 脱), so the two agree. |
 
 ### Deviations from the original spec (approved)
 
@@ -218,8 +225,10 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
    the quality gain, but it is the obvious thing to cache if cost matters.
 4. **No OCR.** Scanned/image-only PDFs produce no text and fail with a clear
    message rather than silently indexing nothing.
-5. **Single workspace per user**, auto-provisioned. `WorkspaceMember` and roles
-   are modelled, but there is no invite flow yet.
+5. **Invites are links, not emails.** An admin copies a single-use link and
+   sends it themselves; the app sends no mail. There is no per-document or
+   per-project access control inside a workspace — a personal project is only
+   hidden from navigation.
 6. **No chat history UI.** Conversations and messages are persisted, and
    follow-ups now work within a session, but the chat page shows only the
    current session and there is no way to reopen a past conversation.
