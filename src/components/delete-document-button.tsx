@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
@@ -13,6 +14,7 @@ export function DeleteDocumentButton({
   id: string;
   filename: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const confirm = useConfirm();
   const toast = useToast();
@@ -20,9 +22,9 @@ export function DeleteDocumentButton({
 
   async function handleDelete() {
     const confirmed = await confirm({
-      title: `Delete “${filename}”?`,
-      body: "This also removes its indexed text, so it will no longer be available as evidence for answers.",
-      confirmLabel: "Delete document",
+      title: t("documents.deleteTitle", { name: filename }),
+      body: t("documents.deleteBody"),
+      confirmLabel: t("documents.delete"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -35,18 +37,18 @@ export function DeleteDocumentButton({
     if (response?.ok) {
       // Navigating away unmounts this component, so the confirmation has to
       // come from the provider above it rather than from local state.
-      toast.success(`Deleted “${filename}”`);
+      toast.success(t("documents.deleted", { name: filename }));
       router.push("/documents");
       router.refresh();
     } else {
       setPending(false);
-      toast.error("Could not delete that document.");
+      toast.error(t("documents.deleteFailed"));
     }
   }
 
   return (
     <Button variant="danger" size="sm" onClick={handleDelete} disabled={pending}>
-      {pending ? "Deleting…" : "Delete"}
+      {t("documents.delete")}
     </Button>
   );
 }

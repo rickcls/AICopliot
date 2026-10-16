@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
+  FileText,
   Flag,
   ListPlus,
   MessageSquareText,
@@ -213,6 +214,30 @@ export function CaptureCard({
     }
   }
 
+  async function saveAsDocument() {
+    const ok = await confirm({
+      title: t("capture.saveTitle"),
+      body: t("capture.saveBody"),
+      confirmLabel: t("capture.saveAsDocument"),
+    });
+    if (!ok) return;
+    setBusy("save");
+    try {
+      const response = await fetch(`/api/captures/${capture.id}/save-document`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.documentId) {
+        toast.error(t("capture.saveDocumentFailed"), data.error);
+        return;
+      }
+      onChange({ ...capture, documentId: data.documentId });
+      toast.success(t("capture.savedToast"));
+    } catch {
+      toast.error(t("common.couldNotReach"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function remove() {
     const ok = await confirm({
       title: t("capture.deleteTitle"),
@@ -245,6 +270,24 @@ export function CaptureCard({
           <Badge tone="info">{t("capture.pendingCount", { count: pending.length })}</Badge>
         ) : null}
         <span className="flex-1" />
+        {capture.documentId ? (
+          <Link
+            href={`/documents/${capture.documentId}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900"
+          >
+            <FileText className="size-3.5" aria-hidden />
+            {t("capture.openDocument")}
+          </Link>
+        ) : capture.status !== "processing" ? (
+          <button
+            type="button"
+            disabled={busy === "save"}
+            onClick={() => void saveAsDocument()}
+            className={cn("text-xs font-medium text-slate-500 hover:text-slate-900 disabled:opacity-50", FOCUS_RING)}
+          >
+            {t("capture.saveAsDocument")}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => setShowNote(!showNote)}

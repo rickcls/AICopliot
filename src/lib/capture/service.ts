@@ -28,6 +28,7 @@ import { detectReplyLanguage } from "@/lib/language";
 import { getOrCreatePersonalProject } from "@/lib/pm/personal-project";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { pickStatusForCategory } from "@/lib/pm/status-pick";
+import { storeDocument } from "@/lib/documents/store";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
 import {
   createTaskCommentRecord,
@@ -579,4 +580,39 @@ export async function getCaptureProjectOptions(access: CaptureAccess) {
         .map((project) => ({ id: project.id, name: project.name, personal: false })),
     ],
   };
+}
+
+/**
+ * Keeps a note as an ordinary document in the person's personal project, so it
+ * is searchable and can ground answers. This is the one deliberate way a
+ * private capture becomes workspace-visible — the person is told so before
+ * they confirm — and it goes through `storeDocument`, the same validated path
+ * as an upload. The capture remembers the document, so it is saved once.
+ */
+export async function saveCaptureAsDocument(access: CaptureAccess, captureId: string) {
+  const capture = await prisma.capture.findFirst({
+    where: { id: captureId, ...scope(access) },
+    select: { id: true, body: true, source: true, documentId: true, localDate: true },
+  });
+  if (!capture) throw new CaptureError("Capture not found", 404);
+  if (capture.documentId) {
+    throw new CaptureError("This note already has a document", 409);
+  }
+
+  const { personalProjectId } = await getCaptureProjectOptions(access);
+  const day = capture.localDate.toISOString().slice(0, 10);
+  const stored = await storeDocument({
+    workspaceId: access.workspaceId,
+    projectId: personalProjectId,
+    filename: `note-${day}.md`,
+    mimeType: "text/markdown",
+    buffer: Buffer.from(`# ${day}\n\n${capture.body}\n`, "utf8"),
+  });
+  if (!stored.ok) throw new CaptureError(stored.error, 422);
+
+  await prisma.capture.updateMany({
+    where: { id: capture.id, ...scope(access), documentId: null },
+    data: { documentId: stored.id },
+  });
+  return { documentId: stored.id };
 }

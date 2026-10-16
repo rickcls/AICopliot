@@ -154,11 +154,12 @@ model Project {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  personalOwner User?              @relation("PersonalProjectOwner", fields: [personalOwnerId], references: [id], onDelete: SetNull)
-  documents     Document[]
-  conversations ChatConversation[]
-  evaluations   EvaluationCase[]
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  personalOwner      User?              @relation("PersonalProjectOwner", fields: [personalOwnerId], references: [id], onDelete: SetNull)
+  documents          Document[]
+  suggestedDocuments Document[]         @relation("DocumentSuggestedProject")
+  conversations      ChatConversation[]
+  evaluations        EvaluationCase[]
 
   // Documents, conversations, and evaluations SET NULL on project delete because
   // they remain meaningful unassigned. The records below cannot exist without a
@@ -225,26 +226,39 @@ enum DocumentStatus {
 }
 
 model Document {
-  id               String         @id @default(cuid())
-  workspaceId      String
-  projectId        String?
-  originalFilename String
-  mimeType         String
-  sizeBytes        Int
-  storageKey       String
-  status           DocumentStatus @default(uploaded)
-  errorMessage     String?
+  id                 String         @id @default(cuid())
+  workspaceId        String
+  projectId          String?
+  originalFilename   String
+  mimeType           String
+  sizeBytes          Int
+  storageKey         String
+  status             DocumentStatus @default(uploaded)
+  errorMessage       String?
   // Cached plain text for the document detail preview; avoids re-parsing the
   // original file just to show an excerpt.
-  extractedText    String?
-  chunkCount       Int            @default(0)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  extractedText      String?
+  chunkCount         Int            @default(0)
+  /// Filing labels, written by the AI after indexing (labelSource "ai") or by
+  /// a person (labelSource "manual"). A manual edit is never overwritten by a
+  /// later AI pass. All optional: a document is complete without them.
+  title              String?
+  /// Two or three sentences, kept only when they cite the document's own text.
+  summary            String?
+  docType            String?
+  tags               String[]       @default([])
+  /// Where the AI thinks this belongs, when that is not where it is.
+  suggestedProjectId String?
+  labelledAt         DateTime?
+  labelSource        String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  chunks    DocumentChunk[]
-  tasks     TaskDocument[]
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project          Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  suggestedProject Project?        @relation("DocumentSuggestedProject", fields: [suggestedProjectId], references: [id], onDelete: SetNull)
+  chunks           DocumentChunk[]
+  tasks            TaskDocument[]
 
   captures Capture[]
 

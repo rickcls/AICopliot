@@ -676,8 +676,43 @@ assistant something — typed, pasted, dictated, or from a file. One model call
   browser sends audio to its vendor, and the button says so. Language tags
   differ by browser (`yue-Hant-HK` in Chrome, `zh-HK` in Safari), so each
   language lists fallbacks tried on `language-not-supported`.
-- **The capture is never evidence.** It is not a document and is not searched
-  by chat; "save as document" is planned for P3.
+- **The capture is never evidence** unless the person chooses to keep it:
+  "Save as document" (`saveCaptureAsDocument`) writes the note as a Markdown
+  document into their personal project through `storeDocument` and indexes it.
+  That is the one deliberate path from private to workspace-visible, and the
+  confirmation says so; the capture records the document so it is saved once.
+
+## Document filing notes
+
+**Every file becomes a Document through `storeDocument()`**
+(`src/lib/documents/store.ts`): three-way validation, the row first, then the
+bytes under `{workspaceId}/{documentId}.{ext}`, and the row removed if storage
+fails. The upload route and "save a capture as a document" both call it.
+
+**Labels are written after indexing, in their own request.** The panel
+uploads up to two files at a time, then calls `/process`, then
+`POST /api/documents/[id]/label` (`label-service.ts`), so indexing keeps its
+60-second budget. Labelling reads up to 12 passages as `S` labels and the
+viewer's visible projects as `P` labels. `validateDocumentLabel()` keeps a
+summary only if it cites a real passage, files an unknown type as `other`,
+cleans and caps tags at six, and suggests a project only when it differs from
+where the document is. **A person's edit wins:** `PATCH /api/documents/[id]`
+with a title, type, or tags sets `labelSource = "manual"`, after which an AI
+pass refreshes only the summary and suggestion. Moving a document anywhere
+clears its suggestion.
+
+**Search is not grounding.** `searchDocuments()` combines `ILIKE` over every
+indexed passage and the labels — which works for Chinese, because a phrase
+either appears or it does not — with the chat's hybrid retrieval held to the
+same `hasGroundingEvidence` bar, and quietly drops the meaning half if
+embeddings are unavailable. Results are links to read, never model input, so
+the lexical grounding path (and its `english` configuration) is unchanged.
+`/documents?q=` is a GET form, so a search is a link.
+
+**Citations open the passage.** Passages carry `id="chunk-{id}"`, and
+`/documents/[id]/chunks?chunk={id}` opens the page holding that passage and
+outlines it. Chat source cards and search results link there. A ready
+document's page offers "Ask about this document" (`/chat?docs={id}`).
 
 ## Team workspace notes
 

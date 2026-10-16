@@ -11,10 +11,10 @@ const tx = {
   captureProposal: { updateMany: vi.fn(), update: vi.fn() },
 };
 const mockPrisma = {
-  capture: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+  capture: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   captureProposal: { createMany: vi.fn(), findFirst: vi.fn() },
   document: { findFirst: vi.fn() },
-  project: { findFirst: vi.fn() },
+  project: { findFirst: vi.fn(), findMany: vi.fn() },
   task: { findFirst: vi.fn() },
   projectTaskStatus: { findMany: vi.fn() },
   $transaction: vi.fn(async (arg: unknown) =>
@@ -46,6 +46,9 @@ vi.mock("@/lib/pm/task-write", () => writes);
 
 const mockPersonal = vi.fn();
 vi.mock("@/lib/pm/personal-project", () => ({ getOrCreatePersonalProject: mockPersonal }));
+
+const mockStore = vi.fn();
+vi.mock("@/lib/documents/store", () => ({ storeDocument: mockStore }));
 
 const service = await import("@/lib/capture/service");
 
@@ -346,3 +349,47 @@ describe("applyProposal", () => {
     });
   });
 });
+
+describe("saveCaptureAsDocument", () => {
+  beforeEach(() => {
+    mockPrisma.project.findMany.mockResolvedValue([
+      { id: "personal-1", name: "Rick的個人工作", personalOwnerId: "u-1" },
+    ]);
+    mockStore.mockResolvedValue({ ok: true, id: "doc-new" });
+  });
+
+  it("stores the note through the validated path, in the personal project", async () => {
+    mockPrisma.capture.findFirst.mockResolvedValue({
+      id: "cap-1",
+      body: "會議重點",
+      source: "text",
+      documentId: null,
+      localDate: new Date("2026-10-16T00:00:00Z"),
+    });
+
+    expect(await service.saveCaptureAsDocument(access, "cap-1")).toEqual({ documentId: "doc-new" });
+    expect(mockStore.mock.calls[0][0]).toMatchObject({
+      workspaceId: "ws-1",
+      projectId: "personal-1",
+      filename: "note-2026-10-16.md",
+    });
+    expect(mockPrisma.capture.updateMany.mock.calls[0][0].where).toMatchObject({
+      id: "cap-1",
+      userId: "u-1",
+      documentId: null,
+    });
+  });
+
+  it("saves a note once", async () => {
+    mockPrisma.capture.findFirst.mockResolvedValue({
+      id: "cap-1",
+      body: "x",
+      source: "text",
+      documentId: "doc-old",
+      localDate: new Date("2026-10-16T00:00:00Z"),
+    });
+    await expect(service.saveCaptureAsDocument(access, "cap-1")).rejects.toMatchObject({ status: 409 });
+    expect(mockStore).not.toHaveBeenCalled();
+  });
+});
+

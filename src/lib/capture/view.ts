@@ -37,6 +37,7 @@ export interface CaptureView {
   status: "processing" | "ready" | "failed";
   errorMessage: string | null;
   localDate: string;
+  documentId: string | null;
   documentName: string | null;
   createdAt: string;
   proposals: CaptureProposalView[];
@@ -52,6 +53,7 @@ export function toCaptureView(row: CaptureRow): CaptureView {
     status: row.status,
     errorMessage: row.errorMessage,
     localDate: row.localDate.toISOString().slice(0, 10),
+    documentId: row.documentId,
     documentName: row.document?.originalFilename ?? null,
     createdAt: row.createdAt.toISOString(),
     proposals: row.proposals.map(

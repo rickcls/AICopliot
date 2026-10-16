@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MessageSquare } from "lucide-react";
 import { DeleteDocumentButton } from "@/components/delete-document-button";
+import { DocumentLabels } from "@/components/document-labels";
 import { RetryIngestionButton } from "@/components/retry-ingestion-button";
 import { Badge, Card, LinkButton, SectionHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
-import { formatBytes, formatDate } from "@/lib/utils";
+import { intlLocale } from "@/lib/i18n/locales";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { formatBytes, formatDay } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +20,8 @@ const STATUS_TONE = {
   failed: "danger",
 } as const;
 
+const PREVIEW_CHARS = 5000;
+
 export default async function DocumentDetailPage({
   params,
 }: {
@@ -23,6 +29,8 @@ export default async function DocumentDetailPage({
 }) {
   const { workspaceId } = await requireWorkspace();
   const { id } = await params;
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const dateLocale = intlLocale(locale);
 
   // Scoped by workspaceId: an ID from another workspace 404s rather than leaking.
   const document = await prisma.document.findFirst({
@@ -31,55 +39,77 @@ export default async function DocumentDetailPage({
   });
 
   if (!document) notFound();
+  const name = document.title ?? document.originalFilename;
 
   return (
     // Extracted document text is prose; cap the width so lines stay readable.
     <div className="mx-auto w-full max-w-4xl">
-      <Link
-        href="/documents"
-        className="text-sm text-slate-500 hover:text-slate-900"
-      >
-        ← Documents
+      <Link href="/documents" className="text-sm text-slate-500 hover:text-slate-900">
+        ← {t("documents.detail.back")}
       </Link>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">
-            {document.originalFilename}
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight break-words">{name}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {formatBytes(document.sizeBytes)} · uploaded{" "}
-            {formatDate(document.createdAt)}
+            {document.title ? `${document.originalFilename} · ` : null}
+            {t("documents.detail.uploaded", {
+              size: formatBytes(document.sizeBytes),
+              date: formatDay(document.createdAt, dateLocale),
+            })}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge tone={STATUS_TONE[document.status]}>{document.status}</Badge>
-          {document.status === "failed" ? (
-            <RetryIngestionButton id={document.id} />
-          ) : null}
-          <DeleteDocumentButton
-            id={document.id}
-            filename={document.originalFilename}
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          {document.status !== "ready" ? (
+            <Badge tone={STATUS_TONE[document.status]}>
+              {t(`documents.status.${document.status}`)}
+            </Badge>
+          ) : (
+            <LinkButton href={`/chat?docs=${document.id}`} variant="secondary" size="sm">
+              <MessageSquare className="size-4" aria-hidden />
+              {t("documents.detail.ask")}
+            </LinkButton>
+          )}
+          {document.status === "failed" ? <RetryIngestionButton id={document.id} /> : null}
+          <DeleteDocumentButton id={document.id} filename={name} />
         </div>
       </div>
 
       {document.status === "failed" && document.errorMessage ? (
-        <div
-          role="alert"
-          className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
-        >
-          <p className="text-sm font-medium text-red-800">Processing failed</p>
+        <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">{t("documents.detail.failedTitle")}</p>
           <p className="mt-1 text-sm text-red-700">{document.errorMessage}</p>
         </div>
       ) : null}
 
+      <section className="mt-6 space-y-3">
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold text-slate-900">{t("documents.detail.summary")}</h2>
+          {document.summary ? (
+            <>
+              <p className="mt-2 text-sm text-pretty text-slate-700">{document.summary}</p>
+              <p className="mt-2 text-xs text-slate-400">{t("documents.detail.summaryHint")}</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">{t("documents.detail.noSummary")}</p>
+          )}
+        </Card>
+        <DocumentLabels
+          documentId={document.id}
+          ready={document.status === "ready"}
+          title={document.title}
+          docType={document.docType}
+          tags={document.tags}
+          labelSource={document.labelSource}
+        />
+      </section>
+
       <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Project", value: document.project?.name ?? "Unassigned" },
-          { label: "Chunks indexed", value: String(document.chunkCount) },
-          { label: "Content type", value: document.mimeType || "unknown" },
-          { label: "Last updated", value: formatDate(document.updatedAt) },
+          { label: t("documents.detail.project"), value: document.project?.name ?? t("documents.unassigned") },
+          { label: t("documents.detail.passagesIndexed"), value: String(document.chunkCount) },
+          { label: t("documents.detail.contentType"), value: document.mimeType || "—" },
+          { label: t("documents.detail.updated"), value: formatDay(document.updatedAt, dateLocale) },
         ].map((item) => (
           <div key={item.label}>
             <dt className="text-xs text-slate-500">{item.label}</dt>
@@ -92,11 +122,8 @@ export default async function DocumentDetailPage({
 
       {document.chunkCount > 0 ? (
         <section className="mt-8">
-          <LinkButton
-            href={`/documents/${document.id}/chunks`}
-            variant="secondary"
-          >
-            Review indexed chunks ({document.chunkCount})
+          <LinkButton href={`/documents/${document.id}/chunks`} variant="secondary">
+            {t("documents.detail.reviewPassages", { count: document.chunkCount })}
           </LinkButton>
         </section>
       ) : null}
@@ -104,17 +131,17 @@ export default async function DocumentDetailPage({
       {document.extractedText ? (
         <section className="mt-8">
           <SectionHeader
-            title="Extracted text preview"
+            title={t("documents.detail.preview")}
             description={
-              document.extractedText.length > 5000
-                ? "First 5,000 characters. The full text is in the indexed chunks."
+              document.extractedText.length > PREVIEW_CHARS
+                ? t("documents.detail.previewHint")
                 : undefined
             }
           />
           <Card className="mt-3 max-h-96 overflow-auto p-4">
             <pre className="font-sans text-xs whitespace-pre-wrap text-slate-700">
-              {document.extractedText.slice(0, 5000)}
-              {document.extractedText.length > 5000 ? "\n\n…" : ""}
+              {document.extractedText.slice(0, PREVIEW_CHARS)}
+              {document.extractedText.length > PREVIEW_CHARS ? "\n\n…" : ""}
             </pre>
           </Card>
         </section>

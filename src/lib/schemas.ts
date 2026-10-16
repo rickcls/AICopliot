@@ -208,6 +208,40 @@ export const assignDocumentProjectSchema = z.object({
   projectId: z.string().min(1).nullable(),
 });
 
+/**
+ * A document's project and filing labels. Every field is optional with no
+ * default, so a PATCH changes only what it names; editing a label marks the
+ * labels as the person's own, which a later AI pass will not overwrite.
+ */
+export const updateDocumentSchema = z
+  .object({
+    projectId: z.string().min(1).nullable().optional(),
+    title: z.string().trim().max(120).nullable().optional(),
+    docType: z
+      .enum([
+        "contract",
+        "proposal",
+        "quotation",
+        "invoice",
+        "report",
+        "minutes",
+        "email",
+        "specification",
+        "policy",
+        "plan",
+        "presentation",
+        "form",
+        "other",
+      ])
+      .nullable()
+      .optional(),
+    tags: z.array(z.string().trim().min(1).max(30)).max(6).optional(),
+  })
+  .refine(
+    (value) => Object.values(value).some((field) => field !== undefined),
+    "Provide a project or a label to change",
+  );
+
 // --- Project management ----------------------------------------------------
 
 export const taskStatusCategorySchema = z.enum(["open", "blocked", "done"]);

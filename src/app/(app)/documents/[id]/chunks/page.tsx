@@ -10,6 +10,7 @@ import {
 } from "@/components/document-chunk-pagination";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,12 @@ export default async function DocumentChunksPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; chunk?: string }>;
 }) {
   const { workspaceId } = await requireWorkspace();
   const { id } = await params;
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, chunk: chunkParam } = await searchParams;
+  const t = await getT();
 
   const document = await prisma.document.findFirst({
     where: { id, workspaceId },
@@ -46,7 +48,22 @@ export default async function DocumentChunksPage({
     1,
     Math.ceil(totalChunks / DOCUMENT_CHUNKS_PAGE_SIZE),
   );
-  const requestedPage = parsePage(pageParam);
+  // `?chunk=` opens the page holding that passage — how a citation or a
+  // search result lands on the words it quoted rather than on page one.
+  const target = chunkParam
+    ? await prisma.documentChunk.findFirst({
+        where: { id: chunkParam, documentId: document.id, workspaceId },
+        select: { id: true, chunkIndex: true },
+      })
+    : null;
+  const before = target
+    ? await prisma.documentChunk.count({
+        where: { documentId: document.id, workspaceId, chunkIndex: { lt: target.chunkIndex } },
+      })
+    : 0;
+  const requestedPage = target
+    ? Math.floor(before / DOCUMENT_CHUNKS_PAGE_SIZE) + 1
+    : parsePage(pageParam);
   const page = Math.min(requestedPage, totalPages);
   const skip = (page - 1) * DOCUMENT_CHUNKS_PAGE_SIZE;
 
@@ -77,21 +94,22 @@ export default async function DocumentChunksPage({
       </Link>
 
       <div className="mt-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Indexed chunks</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("documents.chunks.title")}</h1>
         <p className="mt-1 text-sm text-slate-500">
           {totalChunks === 0
-            ? "Nothing indexed yet."
-            : `Showing ${firstChunk}–${lastChunk} of ${totalChunks}`}
+            ? t("documents.chunks.none")
+            : t("documents.chunks.showing", { first: firstChunk, last: lastChunk, total: totalChunks })}
         </p>
       </div>
 
       <section className="mt-8 space-y-4">
-        <DocumentChunkList chunks={chunks} />
+        <DocumentChunkList chunks={chunks} t={t} highlightId={target?.id ?? null} />
         <DocumentChunkPagination
           documentId={document.id}
           page={page}
           totalPages={totalPages}
           totalChunks={totalChunks}
+          t={t}
         />
         <DocumentChunkPageLinks
           documentId={document.id}
