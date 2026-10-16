@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-source-sans);
+  /* Source Sans 3 has no CJK glyphs, so Chinese falls through to the first
+     installed Hong Kong face: PingFang HK on Apple, Microsoft JhengHei on
+     Windows, Noto Sans HK elsewhere. Listed explicitly so the browser does not
+     pick a Simplified-style or Japanese face for Han characters. */
+  --font-sans: var(--font-source-sans), "PingFang HK", "Noto Sans HK",
+    "Microsoft JhengHei", sans-serif;
   --font-mono: var(--font-geist-mono);
 
   /* Overlay motion. Dialogs and toasts appear without a user-initiated

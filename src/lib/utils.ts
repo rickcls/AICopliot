@@ -26,8 +26,10 @@ export function formatDate(value: string | Date): string {
  * and disagree with the overdue calculation. Pinned to UTC, and with no time
  * component, because the user never entered one.
  */
-export function formatDay(value: string | Date): string {
-  return new Date(value).toLocaleDateString(undefined, {
+export function formatDay(value: string | Date, locale?: string): string {
+  // `locale` is passed by pages that know the viewer's language; without it
+  // the runtime default applies, which can differ between server and browser.
+  return new Date(value).toLocaleDateString(locale, {
     dateStyle: "medium",
     timeZone: "UTC",
   });

@@ -2,7 +2,7 @@ import { nextDiscoveryStep, type DiscoveryCounts, type DiscoveryStep } from "@/l
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
-import { DeliveryToggle } from "@/components/delivery-toggle";
+import { SectionToggle } from "@/components/section-toggle";
 import {
   Badge,
   Card,
@@ -16,6 +16,7 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { sortRisks, worstRiskLevel } from "@/lib/pm/filters";
 import { percentOf } from "@/lib/pm/progress";
+import { getT } from "@/lib/i18n/server";
 import { getScopedProject } from "@/lib/pm/project";
 import { getProjectSummary } from "@/lib/pm/summary";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/lib/pm/rules";
 import { getLatestStatusReport } from "@/lib/reports/service";
 import { cn, formatDate, formatDay } from "@/lib/utils";
+import { getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -206,7 +208,8 @@ export default async function ProjectOverviewPage({
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
 
-  const now = new Date();
+  // The viewer's day: every use below is a day comparison.
+  const [now, t] = await Promise.all([getViewerToday(), getT()]);
   const [
     summary,
     overdueTasks,
@@ -282,303 +285,350 @@ export default async function ProjectOverviewPage({
     byStatus.validated +
     byStatus.approved;
 
+  const overdueList = (
+    <OverviewCard
+      title="Overdue tasks"
+      href={
+        summary.overdueTasks > overdueTasks.length
+          ? `${base}/tasks?filter=overdue`
+          : undefined
+      }
+      linkLabel={`All ${summary.overdueTasks}`}
+    >
+      {overdueTasks.length === 0 ? (
+        <Quiet>Nothing is past its due date.</Quiet>
+      ) : (
+        <ul className="space-y-2">
+          {overdueTasks.map((task) => (
+            <li key={task.id} className="flex justify-between gap-3 text-sm">
+              <Link
+                href={`${base}/tasks?task=${task.id}`}
+                className="min-w-0 truncate hover:underline"
+              >
+                {task.title}
+              </Link>
+              <span className="shrink-0 text-xs text-red-700">
+                {task.dueDate ? formatDay(task.dueDate) : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </OverviewCard>
+  );
+
+  const blockedList = (
+    <OverviewCard
+      title="Blocked tasks"
+      href={
+        summary.blockedTasks > blockedTasks.length
+          ? `${base}/tasks?filter=blocked`
+          : undefined
+      }
+      linkLabel={`All ${summary.blockedTasks}`}
+    >
+      {blockedTasks.length === 0 ? (
+        <Quiet>Nothing is blocked.</Quiet>
+      ) : (
+        <ul className="space-y-2">
+          {blockedTasks.map((task) => (
+            <li key={task.id} className="truncate text-sm">
+              <Link
+                href={`${base}/tasks?task=${task.id}`}
+                className="hover:underline"
+              >
+                {task.title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </OverviewCard>
+  );
+
+  // Layers that are switched off, offered in one card at the bottom rather
+  // than as an empty section each.
+  const offLayers = [
+    ...(project.discoveryEnabled ? [] : (["discovery"] as const)),
+    ...(project.deliveryEnabled ? [] : (["delivery"] as const)),
+  ];
+
   return (
     <div className="space-y-6">
-      <Card className="flex flex-wrap items-center justify-between gap-4 border-slate-300 p-5">
-        <div className="min-w-0">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-            Next step
-          </p>
-          <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">
-            {next.title}
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-pretty text-slate-600">
-            {next.description}
-          </p>
-        </div>
-        <LinkButton href={next.href}>
-          {next.cta}
-          <ArrowRight className="size-4" aria-hidden />
-        </LinkButton>
-      </Card>
+      {project.discoveryEnabled ? (
+        <>
+          <Card className="flex flex-wrap items-center justify-between gap-4 border-slate-300 p-5">
+            <div className="min-w-0">
+              <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+                Next step
+              </p>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">
+                {next.title}
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm text-pretty text-slate-600">
+                {next.description}
+              </p>
+            </div>
+            <LinkButton href={next.href}>
+              {next.cta}
+              <ArrowRight className="size-4" aria-hidden />
+            </LinkButton>
+          </Card>
 
-      <ol
-        aria-label="Discovery progress"
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <DiscoveryStage
-          index={1}
-          label="Documents"
-          value={`${summary.readyDocuments} indexed`}
-          hint={
-            summary.totalDocuments > summary.readyDocuments
-              ? `${summary.totalDocuments - summary.readyDocuments} still processing`
-              : undefined
-          }
-          done={summary.readyDocuments > 0}
-          href={`${base}/documents`}
-        />
-        <DiscoveryStage
-          index={2}
-          label="Extracted"
-          value={`${live} requirement${live === 1 ? "" : "s"}`}
-          done={live > 0}
-          href={`${base}/requirements`}
-        />
-        <DiscoveryStage
-          index={3}
-          label="Reviewed"
-          value={`${live - byStatus.draft} of ${live}`}
-          hint={
-            byStatus.needs_clarification > 0
-              ? `${byStatus.needs_clarification} waiting on the client`
-              : undefined
-          }
-          done={live > 0 && byStatus.draft === 0}
-          href={`${base}/requirements?filter=draft`}
-        />
-        <DiscoveryStage
-          index={4}
-          label="Agreed"
-          value={`${byStatus.approved} of ${live}`}
-          done={live > 0 && byStatus.approved === live}
-          href={`${base}/requirements?filter=approved`}
-        />
-      </ol>
+          <ol
+            aria-label="Discovery progress"
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            <DiscoveryStage
+              index={1}
+              label="Documents"
+              value={`${summary.readyDocuments} indexed`}
+              hint={
+                summary.totalDocuments > summary.readyDocuments
+                  ? `${summary.totalDocuments - summary.readyDocuments} still processing`
+                  : undefined
+              }
+              done={summary.readyDocuments > 0}
+              href={`${base}/documents`}
+            />
+            <DiscoveryStage
+              index={2}
+              label="Extracted"
+              value={`${live} requirement${live === 1 ? "" : "s"}`}
+              done={live > 0}
+              href={`${base}/requirements`}
+            />
+            <DiscoveryStage
+              index={3}
+              label="Reviewed"
+              value={`${live - byStatus.draft} of ${live}`}
+              hint={
+                byStatus.needs_clarification > 0
+                  ? `${byStatus.needs_clarification} waiting on the client`
+                  : undefined
+              }
+              done={live > 0 && byStatus.draft === 0}
+              href={`${base}/requirements?filter=draft`}
+            />
+            <DiscoveryStage
+              index={4}
+              label="Agreed"
+              value={`${byStatus.approved} of ${live}`}
+              done={live > 0 && byStatus.approved === live}
+              href={`${base}/requirements?filter=approved`}
+            />
+          </ol>
+        </>
+      ) : null}
+
+      <section aria-label={t("project.tabs.tasks")} className="space-y-4">
+        <SectionHeader title={t("project.tabs.tasks")} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard
+            label="Task completion"
+            value={totalTasks === 0 ? "—" : `${completion}%`}
+            href={`${base}/tasks`}
+            hint={
+              totalTasks === 0 ? (
+                "No tasks yet"
+              ) : (
+                <>
+                  <ProgressBar
+                    percent={completion}
+                    label="Tasks done"
+                    className="mb-1.5"
+                  />
+                  {summary.doneTasks} of {totalTasks} done
+                </>
+              )
+            }
+          />
+          <StatCard
+            label="Overdue tasks"
+            value={summary.overdueTasks}
+            tone="danger"
+            href={`${base}/tasks?filter=overdue`}
+            hint={
+              summary.dueSoonTasks > 0
+                ? `${summary.dueSoonTasks} more due in 7 days`
+                : "Nothing else due this week"
+            }
+          />
+          <StatCard
+            label="Blocked tasks"
+            value={summary.blockedTasks}
+            tone="warning"
+            href={`${base}/tasks?filter=blocked`}
+          />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {overdueList}
+          {blockedList}
+        </div>
+      </section>
 
       {project.deliveryEnabled ? (
         <section aria-label="Delivery" className="space-y-4">
           <SectionHeader
             title="Delivery"
-            description="Tasks, milestones, and risks for this project."
+            description="Milestones, risks, and reports for this project."
           >
-            <DeliveryToggle
+            <SectionToggle
               projectId={project.id}
+              section="delivery"
               enabled
               variant="ghost"
             />
           </SectionHeader>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          label="Scope coverage"
-          value={summary.approvedRequirements === 0 ? "—" : `${coverage}%`}
-          href={`${base}/requirements?filter=approved`}
-          hint={
-            summary.approvedRequirements === 0 ? (
-              "Nothing agreed yet"
-            ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {project.discoveryEnabled ? (
               <>
-                <ProgressBar
-                  percent={coverage}
-                  label="Agreed requirements with a delivery task"
-                  className="mb-1.5"
+                <StatCard
+                  label="Scope coverage"
+                  value={summary.approvedRequirements === 0 ? "—" : `${coverage}%`}
+                  href={`${base}/requirements?filter=approved`}
+                  hint={
+                    summary.approvedRequirements === 0 ? (
+                      "Nothing agreed yet"
+                    ) : (
+                      <>
+                        <ProgressBar
+                          percent={coverage}
+                          label="Agreed requirements with a delivery task"
+                          className="mb-1.5"
+                        />
+                        {coveredRequirements} of {summary.approvedRequirements} agreed
+                        have a task
+                      </>
+                    )
+                  }
                 />
-                {coveredRequirements} of {summary.approvedRequirements} agreed
-                have a task
-              </>
-            )
-          }
-        />
-        <StatCard
-          label="Uncovered requirements"
-          value={summary.uncoveredRequirements}
-          tone="danger"
-          href={`${base}/requirements?filter=gaps`}
-          hint="Agreed scope with no delivery task"
-        />
-        <StatCard
-          label="Task completion"
-          value={totalTasks === 0 ? "—" : `${completion}%`}
-          href={`${base}/tasks`}
-          hint={
-            totalTasks === 0 ? (
-              "No tasks yet"
-            ) : (
-              <>
-                <ProgressBar
-                  percent={completion}
-                  label="Tasks done"
-                  className="mb-1.5"
+                <StatCard
+                  label="Uncovered requirements"
+                  value={summary.uncoveredRequirements}
+                  tone="danger"
+                  href={`${base}/requirements?filter=gaps`}
+                  hint="Agreed scope with no delivery task"
                 />
-                {summary.doneTasks} of {totalTasks} done
               </>
-            )
-          }
-        />
-        <StatCard
-          label="Overdue tasks"
-          value={summary.overdueTasks}
-          tone="danger"
-          href={`${base}/tasks?filter=overdue`}
-          hint={
-            summary.dueSoonTasks > 0
-              ? `${summary.dueSoonTasks} more due in 7 days`
-              : "Nothing else due this week"
-          }
-        />
-        <StatCard
-          label="Blocked tasks"
-          value={summary.blockedTasks}
-          tone="warning"
-          href={`${base}/tasks?filter=blocked`}
-        />
-        <StatCard
-          label="Open risks"
-          value={summary.openRisks}
-          tone={highRisks > 0 ? "danger" : undefined}
-          href={`${base}/risks`}
-          hint={highRisks > 0 ? `${highRisks} rated high` : undefined}
-        />
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <OverviewCard
-          title="Overdue tasks"
-          href={
-            summary.overdueTasks > overdueTasks.length
-              ? `${base}/tasks?filter=overdue`
-              : undefined
-          }
-          linkLabel={`All ${summary.overdueTasks}`}
-        >
-          {overdueTasks.length === 0 ? (
-            <Quiet>Nothing is past its due date.</Quiet>
-          ) : (
-            <ul className="space-y-2">
-              {overdueTasks.map((task) => (
-                <li key={task.id} className="flex justify-between gap-3 text-sm">
-                  <Link
-                    href={`${base}/tasks?task=${task.id}`}
-                    className="min-w-0 truncate hover:underline"
-                  >
-                    {task.title}
-                  </Link>
-                  <span className="shrink-0 text-xs text-red-700">
-                    {task.dueDate ? formatDay(task.dueDate) : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </OverviewCard>
-
-        <OverviewCard
-          title="Blocked tasks"
-          href={
-            summary.blockedTasks > blockedTasks.length
-              ? `${base}/tasks?filter=blocked`
-              : undefined
-          }
-          linkLabel={`All ${summary.blockedTasks}`}
-        >
-          {blockedTasks.length === 0 ? (
-            <Quiet>Nothing is blocked.</Quiet>
-          ) : (
-            <ul className="space-y-2">
-              {blockedTasks.map((task) => (
-                <li key={task.id} className="truncate text-sm">
-                  <Link
-                    href={`${base}/tasks?task=${task.id}`}
-                    className="hover:underline"
-                  >
-                    {task.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </OverviewCard>
-
-        <OverviewCard title="Upcoming milestones" href={`${base}/timeline`} linkLabel="Timeline">
-          {nextMilestones.length === 0 ? (
-            <Quiet>No milestones recorded yet.</Quiet>
-          ) : (
-            <ul className="space-y-2">
-              {nextMilestones.map((milestone) => {
-                const late = isOverdue(
-                  { date: milestone.targetDate, open: true },
-                  now,
-                );
-                return (
-                  <li
-                    key={milestone.id}
-                    className="flex items-center justify-between gap-3 text-sm"
-                  >
-                    <span className="min-w-0 truncate">{milestone.title}</span>
-                    <span
-                      className={cn(
-                        "shrink-0 text-xs",
-                        late ? "font-medium text-red-700" : "text-slate-500",
-                      )}
-                    >
-                      {milestone.targetDate
-                        ? formatDay(milestone.targetDate)
-                        : "No date"}
-                      {late ? <span className="sr-only"> (overdue)</span> : null}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </OverviewCard>
-
-        <OverviewCard title="Top risks" href={`${base}/risks`} linkLabel="All risks">
-          {topRisks.length === 0 ? (
-            <Quiet>No open risks.</Quiet>
-          ) : (
-            <ul className="space-y-2">
-              {topRisks.map((risk) => (
-                <li key={risk.id} className="flex items-start justify-between gap-3 text-sm">
-                  <span className="min-w-0 line-clamp-2">{risk.description}</span>
-                  <Badge tone={LEVEL_TONE[worstRiskLevel(risk)]} className="shrink-0">
-                    {risk.impact} · {risk.likelihood}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </OverviewCard>
-
-        <OverviewCard
-          title="Latest status report"
-          href={`${base}/reports`}
-          linkLabel={report ? "Open" : "Reports"}
-        >
-          {report && latestReport ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <Badge tone={HEALTH_TONE[report.health]}>
-                  {report.health}
-                </Badge>
-                {report.period.start} – {report.period.end} · generated{" "}
-                {formatDate(latestReport.createdAt)}
-              </div>
-              <p className="line-clamp-3 text-sm text-slate-700">
-                {report.narrative}
-              </p>
-            </div>
-          ) : (
-            <Quiet>No weekly report yet. Generate one from the Reports tab.</Quiet>
-          )}
-        </OverviewCard>
-      </div>
-        </section>
-      ) : (
-        <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Delivery tools are off
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-pretty text-slate-600">
-              This project is set up for requirements discovery. Turn delivery
-              tools on to plan tasks, a timeline, risks, and weekly reports
-              here — or export the agreed requirements to the tool your team
-              already uses.
-            </p>
+            ) : null}
+            <StatCard
+              label="Open risks"
+              value={summary.openRisks}
+              tone={highRisks > 0 ? "danger" : undefined}
+              href={`${base}/risks`}
+              hint={highRisks > 0 ? `${highRisks} rated high` : undefined}
+            />
           </div>
-          <DeliveryToggle projectId={project.id} enabled={false} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <OverviewCard title="Upcoming milestones" href={`${base}/timeline`} linkLabel="Timeline">
+              {nextMilestones.length === 0 ? (
+                <Quiet>No milestones recorded yet.</Quiet>
+              ) : (
+                <ul className="space-y-2">
+                  {nextMilestones.map((milestone) => {
+                    const late = isOverdue(
+                      { date: milestone.targetDate, open: true },
+                      now,
+                    );
+                    return (
+                      <li
+                        key={milestone.id}
+                        className="flex items-center justify-between gap-3 text-sm"
+                      >
+                        <span className="min-w-0 truncate">{milestone.title}</span>
+                        <span
+                          className={cn(
+                            "shrink-0 text-xs",
+                            late ? "font-medium text-red-700" : "text-slate-500",
+                          )}
+                        >
+                          {milestone.targetDate
+                            ? formatDay(milestone.targetDate)
+                            : "No date"}
+                          {late ? <span className="sr-only"> (overdue)</span> : null}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </OverviewCard>
+
+            <OverviewCard title="Top risks" href={`${base}/risks`} linkLabel="All risks">
+              {topRisks.length === 0 ? (
+                <Quiet>No open risks.</Quiet>
+              ) : (
+                <ul className="space-y-2">
+                  {topRisks.map((risk) => (
+                    <li key={risk.id} className="flex items-start justify-between gap-3 text-sm">
+                      <span className="min-w-0 line-clamp-2">{risk.description}</span>
+                      <Badge tone={LEVEL_TONE[worstRiskLevel(risk)]} className="shrink-0">
+                        {risk.impact} · {risk.likelihood}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </OverviewCard>
+
+            <OverviewCard
+              title="Latest status report"
+              href={`${base}/reports`}
+              linkLabel={report ? "Open" : "Reports"}
+            >
+              {report && latestReport ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <Badge tone={HEALTH_TONE[report.health]}>
+                      {report.health}
+                    </Badge>
+                    {report.period.start} – {report.period.end} · generated{" "}
+                    {formatDate(latestReport.createdAt)}
+                  </div>
+                  <p className="line-clamp-3 text-sm text-slate-700">
+                    {report.narrative}
+                  </p>
+                </div>
+              ) : (
+                <Quiet>No weekly report yet. Generate one from the Reports tab.</Quiet>
+              )}
+            </OverviewCard>
+          </div>
+        </section>
+      ) : null}
+
+      {offLayers.length > 0 ? (
+        <Card className="divide-y divide-slate-100">
+          <h2 className="px-5 pt-5 pb-3 text-sm font-semibold text-slate-900">
+            {t("project.layers.title")}
+          </h2>
+          {offLayers.map((layer) => (
+            <div
+              key={layer}
+              className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+            >
+              <div className="min-w-0">
+                <h3 className="text-sm font-medium text-slate-900">
+                  {t(
+                    layer === "discovery"
+                      ? "project.layers.discoveryTitle"
+                      : "project.layers.deliveryTitle",
+                  )}
+                </h3>
+                <p className="mt-0.5 max-w-2xl text-sm text-pretty text-slate-600">
+                  {t(
+                    layer === "discovery"
+                      ? "project.layers.discoveryBody"
+                      : "project.layers.deliveryBody",
+                  )}
+                </p>
+              </div>
+              <SectionToggle projectId={project.id} section={layer} enabled={false} />
+            </div>
+          ))}
         </Card>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { LoginForm } from "./login-form";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
-  if (user) redirect("/dashboard");
+  if (user) redirect("/today");
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">

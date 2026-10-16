@@ -32,6 +32,14 @@ model User {
   // Credentials provider has no password store of its own, so the bcrypt hash
   // lives on the Auth.js user row. Never selected into any client payload.
   passwordHash  String?
+  /// UI language. A string validated by Zod rather than an enum, so adding a
+  /// locale needs no enum migration. Model output follows the input's language
+  /// instead (src/lib/language.ts).
+  locale        String    @default("zh-Hant")
+  /// IANA zone that decides which calendar day is "today" for this person.
+  /// Date-only values stay at UTC midnight; this only moves the anchor they
+  /// are compared against (src/lib/time.ts).
+  timeZone      String    @default("Asia/Hong_Kong")
   createdAt     DateTime  @default(now())
 
   accounts                 Account[]
@@ -116,9 +124,11 @@ model Project {
   workspaceId String
   name        String
   description String?
-  /// Shows the delivery tabs (tasks, timeline, risks, plan, reports). Gates
-  /// navigation only — never data access or grounding.
+  /// Shows the delivery tabs (timeline, risks, plan, reports). Tasks are a
+  /// core tab. Gates navigation only — never data access or grounding.
   deliveryEnabled Boolean @default(false)
+  /// Shows the Requirements tab. Same rule as deliveryEnabled: navigation only.
+  discoveryEnabled Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

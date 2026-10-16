@@ -324,6 +324,28 @@ export function wouldCreateDependencyCycle(
 // *and* the same workspace constraint. Each builder takes workspaceId first
 // because no query may omit it.
 
+/**
+ * Narrows any task filter to one person's work.
+ *
+ * In a workspace of one, every task is that person's whether or not anyone
+ * set the assignee — most tasks predate the field being filled in — so
+ * `includeUnassigned` widens "mine" to unassigned work too. With colleagues,
+ * an unassigned task is nobody's yet and stays out.
+ *
+ * The widened form is an `AND` of the whole filter rather than a spread, so the
+ * official-record `OR` inside `where` and this `OR` cannot overwrite each other.
+ */
+export function assignedTo<T extends object>(
+  userId: string,
+  where: T,
+  { includeUnassigned = false }: { includeUnassigned?: boolean } = {},
+) {
+  if (!includeUnassigned) return { ...where, assigneeId: userId };
+  return {
+    AND: [where, { OR: [{ assigneeId: userId }, { assigneeId: null }] }],
+  };
+}
+
 export function overdueTaskWhere(
   workspaceId: string,
   now: Date,

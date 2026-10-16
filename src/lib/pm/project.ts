@@ -14,7 +14,13 @@ export const getScopedProject = cache(
   async (workspaceId: string, projectId: string) =>
     prisma.project.findFirst({
       where: { id: projectId, workspaceId },
-      select: { id: true, name: true, description: true, deliveryEnabled: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        deliveryEnabled: true,
+        discoveryEnabled: true,
+      },
     }),
 );
 

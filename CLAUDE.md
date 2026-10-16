@@ -4,29 +4,37 @@ Guidance for working in this repository.
 
 ## What this project is
 
-**ScopePilot — AI Requirements-to-Delivery Copilot** — for project managers and
-business analysts (consultants and small teams) who turn client documents into
-agreed scope. **The core product is requirements discovery:** upload client
-documents → extract cited draft requirements → review them → take open questions
-back to the client → agree → hand over a sign-off document. Grounded Q&A over
-the documents supports every step.
+**ScopePilot — AI work assistant** for one person or a small team (Hong Kong
+first: the UI defaults to Traditional Chinese). It turns the raw material of a
+working week — documents, notes, and later emails and voice memos — into cited
+tasks, a clear view of what needs you today, and answers grounded in your own
+files. **Home is `/today`:** the viewer's open tasks across every project,
+bucketed by the viewer's own calendar day. The roadmap (captures, check-ins,
+day plans, document labelling, task approaches, email drafts in the user's tone,
+read-only Gmail) is in `PLANNING.md`.
 
-**Delivery is an optional layer, off by default per project**
-(`Project.deliveryEnabled`): tasks, timeline, risks, AI draft plans, and weekly
-reports. It exists for teams who run delivery here; everyone else exports the
-agreed requirements to the tool they already use. **Do not grow the delivery
-layer into a Jira/Asana competitor** — new work should make the discovery loop
-better, and anything that is not part of it belongs behind the switch.
+**A project holds work and files; two layers are optional per project.** Every
+project has Overview, Tasks, and Documents. **Requirements discovery**
+(`Project.discoveryEnabled`) — extract cited requirements, review, take
+questions to the client, sign off — is for projects that start from a client
+brief. **Delivery tools** (`Project.deliveryEnabled`) — timeline, risks, AI
+draft plans, weekly reports — are for projects tracked in depth. Both are off for
+new projects. Do not grow either into a Jira/Asana competitor: new work should
+make the assistant loop (capture → review → act → check in) better.
 
-**`deliveryEnabled` gates navigation, never data or security.** It decides which
-tabs show and which delivery widgets render. Hidden routes still resolve (with a
-notice and a way to turn the tools on), still enforce workspace scoping, and
-project chat still grounds on official records whatever the switch says.
+**Both switches gate navigation, never data or security.** They decide which
+tabs show and which widgets render. Hidden routes still resolve (with a notice
+and a way to turn the layer on), still enforce workspace scoping, and project
+chat still grounds on official records whatever the switches say.
 
 **This is a RAG workflow, not an autonomous agent.** Do not add multi-agent
-orchestration, autonomous loops, external tool calling, ServiceNow (or similar)
-integrations, or anything that modifies external systems. Every LLM call is a
-single request/response inside a user-initiated action.
+orchestration, autonomous loops, external tool calling, or background jobs.
+Every LLM call is a single request/response inside a user-initiated action, and
+the model only ever proposes — a person's click is what writes. External
+systems are read-only and read only when the user asks (the planned Gmail
+connection lists mail when "Check Gmail" is pressed, never on a schedule). The
+app never sends email and never writes to another system: email drafts leave
+through copy, `mailto:`, or a compose link the user opens.
 
 ## Stack
 
@@ -166,6 +174,26 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    the only item route that resolves rows without it. Every operational read
    still uses `baselinedRequirementWhere()`.
 
+15. **"Today" is the viewer's local day, and it is a date anchor, not an
+   instant.** Date-only values stay at UTC midnight and every rule in `rules.ts`
+   still compares at UTC-day granularity. What the rules receive is
+   `getViewerToday()` (`src/lib/viewer.ts`) — UTC midnight of the viewer's local
+   date from `localToday(User.timeZone, now)` in `src/lib/time.ts`. Every page
+   that decides overdue / due today / due soon passes it (Today, dashboard,
+   Overview, the board's `nowIso`, the timeline), so the pages cannot disagree
+   between 00:00 and 08:00 in Hong Kong. Never pass it where an instant belongs —
+   `completedAt`, `reviewedAt`, report windows, chat snapshots' `observedAt`.
+
+16. **UI language is a preference; Chinese is Traditional only.** `User.locale`
+   (`zh-Hant` default, `en`) is read by `getLocale()` in `src/lib/i18n/server.ts`
+   (user row → `locale` cookie → Accept-Language, where every `zh*` maps to
+   `zh-Hant`). Copy lives in `src/lib/i18n/dictionaries/`; `en.ts` defines the
+   keys and `zh-Hant.ts` must `satisfies Dictionary`, so a missing key fails the
+   type-check, and `tests/i18n-dictionaries.test.ts` fails on any Simplified
+   character (`containsSimplified` in `src/lib/language.ts`). Model output
+   follows the *input's* language by a deterministic `detectReplyLanguage()` —
+   Hong Kong code-mixing counts as Chinese — never by asking the model to match.
+
 ## ⚠️ Prisma drops the pgvector index on every migration
 
 Prisma cannot see raw-SQL indexes on `Unsupported()` columns, so **every**
@@ -252,7 +280,9 @@ reports export `maxDuration = 60`, the Hobby ceiling. A large PDF needs a
 higher limit on Pro. The upload screen already polls and can retry a document
 left `failed`.
 
-Signed-in `/` redirects to `/dashboard`. It opens on the **discovery inbox** —
+Signed-in `/` redirects to `/today` (see "Personal work notes" below). The
+workspace-wide summary lives at `/dashboard`, titled **Workspace overview** and
+reached from the Projects page rather than the sidebar. It opens on the **discovery inbox** —
 requirements to review and questions for clients, per project — and renders its
 delivery half only when some project has delivery tools on, listing only those
 projects. The delivery half lists overdue, due-within-7-days
@@ -505,12 +535,46 @@ scale, and both levels stay named in the chip and again in the expansion.
 Wherever colour replaces a word, the word goes to `sr-only` — see the flag on
 `task-card.tsx`.
 
+## Personal work notes
+
+`/today` (`src/app/(app)/today/page.tsx`) answers one question — what needs me
+now — across every project. `getMyOpenTasks()` in `src/lib/pm/my-work.ts` reads
+the viewer's open official tasks through `assignedTo()` from `rules.ts`, and the
+pure `bucketMyTasks()` in `src/lib/pm/today.ts` puts each in exactly one bucket,
+earliest rule first: overdue, due today, blocked, due in 7 days, later. A
+blocked task due today is "due today" — the deadline is the fact that needs
+attention — and the row still says it is blocked. Empty buckets are not drawn.
+
+**"Mine" depends on the workspace.** In a workspace of one, every task is that
+person's, set assignee or not (`isSoloWorkspace`), so unassigned tasks are
+included. With colleagues, only tasks assigned to the viewer count.
+`assignedTo(userId, where, { includeUnassigned })` widens with an `AND` of the
+whole filter, never a spread, because the official-record `OR` and the
+"me-or-nobody" `OR` would otherwise overwrite each other.
+
+`/settings` holds per-person preferences (language, time zone) and saves each
+control as it changes through `PATCH /api/me/preferences`, which writes only the
+session user's row and mirrors the language into a cookie for signed-out pages.
+`getUserPreferences()` rides on the same cached user lookup `getSessionUser()`
+already makes, so pages pay no extra query for it.
+
+**i18n is being applied page by page.** The shell, Today, Settings, the project
+tabs and layout, the error pages, and the landing page read `t()`; older panels
+still render English until they are migrated. New UI must use the dictionaries
+from the start. Seeded task-column labels are data and are translated only when
+untouched (`displayStatusLabel`); a renamed column is shown as typed. Date-only
+values are formatted with `formatDay(value, intlLocale(locale))` so the server
+and the browser cannot pick different formats.
+
 ## Project management notes
 
-`/projects/[id]` has three core sections in workflow order — **Overview,
-Documents, Requirements** — and, when `deliveryEnabled`, five delivery sections:
-**Tasks, Timeline, Risks, Plan** (route `/review`; renamed because the tab is
-where a plan is generated, not merely reviewed) **and Reports**. They are nested
+`/projects/[id]` has three core sections — **Overview, Tasks, Documents** — then
+**Requirements** when `discoveryEnabled`, then four delivery sections when
+`deliveryEnabled`: **Timeline, Risks, Plan** (route `/review`; renamed because
+the tab is where a plan is generated, not merely reviewed) **and Reports**. The
+Overview follows the same layers: the discovery strip only with discovery on,
+task stats always, milestones/risks/reports only with delivery on, and one card
+offering whichever layers are off. They are nested
 routes under a shared `layout.tsx`. Each
 is its own server page fetching only its own data. Layouts cannot pass data to
 children and do not re-render, so the project lookup goes through `getScopedProject` in
@@ -549,10 +613,11 @@ The app shell is full width; the old `max-w-5xl` cap is what squeezed five board
 columns into ~180px each. Prose pages (`/chat`, `/documents/[id]`) opt back out
 with their own `max-w-*`, because text gets harder to read as it widens.
 
-**Routes:** `/dashboard` is the morning inbox (overdue, due soon, blocked) plus
-the workspace counts, and `/documents` is cross-project document
-administration. They were one page; splitting them is why
-the sidebar entry labelled "All Documents" leads to documents and nothing else.
+**Routes:** `/today` is home — the viewer's own work. `/dashboard` is the
+workspace overview (every project and member) and `/documents` is cross-project
+document administration. The sidebar's global links are Today, Projects,
+Documents, and Ask, with Settings in the footer; the workspace overview is
+reached from Projects, so each question has one entry.
 `/projects/[id]/documents` remains the project-scoped library.
 
 **The Overview leads somewhere.** Each stat card opens the filtered rows it
@@ -569,7 +634,10 @@ filter bar serves both board and list, so switching view keeps the same rows.
 `?filter=` is parsed by `parseTaskQuickFilter` / `parseRegisterFilter`, which
 live in that module rather than in the client panels: a server page cannot call
 a function exported from a `"use client"` file. `TaskBoard` takes `nowIso` from
-the server for the same hydration reason `ProjectTimeline` does. Risks default
+the server for the same hydration reason `ProjectTimeline` does — and it is the
+viewer's day anchor (invariant 15), threaded down to `isTaskOverdue(task,
+todayIso)` on cards, list rows, and the detail panel rather than read from the
+browser clock. Risks default
 to highest exposure first (`sortRisks`); exposure orders the list and is never
 shown as a number, so it does not become a severity scale of its own.
 

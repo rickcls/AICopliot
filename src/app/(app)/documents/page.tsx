@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 /**
  * Cross-project document administration: upload, reassign, or leave unassigned.
  *
- * Split out of /dashboard so the sidebar entry labelled "All Documents" leads
- * to documents and nothing else. /dashboard is now the workspace summary.
+ * Split out of /dashboard so the sidebar's Documents entry leads to documents
+ * and nothing else. /dashboard is the workspace overview, reached from Projects.
  */
 export default async function AllDocumentsPage({
   searchParams,

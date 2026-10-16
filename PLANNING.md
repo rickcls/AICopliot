@@ -1,21 +1,40 @@
 # PLANNING.md
 
-Living plan and decision log for ScopePilot — AI Project Delivery Copilot.
+Living plan and decision log for ScopePilot — AI work assistant.
 
 ---
 
 ## Goal
 
-A secure, single-workspace requirements-discovery and delivery assistant: create
-project workspaces, upload source documents, extract reviewable cited
-requirements and reviewable cited plans, trace agreed scope to the work that
-delivers it, and ask questions grounded in documents and approved live project
-records.
+An AI work assistant for one person or a small team, Hong Kong first. It
+removes the bookkeeping from a working week: turn notes, documents, and (later)
+emails and voice memos into cited tasks and progress updates the user approves
+with a click; show what needs the user today across every project; find files
+and answers grounded in the user's own documents; suggest how to tackle a task;
+and draft emails in the user's own tone. Requirements discovery and delivery
+tracking remain, as optional layers per project.
 
 **Explicitly out of scope**, now and later unless deliberately revisited:
-multi-agent orchestration, autonomous loops, external tool calling, ServiceNow
-integration, or any action that modifies an external system. This is retrieval
-and generation — it answers questions, it does not act.
+multi-agent orchestration, autonomous loops, background jobs or schedules,
+external tool calling, and any action that writes to an external system. The
+model proposes; a click writes. External systems are read-only and read only
+inside a user-initiated action (Gmail, P6). The app never sends email.
+
+### Assistant roadmap (pivot approved 2026-10-16)
+
+Each phase is one branch and PR, usable on its own.
+
+| Phase | Pain point | Scope | Status |
+|---|---|---|---|
+| P0a | Foundation | Product docs, i18n (zh-Hant default + en), `User.locale`/`timeZone`, viewer-local "today", Today page, Settings, Tasks as a core tab, `discoveryEnabled` | **Shipped on `feat/assistant-foundation`** |
+| P0b | Team | Invite links, member roles, workspace switcher, personal project hidden from colleagues' navigation | Next |
+| P1 | Lazy / inaccurate records, forgotten progress | Capture box (paste, browser dictation, file) → cited proposals (create task, update status/date, progress note) applied by click; server-resolved relative dates (聽日, 下星期五) | Planned |
+| P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | Planned |
+| P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | Planned |
+| P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | Planned |
+| P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | Planned |
+| P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | Planned |
+| P7 | More assistance | Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated | Planned |
 
 ---
 
@@ -158,6 +177,10 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 33 | `sequence Int` rather than a stored `REQ-001` string | Traceability needs stable human-readable keys, but a stored string sorts wrong past 999 and freezes the format forever. The integer sorts correctly and `formatRequirementCode()` is the single place the rendering lives. |
 | 34 | A new `GenerationRunType` value gets its own migration file | Postgres refuses to use an enum value in the transaction that added it, and Prisma wraps each migration file in one. The partial unique index for active requirement runs references `'requirements'`, so the `ALTER TYPE` had to ship separately. The earlier `GenerationRunStatus` addition survived in one file only because nothing referenced its new value — not precedent. |
 | 35 | Extraction reuses the plan pipeline instead of forking it | Citation resolution, the S-label context builder, the audit lifecycle, and the single JSON repair attempt were already correct and tested. The only flow-specific part was the retrieval probes, so `selectDocumentContext` takes its queries as an argument — the second implementation that justifies the parameter. |
+| 36 | Pivot to a personal work assistant; discovery and delivery become optional layers | The user's pain points are personal workload (recording, priorities, files, progress, email), not scope agreement. Tasks moved into the core tabs; `discoveryEnabled` was added beside `deliveryEnabled` and backfilled to `true` for every existing project, so nobody lost a tab they worked in. Both still gate navigation only. |
+| 37 | "Today" is UTC midnight of the viewer's local date, passed where `now` was | Every rule already compares UTC days, so changing the anchor instead of the rules keeps one definition of overdue. Applied to every page that counts overdue work at once — Today alone would disagree with the board between 00:00 and 08:00 HKT. Instants keep the real clock. |
+| 38 | No i18n library; typed dictionaries, locale as a user preference | Every page is behind sign-in, so a locale URL segment buys nothing. `satisfies Dictionary` makes a missing key a type error; a test rejects Simplified characters, the error a reviewer is most likely to miss. |
+| 39 | In a workspace of one, unassigned tasks are "mine" | Existing tasks mostly have no assignee. Requiring one would have opened Today empty for the only user; with colleagues, unassigned work is nobody's yet and stays out. |
 
 ### Deviations from the original spec (approved)
 
@@ -202,6 +225,13 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
    current session and there is no way to reopen a past conversation.
 7. **`next-auth@5.0.0-beta.32`** is beta-tagged. Verified compatible with Next 16
    and React 19; the risk is API churn on upgrade, not breakage today.
+8. **Chinese retrieval is semantic-only, and the threshold is unmeasured for
+   it.** The lexical path uses the `english` text-search configuration, which
+   does not segment Chinese, so a Chinese question is grounded only if its
+   cosine similarity clears `RAG_MIN_SCORE` — a value calibrated on one English
+   corpus. Add Traditional Chinese answerable/unanswerable evaluation cases and
+   record a baseline before changing either (P3 adds `ILIKE` *search*, which is
+   not the grounding path).
 
 ---
 

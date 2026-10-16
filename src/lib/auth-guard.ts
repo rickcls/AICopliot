@@ -37,17 +37,35 @@ export interface SessionUser {
  * reached workspace provisioning and crashed every page on a foreign-key
  * violation; treated as signed out, they land on the sign-in form, whose next
  * sign-in replaces the cookie. Cached so a request pays for one lookup.
+ *
+ * The same read carries the person's preferences, so the language and time
+ * zone every page needs cost no second query.
  */
-const userExists = cache(async function userExists(id: string) {
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true } });
-  return user !== null;
+const getUserRow = cache(async function getUserRow(id: string) {
+  return prisma.user.findUnique({
+    where: { id },
+    select: { id: true, locale: true, timeZone: true },
+  });
 });
+
+export interface UserPreferences {
+  locale: string;
+  timeZone: string;
+}
+
+/** The signed-in person's saved language and time zone, or null if no such user. */
+export async function getUserPreferences(
+  id: string,
+): Promise<UserPreferences | null> {
+  const user = await getUserRow(id);
+  return user ? { locale: user.locale, timeZone: user.timeZone } : null;
+}
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) return null;
-  if (!(await userExists(id))) return null;
+  if (!(await getUserRow(id))) return null;
   return {
     id,
     email: session.user?.email ?? "",

@@ -186,9 +186,15 @@ export function statusColorToken(
  * Compares the date portion only, matching the UTC-day rule the server uses in
  * src/lib/pm/rules.ts — a task due today must never read as overdue.
  */
-export function isTaskOverdue(task: TaskRow): boolean {
+/**
+ * `todayIso` is the viewer's day anchor from the server (UTC midnight of their
+ * local date). Reading the browser clock here would put "today" in UTC, so a
+ * task due today in Hong Kong read as overdue until 08:00 — and the board
+ * disagreed with the server's overdue count.
+ */
+export function isTaskOverdue(task: TaskRow, todayIso: string): boolean {
   if (!task.dueDate || task.status.category === "done") return false;
-  return task.dueDate.slice(0, 10) < new Date().toISOString().slice(0, 10);
+  return task.dueDate.slice(0, 10) < todayIso.slice(0, 10);
 }
 
 /** `<input type="date">` needs YYYY-MM-DD, not a full ISO timestamp. */

@@ -11,6 +11,7 @@ import {
 import { parseTaskQuickFilter } from "@/lib/pm/filters";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { taskSelect, taskStatusSelect } from "@/lib/pm/select";
+import { getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,7 @@ export default async function ProjectTasksPage({
       currentUserId={user.id}
       initialOpenTaskId={requestedTaskId ?? null}
       initialQuickFilter={parseTaskQuickFilter(filterParam)}
-      nowIso={new Date().toISOString()}
+      nowIso={(await getViewerToday()).toISOString()}
     />
   );
 }

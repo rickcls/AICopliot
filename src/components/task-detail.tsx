@@ -65,6 +65,7 @@ import { TracedRequirements } from "@/components/traced-requirements";
  */
 export function TaskDetail({
   task,
+  todayIso,
   allTasks,
   statuses,
   members,
@@ -80,6 +81,7 @@ export function TaskDetail({
   onError,
 }: {
   task: TaskRow;
+  todayIso: string;
   allTasks: TaskRow[];
   statuses: TaskStatusOption[];
   members: MemberOption[];
@@ -513,7 +515,7 @@ export function TaskDetail({
                 className={cn(
                   QUIET_CONTROL,
                   "max-w-none px-2",
-                  isTaskOverdue(task) &&
+                  isTaskOverdue(task, todayIso) &&
                     "bg-red-50 text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
                 )}
                 value={draft.dueDate}
@@ -529,7 +531,7 @@ export function TaskDetail({
                   void save({ dueDate: event.target.value });
                 }}
               />
-              {isTaskOverdue(task) ? (
+              {isTaskOverdue(task, todayIso) ? (
                 <span className="text-xs font-medium text-red-700">overdue</span>
               ) : null}
             </div>

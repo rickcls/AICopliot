@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { ToastProvider } from "@/components/toast";
 import { prisma } from "@/lib/db";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Auth boundary for every signed-in page. Unauthenticated visitors are
@@ -22,6 +23,7 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   const workspace = await getOrCreateDefaultWorkspace(user);
+  const t = await getT();
 
   const projects = await prisma.project.findMany({
     where: { workspaceId: workspace.workspaceId },
@@ -45,7 +47,7 @@ export default async function AppLayout({
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
         >
-          Skip to content
+          {t("app.skipToContent")}
         </a>
         {/* Always a row: the sidebar is present at every width, narrowing to an
             icon rail rather than collapsing behind a toggle. */}

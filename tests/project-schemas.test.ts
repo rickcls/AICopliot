@@ -3,6 +3,7 @@ import {
   askQuestionSchema,
   assignDocumentProjectSchema,
   createProjectSchema,
+  updatePreferencesSchema,
   updateProjectSchema,
 } from "@/lib/schemas";
 
@@ -56,3 +57,39 @@ describe("delivery tools setting", () => {
     expect(updateProjectSchema.safeParse({}).success).toBe(false);
   });
 });
+
+describe("requirements discovery setting", () => {
+  it("accepts discoveryEnabled on its own", () => {
+    expect(updateProjectSchema.safeParse({ discoveryEnabled: false }).success).toBe(
+      true,
+    );
+  });
+
+  it("rejects a non-boolean value", () => {
+    expect(
+      updateProjectSchema.safeParse({ discoveryEnabled: 1 }).success,
+    ).toBe(false);
+  });
+});
+
+describe("personal preferences", () => {
+  it("accepts a supported language or a real time zone", () => {
+    expect(updatePreferencesSchema.safeParse({ locale: "en" }).success).toBe(true);
+    expect(
+      updatePreferencesSchema.safeParse({ timeZone: "Asia/Hong_Kong" }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an unsupported language, an unknown zone, or nothing at all", () => {
+    expect(updatePreferencesSchema.safeParse({ locale: "zh-Hans" }).success).toBe(false);
+    expect(updatePreferencesSchema.safeParse({ timeZone: "Mars/Olympus" }).success).toBe(
+      false,
+    );
+    expect(updatePreferencesSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("never fills in the field a PATCH left out", () => {
+    expect(updatePreferencesSchema.parse({ locale: "en" })).toEqual({ locale: "en" });
+  });
+});
+

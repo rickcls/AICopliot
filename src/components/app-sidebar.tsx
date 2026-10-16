@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
+  CalendarCheck,
   ClipboardList,
   FileText,
   FolderKanban,
-  LayoutDashboard,
   LogOut,
   MessageSquare,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n-provider";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
@@ -36,15 +39,18 @@ export interface SidebarProject {
   name: string;
 }
 
+// Today is first because it is home: the question this app answers first is
+// "what needs me now". The workspace-wide dashboard is reached from Projects
+// as "Workspace overview" — one question, one entry.
 const GLOBAL_LINKS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/documents", label: "All Documents", icon: FileText },
+  { href: "/today", labelKey: "nav.today", icon: CalendarCheck },
+  { href: "/projects", labelKey: "nav.projects", icon: FolderKanban },
+  { href: "/documents", labelKey: "nav.documents", icon: FileText },
   // Ask keeps its highlight on /chat/<conversationId>, because a thread has no
   // other entry in this nav. It is deliberately not a blanket prefix rule: on
   // /projects/<id> the project row below already carries aria-current, and a
   // second one on "Projects" would announce two current pages in one nav.
-  { href: "/chat", label: "Ask", icon: MessageSquare, matchChildren: true },
+  { href: "/chat", labelKey: "nav.ask", icon: MessageSquare, matchChildren: true },
 ] as const;
 
 /** Hidden on the rail, shown once there is room for text. */
@@ -55,11 +61,13 @@ function NavItem({
   label,
   icon: Icon,
   active,
+  className,
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
+  className?: string;
 }) {
   return (
     <Link
@@ -73,6 +81,7 @@ function NavItem({
         active
           ? "bg-slate-900 text-white"
           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+        className,
       )}
     >
       <Icon className="size-4.5 shrink-0" />
@@ -92,13 +101,14 @@ export function AppSidebar({
   userEmail: string;
   isAdmin: boolean;
 }) {
+  const t = useT();
   const pathname = usePathname();
   const activeProjectId = /^\/projects\/([^/]+)/.exec(pathname)?.[1];
 
   return (
     <aside className="sticky top-0 z-30 flex h-dvh w-14 shrink-0 flex-col border-r border-slate-200 bg-white md:w-64">
       <div className="flex h-14 shrink-0 items-center justify-center px-2 md:justify-start md:px-4">
-        <Link href="/dashboard" title="ScopePilot — AI Project Delivery Copilot">
+        <Link href="/today" title={`${t("app.name")} — ${t("app.tagline")}`}>
           <span className="text-sm font-semibold tracking-tight md:hidden">
             SP
           </span>
@@ -109,7 +119,7 @@ export function AppSidebar({
       </div>
 
       <nav
-        aria-label="Main"
+        aria-label={t("nav.main")}
         // `min-h-0` is what lets this actually scroll: a column flex child
         // defaults to `min-height: auto`, so without it a long project list
         // grows past the rail and slides under the footer instead of scrolling.
@@ -120,7 +130,7 @@ export function AppSidebar({
             <li key={link.href}>
               <NavItem
                 href={link.href}
-                label={link.label}
+                label={t(link.labelKey)}
                 icon={link.icon}
                 active={
                   pathname === link.href ||
@@ -134,7 +144,7 @@ export function AppSidebar({
             <li>
               <NavItem
                 href="/admin/evaluations"
-                label="Evaluations"
+                label={t("nav.evaluations")}
                 icon={ClipboardList}
                 active={pathname === "/admin/evaluations"}
               />
@@ -150,7 +160,7 @@ export function AppSidebar({
                 "hidden px-3 md:block",
               )}
             >
-              Projects
+              {t("nav.projectsHeading")}
             </p>
             {/* On the rail a divider stands in for the heading. */}
             <div className="mx-2 mb-2 border-t border-slate-200 md:hidden" />
@@ -203,19 +213,29 @@ export function AppSidebar({
             {workspaceName}
           </p>
           <p className="truncate px-1 text-xs text-slate-500">{userEmail}</p>
-          <ThemeToggle className="mt-2" />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <ThemeToggle />
+            <LocaleSwitcher />
+          </div>
         </div>
+        <NavItem
+          href="/settings"
+          label={t("nav.settings")}
+          icon={Settings}
+          active={pathname === "/settings"}
+          className="md:mt-2 md:px-1"
+        />
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}
-          title={`Sign out (${userEmail})`}
+          title={t("nav.signOutAs", { email: userEmail })}
           className={cn(
             "flex w-full items-center gap-2.5 rounded-lg text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900",
-            "justify-center px-2 py-2 md:mt-2 md:justify-start md:px-1",
+            "justify-center px-2 py-2 md:justify-start md:px-1",
           )}
         >
           <LogOut className="size-4 shrink-0" aria-hidden />
-          <span className={LABEL}>Sign out</span>
+          <span className={LABEL}>{t("nav.signOut")}</span>
         </button>
       </div>
     </aside>

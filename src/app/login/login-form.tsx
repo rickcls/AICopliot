@@ -47,7 +47,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/today");
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");

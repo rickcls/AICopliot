@@ -18,6 +18,7 @@ import {
   isTaskOpen,
   officialRecordWhere,
 } from "@/lib/pm/rules";
+import { getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,8 @@ export default async function ProjectTimelinePage({
     }),
   ]);
 
-  const now = new Date();
+  // The viewer's day, not the UTC one: every use below is a day comparison.
+  const now = await getViewerToday();
 
   const taskProgress = countProgress(
     tasks.map((task) => ({

@@ -13,7 +13,9 @@ import {
   Sparkles,
   SquareKanban,
 } from "lucide-react";
-import { DeliveryToggle } from "@/components/delivery-toggle";
+import { useT } from "@/components/i18n-provider";
+import { SectionToggle, type ProjectSection } from "@/components/section-toggle";
+import type { MessageKey } from "@/lib/i18n/translate";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,37 +34,54 @@ import { cn } from "@/lib/utils";
  * with `aria-current` instead.
  */
 
-// The core tabs follow the discovery workflow in order: documents go in, the
-// register comes out. Delivery tabs are an optional layer per project
-// (`Project.deliveryEnabled`) — hidden, never deleted, and their routes still
-// resolve so an old link lands with a notice rather than a 404.
-const CORE_SECTIONS = [
-  { path: "", label: "Overview", icon: LayoutDashboard },
-  { path: "/documents", label: "Documents", icon: FileText },
-  { path: "/requirements", label: "Requirements", icon: ListChecks },
-] as const;
+interface Section {
+  path: string;
+  labelKey: MessageKey;
+  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+}
 
-const DELIVERY_SECTIONS = [
-  { path: "/tasks", label: "Tasks", icon: SquareKanban },
-  { path: "/timeline", label: "Timeline", icon: GanttChartSquare },
-  { path: "/risks", label: "Risks", icon: ShieldAlert },
+// Core tabs are what every project is for: its work and its files. The other
+// two groups are optional layers per project — requirements discovery
+// (`Project.discoveryEnabled`) and delivery tracking (`deliveryEnabled`).
+// A hidden layer is never deleted: its routes still resolve, so an old link
+// lands with a notice and a way to turn it back on rather than a 404.
+const CORE_SECTIONS: readonly Section[] = [
+  { path: "", labelKey: "project.tabs.overview", icon: LayoutDashboard },
+  { path: "/tasks", labelKey: "project.tabs.tasks", icon: SquareKanban },
+  { path: "/documents", labelKey: "project.tabs.documents", icon: FileText },
+];
+
+const DISCOVERY_SECTIONS: readonly Section[] = [
+  { path: "/requirements", labelKey: "project.tabs.requirements", icon: ListChecks },
+];
+
+const DELIVERY_SECTIONS: readonly Section[] = [
+  { path: "/timeline", labelKey: "project.tabs.timeline", icon: GanttChartSquare },
+  { path: "/risks", labelKey: "project.tabs.risks", icon: ShieldAlert },
   // The route stays /review; "Plan" says what the tab is for — generating a
   // delivery plan — rather than one step of using it.
-  { path: "/review", label: "Plan", icon: Sparkles },
-  { path: "/reports", label: "Reports", icon: FileBarChart },
-] as const;
+  { path: "/review", labelKey: "project.tabs.plan", icon: Sparkles },
+  { path: "/reports", labelKey: "project.tabs.reports", icon: FileBarChart },
+];
 
-const DELIVERY_PATHS: readonly string[] = DELIVERY_SECTIONS.map(
-  (section) => section.path,
-);
+function isUnder(activeSection: string, sections: readonly Section[]): boolean {
+  return sections.some(
+    (section) =>
+      activeSection === section.path ||
+      activeSection.startsWith(`${section.path}/`),
+  );
+}
 
 export function ProjectTabs({
   projectId,
   deliveryEnabled,
+  discoveryEnabled,
 }: {
   projectId: string;
   deliveryEnabled: boolean;
+  discoveryEnabled: boolean;
 }) {
+  const t = useT();
   const pathname = usePathname();
 
   // Everything after the project id, so `/projects/abc/tasks` resolves to
@@ -93,20 +112,25 @@ export function ProjectTabs({
     });
   }, [activeSection]);
 
-  const sections = deliveryEnabled
-    ? [...CORE_SECTIONS, ...DELIVERY_SECTIONS]
-    : CORE_SECTIONS;
-  const onHiddenSection =
-    !deliveryEnabled &&
-    activeSection !== null &&
-    DELIVERY_PATHS.some(
-      (path) => activeSection === path || activeSection.startsWith(`${path}/`),
-    );
+  const sections = [
+    ...CORE_SECTIONS,
+    ...(discoveryEnabled ? DISCOVERY_SECTIONS : []),
+    ...(deliveryEnabled ? DELIVERY_SECTIONS : []),
+  ];
+  // Which switched-off layer the current page belongs to, if any.
+  const hiddenLayer: ProjectSection | null =
+    activeSection === null
+      ? null
+      : !discoveryEnabled && isUnder(activeSection, DISCOVERY_SECTIONS)
+        ? "discovery"
+        : !deliveryEnabled && isUnder(activeSection, DELIVERY_SECTIONS)
+          ? "delivery"
+          : null;
 
   return (
     <>
     <nav
-      aria-label="Project sections"
+      aria-label={t("project.sections")}
       // The strip scrolls sideways below `lg` rather than wrapping to a second
       // row: a two-row tab strip reads as two groups and hides which row the
       // active tab is on. `scrollbar-none` is deliberately not used — the bar is
@@ -119,7 +143,7 @@ export function ProjectTabs({
           const Icon = section.icon;
 
           return (
-            <li key={section.label}>
+            <li key={section.path}>
               <Link
                 href={`${prefix}${section.path}`}
                 ref={active ? activeTab : undefined}
@@ -141,23 +165,26 @@ export function ProjectTabs({
                     active ? "text-slate-900" : "text-slate-400 group-hover:text-slate-600",
                   )}
                 />
-                {section.label}
+                {t(section.labelKey)}
               </Link>
             </li>
           );
         })}
       </ul>
     </nav>
-    {onHiddenSection ? (
+    {hiddenLayer ? (
       <div
         role="status"
         className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
       >
         <span>
-          Delivery tools are off for this project, so this page is hidden from
-          its tabs. Nothing here has been removed.
+          {t(
+            hiddenLayer === "discovery"
+              ? "project.hiddenDiscovery"
+              : "project.hiddenDelivery",
+          )}
         </span>
-        <DeliveryToggle projectId={projectId} enabled={false} />
+        <SectionToggle projectId={projectId} section={hiddenLayer} enabled={false} />
       </div>
     ) : null}
     </>

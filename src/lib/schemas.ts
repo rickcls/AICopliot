@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { LOCALES } from "@/lib/i18n/locales";
+import { isValidTimeZone } from "@/lib/time";
 
 /** Every API input and the model's JSON output are validated through this file. */
 
@@ -169,13 +171,37 @@ export const createProjectSchema = z.object({
 
 export const updateProjectSchema = createProjectSchema
   .partial()
-  .extend({ deliveryEnabled: z.boolean().optional() })
+  .extend({
+    deliveryEnabled: z.boolean().optional(),
+    discoveryEnabled: z.boolean().optional(),
+  })
   .refine(
     (value) =>
       value.name !== undefined ||
       value.description !== undefined ||
-      value.deliveryEnabled !== undefined,
-    "Provide a name, description, or delivery setting",
+      value.deliveryEnabled !== undefined ||
+      value.discoveryEnabled !== undefined,
+    "Provide a name, description, or section setting",
+  );
+
+/**
+ * One person's own preferences. The locale list and time-zone check live in
+ * their own modules; this only says both are optional and at least one is
+ * present, with no defaults — a PATCH must never reset the field it omits.
+ */
+export const updatePreferencesSchema = z
+  .object({
+    locale: z.enum(LOCALES).optional(),
+    timeZone: z
+      .string()
+      .trim()
+      .max(64)
+      .refine(isValidTimeZone, "Unknown time zone")
+      .optional(),
+  })
+  .refine(
+    (value) => value.locale !== undefined || value.timeZone !== undefined,
+    "Provide a language or time zone",
   );
 
 export const assignDocumentProjectSchema = z.object({

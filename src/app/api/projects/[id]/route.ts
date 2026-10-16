@@ -56,6 +56,9 @@ export async function PATCH(request: Request, { params }: Params) {
         ...(parsed.data.deliveryEnabled !== undefined
           ? { deliveryEnabled: parsed.data.deliveryEnabled }
           : {}),
+        ...(parsed.data.discoveryEnabled !== undefined
+          ? { discoveryEnabled: parsed.data.discoveryEnabled }
+          : {}),
       },
       include: {
         _count: {
