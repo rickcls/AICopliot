@@ -1,0 +1,41 @@
+import { AssistantWorkspace } from "@/components/assistant/assistant-workspace";
+import { getThread, listThreads } from "@/lib/assistant/service";
+import { requireWorkspace } from "@/lib/auth-guard";
+import { getCaptureProjectOptions } from "@/lib/capture/service";
+import { getT } from "@/lib/i18n/server";
+
+export const dynamic = "force-dynamic";
+
+/** The assistant. `?thread=` reopens one of the person's own conversations. */
+export default async function AssistantPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ thread?: string }>;
+}) {
+  const access = await requireWorkspace();
+  const { thread: threadId } = await searchParams;
+  const [t, threads, thread, options] = await Promise.all([
+    getT(),
+    listThreads(access),
+    threadId ? getThread(access, threadId) : Promise.resolve(null),
+    getCaptureProjectOptions(access),
+  ]);
+
+  return (
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">{t("assistant.title")}</h1>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600">{t("assistant.lead")}</p>
+      </div>
+      {/* Keyed on the thread, so opening another conversation starts from its
+          own messages rather than keeping the previous one's state. */}
+      <AssistantWorkspace
+        key={thread?.id ?? "new"}
+        threads={threads.map((row) => ({ id: row.id, title: row.title }))}
+        threadId={thread?.id ?? null}
+        messages={thread?.messages ?? []}
+        projects={options.projects}
+      />
+    </div>
+  );
+}

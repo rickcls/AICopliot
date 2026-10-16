@@ -15,10 +15,11 @@ and draft emails in the user's own tone. Requirements discovery and delivery
 tracking remain, as optional layers per project.
 
 **Explicitly out of scope**, now and later unless deliberately revisited:
-multi-agent orchestration, autonomous loops, background jobs or schedules,
-external tool calling, and any action that writes to an external system. The
-model proposes; a click writes. External systems are read-only and read only
-inside a user-initiated action (Gmail, P6). The app never sends email.
+multi-agent orchestration, loops that outlive a request, background jobs or
+schedules, tools that write, and any action that writes to an external system.
+The model proposes; a click writes. The one agent (P7) is fenced inside a
+single request with read-only tools. External systems are read-only and read
+only inside a user-initiated action (Gmail, P6). The app never sends email.
 
 ### Assistant roadmap (pivot approved 2026-10-16)
 
@@ -34,7 +35,8 @@ Each phase is one branch and PR, usable on its own.
 | P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | **Built on `feat/assistant-foundation`** |
 | P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | **Built on `feat/assistant-foundation`** |
 | P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | **Built on `feat/assistant-foundation`** |
-| P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | Planned (after P6, decided 2026-10-16) |
+| P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | **Agent built on `feat/assistant-foundation`**; the remaining-page translation moves to P8 |
+| P8 | Finish the Chinese UI | Translate the older panels still in English (task board and detail, requirements, timeline, risks, plan review, reports, chat, projects, dashboard), and the status labels in `labels.ts` | Next |
 
 ---
 
@@ -200,6 +202,9 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 56 | Writing style is per person, not per workspace | A voice belongs to the person and follows them between workspaces; nobody else's drafts may borrow it. |
 | 57 | Gmail through our own OAuth flow, not Auth.js | Sign-in stays Credentials; Gmail is a separate, revocable, read-only grant. A table of our own (`IntegrationAccount`) keeps the encrypted refresh token out of Auth.js's `Account` table, which would collide if Google sign-in is ever added. |
 | 58 | Voice memos become WAV in the browser | OpenRouter's audio input lists wav, mp3, aac, ogg, flac, m4a, and PCM, not webm — and webm is what Chrome records. Decoding and resampling client-side also shrinks a minute to ~1.9 MB, so segments fit Vercel's limits without a server-side encoder. |
+| 59 | One supervised agent, fenced inside a request (user decision, 2026-10-16) | The person asked for help that takes several look-ups ("prepare me for tomorrow's meeting"). A bounded loop inside one request gives that without the risks of an autonomous agent: a step cap and a time limit, tools that only read or save a draft, opaque labels, and every change returned as a proposal through the capture validator and the shared write path. |
+| 60 | JSON steps instead of native tool calling | Works with any JSON-mode model (the configured model may not support tools well), keeps the provider contract a plain string, and makes the loop replayable in tests with a scripted fake. |
+| 61 | `applyChange` takes the claim as a hook | Capture and assistant proposals live in different tables but must write identically; the claim-and-record hooks are the only difference, so there is one write path to keep correct. |
 
 ### Deviations from the original spec (approved)
 

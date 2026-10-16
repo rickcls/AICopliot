@@ -1,0 +1,67 @@
+import Link from "next/link";
+import type { PublicSource } from "@/lib/assistant/protocol";
+
+const LABEL_GROUP = /\[((?:[A-Z]\d{1,3})(?:\s*[,，、]\s*[A-Z]\d{1,3})*)\]/g;
+
+export function sourceHref(source: PublicSource): string {
+  switch (source.kind) {
+    case "document":
+      return `/documents/${source.documentId}/chunks?chunk=${source.chunkId}#chunk-${source.chunkId}`;
+    case "task":
+      return `/projects/${source.projectId}/tasks?task=${source.taskId}`;
+    case "note":
+      return `/capture#capture-${source.captureId}`;
+    case "draft":
+      return `/email?draft=${source.draftId}`;
+    case "project":
+      return `/projects/${source.projectId}`;
+  }
+}
+
+export function sourceTitle(source: PublicSource): string {
+  switch (source.kind) {
+    case "document":
+      return `${source.filename}${source.pageNumber !== null ? ` · p.${source.pageNumber}` : ""}\n${source.excerpt}`;
+    case "task":
+      return source.title;
+    case "note":
+      return source.excerpt;
+    case "draft":
+      return source.subject;
+    case "project":
+      return source.name;
+  }
+}
+
+/**
+ * The assistant's answer with each label turned into a link to what it cites.
+ * Labels were already checked on the server — any the run never issued were
+ * removed — so every chip here leads somewhere real.
+ */
+export function AnswerText({ content, sources }: { content: string; sources: PublicSource[] }) {
+  const byLabel = new Map(sources.map((source) => [source.label, source]));
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  for (const match of content.matchAll(LABEL_GROUP)) {
+    const at = match.index ?? 0;
+    if (at > last) parts.push(content.slice(last, at));
+    for (const label of match[1].split(/\s*[,，、]\s*/)) {
+      const source = byLabel.get(label);
+      parts.push(
+        source ? (
+          <Link
+            key={`${at}-${label}`}
+            href={sourceHref(source)}
+            title={sourceTitle(source)}
+            className="mx-0.5 inline-flex rounded bg-slate-100 px-1 align-baseline font-mono text-[11px] text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+          >
+            {label}
+          </Link>
+        ) : null,
+      );
+    }
+    last = at + match[0].length;
+  }
+  if (last < content.length) parts.push(content.slice(last));
+  return <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-800">{parts}</p>;
+}

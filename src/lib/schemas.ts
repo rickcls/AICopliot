@@ -623,6 +623,11 @@ export const emailDraftRequestSchema = z.object({
   language: z.enum(["auto", "zh-Hant", "en"]).default("auto"),
 });
 
+export const assistantQuestionSchema = z.object({
+  threadId: z.string().trim().min(1).optional(),
+  question: z.string().trim().min(1, "Ask something first").max(2000),
+});
+
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),

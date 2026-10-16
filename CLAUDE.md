@@ -27,14 +27,18 @@ tabs show and which widgets render. Hidden routes still resolve (with a notice
 and a way to turn the layer on), still enforce workspace scoping, and project
 chat still grounds on official records whatever the switches say.
 
-**This is a RAG workflow, not an autonomous agent.** Do not add multi-agent
-orchestration, autonomous loops, external tool calling, or background jobs.
-Every LLM call is a single request/response inside a user-initiated action, and
-the model only ever proposes — a person's click is what writes. External
-systems are read-only and read only when the user asks (the planned Gmail
-connection lists mail when "Check Gmail" is pressed, never on a schedule). The
-app never sends email and never writes to another system: email drafts leave
-through copy, `mailto:`, or a compose link the user opens.
+**A RAG workflow with one supervised agent — never an autonomous one.** Every
+model call happens inside a request a person started, and the model only ever
+proposes — a person's click is what writes. The single exception to "one call
+per action" is the Assistant (`/assistant`, invariant 24): inside one request
+it may take up to five read-only tool steps before answering, and it is fenced
+by a step cap, a time limit, read-only tools, and the same proposal path as
+everything else. Do not add multi-agent orchestration, background jobs, loops
+that outlive a request, or tools that write. External systems are read-only
+and read only when the user asks (Gmail is listed when "Check Gmail" is
+pressed, never on a schedule). The app never sends email and never writes to
+another system: email drafts leave through copy, `mailto:`, or a compose link
+the user opens.
 
 ## Stack
 
@@ -267,6 +271,20 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    gmail:{id}`, once per person). Email text is someone else's words: it
    reaches the model only as capture lines marked as data, and nothing it says
    is applied without a click. The app never sends mail or writes to Gmail.
+
+24. **The assistant is a fenced loop inside one request.** `runAssistantTurn`
+   (`src/lib/assistant/service.ts`) lets the model choose tools step by step,
+   and that is all it may do: at most `MAX_TOOL_STEPS` (5) tools, then — or
+   once `DEADLINE_MS` (40 s) has passed — it is told to answer and gets no
+   more tools. Its tools only read inside the workspace (notes: the caller's
+   own) or save a private email draft; none writes a task, sends, or calls
+   out. Every source a tool returns gets an opaque label (S, T, N, D, P; U1 is
+   the question) through `SourceRegistry`; `finalizeAnswer` strips labels the
+   run never issued and marks an answer `general` when it cites no source,
+   whatever the model claimed. Changes it suggests go through
+   `validateCaptureProposals` (citations, server-resolved dates) and are
+   applied only by Apply, through `applyChange` and a claim on
+   `AssistantProposal`. History carries wording only, with labels stripped.
 
 ## ⚠️ Prisma drops the pgvector index on every migration
 
@@ -737,6 +755,33 @@ the lexical grounding path (and its `english` configuration) is unchanged.
 outlines it. Chat source cards and search results link there. A ready
 document's page offers "Ask about this document" (`/chat?docs={id}`).
 
+## Assistant notes
+
+`/assistant` is the agent; `/chat` ("Ask documents") stays the strictly
+grounded, scope-pinned Q&A. Both are in the sidebar under those names.
+
+- **The protocol is JSON steps, not native tool calling.** Each model reply is
+  one object — `{"action":"<tool>","input":{…}}` or `{"action":"answer",…}` —
+  parsed by `parseStep`. Any model with a JSON mode can run it, and tests
+  drive the loop with a scripted fake. An unknown tool is reported back, not
+  run; two malformed replies end the turn with an honest fallback answer.
+- **Tools** (`tools.ts`): `search_documents` (the chat's hybrid retrieval at
+  the same evidence bar, falling back to a literal match without
+  embeddings), `list_my_tasks` (Today's buckets, staleness, and ranking),
+  `get_task` (description, recent notes, linked documents — by label only),
+  `search_notes` (the caller's own captures), and `draft_email` (saves a
+  private draft through the email service; never sends). Bad input returns
+  text the model can correct.
+- **What a turn stores:** the answer, the public form of each cited source
+  (enough to link — passage, task, note, draft, project), the tool trace shown
+  as "What it looked up", the general flag, draft ids, and proposals.
+- **Proposals render through `ProposalList`** (`components/capture/
+  proposal-list.tsx`), shared with captures; only the apply and decide
+  endpoints differ. Applying both kinds goes through
+  `src/lib/capture/apply-change.ts`, which takes the claim as a hook.
+- A turn is one request (`maxDuration` 60), so the page waits for the answer
+  rather than streaming steps. Threads are private, like chat threads.
+
 ## Gmail and voice notes
 
 **Gmail** (`src/lib/gmail/`) is offered only when `GOOGLE_CLIENT_ID`,
@@ -880,8 +925,9 @@ with their own `max-w-*`, because text gets harder to read as it widens.
 **Routes:** `/today` is home — the viewer's own work. `/dashboard` is the
 workspace overview (every project and member) and `/documents` is cross-project
 document administration. The sidebar's global links are Today, Projects,
-Documents, and Ask, with Settings in the footer; the workspace overview is
-reached from Projects, so each question has one entry.
+Documents, Capture, Assistant, Ask documents, and Email, with Settings in the
+footer; the workspace overview is reached from Projects, so each question has
+one entry.
 `/projects/[id]/documents` remains the project-scoped library.
 
 **The Overview leads somewhere.** Each stat card opens the filtered rows it

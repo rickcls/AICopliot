@@ -45,18 +45,20 @@ model User {
   activeWorkspaceId String?
   createdAt         DateTime  @default(now())
 
-  activeWorkspace  Workspace?           @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
-  personalProjects Project[]            @relation("PersonalProjectOwner")
-  createdInvites   WorkspaceInvite[]    @relation("InviteCreator")
-  acceptedInvites  WorkspaceInvite[]    @relation("InviteAcceptor")
-  captures         Capture[]
-  captureProposals CaptureProposal[]
-  taskSnoozes      TaskSnooze[]
-  dailyPlans       DailyPlan[]
-  taskSuggestions  TaskSuggestion[]
-  writingStyle     WritingStyle?
-  emailDrafts      EmailDraft[]
-  integrations     IntegrationAccount[]
+  activeWorkspace    Workspace?           @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
+  personalProjects   Project[]            @relation("PersonalProjectOwner")
+  createdInvites     WorkspaceInvite[]    @relation("InviteCreator")
+  acceptedInvites    WorkspaceInvite[]    @relation("InviteAcceptor")
+  captures           Capture[]
+  captureProposals   CaptureProposal[]
+  taskSnoozes        TaskSnooze[]
+  dailyPlans         DailyPlan[]
+  taskSuggestions    TaskSuggestion[]
+  writingStyle       WritingStyle?
+  emailDrafts        EmailDraft[]
+  integrations       IntegrationAccount[]
+  assistantThreads   AssistantThread[]
+  assistantProposals AssistantProposal[]
 
   accounts                 Account[]
   ownedWorkspaces          Workspace[]
@@ -139,6 +141,8 @@ model Workspace {
   dailyPlans              DailyPlan[]
   taskSuggestions         TaskSuggestion[]
   emailDrafts             EmailDraft[]
+  assistantThreads        AssistantThread[]
+  assistantProposals      AssistantProposal[]
 
   @@index([ownerId])
 }
@@ -646,6 +650,9 @@ model Task {
 
   emailDrafts EmailDraft[]
 
+  assistantTargets AssistantProposal[] @relation("AssistantProposalTarget")
+  assistantApplied AssistantProposal[] @relation("AssistantProposalTask")
+
   @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])
   @@index([workspaceId, startDate])
@@ -680,6 +687,8 @@ model TaskComment {
   author    User?     @relation("TaskCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
 
   captureProposals CaptureProposal[]
+
+  assistantProposals AssistantProposal[]
 
   @@index([workspaceId, taskId, createdAt])
   @@index([authorId])
@@ -1291,4 +1300,79 @@ model IntegrationAccount {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])
+}
+
+// ---------------------------------------------------------------------------
+// The assistant: a supervised agent inside one request (private, per person)
+// ---------------------------------------------------------------------------
+
+/// One conversation with the assistant. Private to the person.
+model AssistantThread {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  userId        String
+  title         String
+  createdAt     DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AssistantMessage[]
+
+  @@index([workspaceId, userId, lastMessageAt(sort: Desc)])
+}
+
+/// One turn. An assistant turn records the sources its answer may cite (by
+/// label, frozen at answer time), the tool steps it took — so the person can
+/// see what was looked up — and whether it drew on general knowledge.
+model AssistantMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  role      String
+  content   String
+  /// [{ label, kind, … }] — what each label in `content` points to.
+  sources   Json     @default("[]")
+  /// [{ tool, input, summary }] — the lookups behind the answer.
+  steps     Json     @default("[]")
+  general   Boolean  @default(false)
+  draftIds  String[] @default([])
+  modelName String?
+  latencyMs Int?
+  createdAt DateTime @default(now())
+
+  thread    AssistantThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  proposals AssistantProposal[]
+
+  @@index([threadId, createdAt])
+}
+
+/// A change the assistant proposed. Same shape and the same validation as a
+/// capture proposal, applied through the same write path, and claimed
+/// pending → applied in the write's transaction.
+model AssistantProposal {
+  id               String               @id @default(cuid())
+  workspaceId      String
+  userId           String
+  messageId        String
+  position         Int
+  kind             CaptureProposalKind
+  payload          Json
+  citations        Json
+  flags            String[]             @default([])
+  taskId           String?
+  state            CaptureProposalState @default(pending)
+  decidedAt        DateTime?
+  appliedTaskId    String?
+  appliedCommentId String?
+  createdAt        DateTime             @default(now())
+
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message        AssistantMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  task           Task?            @relation("AssistantProposalTarget", fields: [taskId], references: [id], onDelete: SetNull)
+  appliedTask    Task?            @relation("AssistantProposalTask", fields: [appliedTaskId], references: [id], onDelete: SetNull)
+  appliedComment TaskComment?     @relation(fields: [appliedCommentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, userId, state])
+  @@index([messageId, position])
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
+  Bot,
   CalendarCheck,
   ClipboardList,
   FileText,
@@ -54,6 +55,7 @@ export interface SidebarProject {
 const GLOBAL_LINKS = [
   { href: "/today", labelKey: "nav.today", icon: CalendarCheck },
   { href: "/capture", labelKey: "nav.capture", icon: NotebookPen },
+  { href: "/assistant", labelKey: "nav.assistant", icon: Bot },
   { href: "/projects", labelKey: "nav.projects", icon: FolderKanban },
   { href: "/documents", labelKey: "nav.documents", icon: FileText },
   // Ask keeps its highlight on /chat/<conversationId>, because a thread has no

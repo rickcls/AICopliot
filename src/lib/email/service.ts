@@ -282,3 +282,11 @@ export async function deleteEmailDraft(access: WorkspaceAccess, id: string) {
   });
   return count > 0;
 }
+
+/** One of the caller's own drafts, for reopening it from the assistant. */
+export async function getEmailDraft(access: WorkspaceAccess, id: string) {
+  const row = await prisma.emailDraft.findFirst({
+    where: { id, workspaceId: access.workspaceId, userId: access.userId },
+  });
+  return row ? toDraftView(row) : null;
+}

@@ -2,7 +2,7 @@ import { EmailComposer } from "@/components/email/email-composer";
 import { WritingStyleCard } from "@/components/email/writing-style-card";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { getCapture } from "@/lib/capture/service";
-import { getWritingStyle, listEmailDrafts } from "@/lib/email/service";
+import { getEmailDraft, getWritingStyle, listEmailDrafts } from "@/lib/email/service";
 import { getT } from "@/lib/i18n/server";
 import { getMyOpenTasks } from "@/lib/pm/my-work";
 
@@ -16,17 +16,18 @@ export const dynamic = "force-dynamic";
 export default async function EmailPage({
   searchParams,
 }: {
-  searchParams: Promise<{ task?: string; capture?: string }>;
+  searchParams: Promise<{ task?: string; capture?: string; draft?: string }>;
 }) {
   const access = await requireWorkspace();
-  const { task: requestedTask, capture: captureId } = await searchParams;
-  const [t, tasks, drafts, style, capture] = await Promise.all([
+  const { task: requestedTask, capture: captureId, draft: draftId } = await searchParams;
+  const [t, tasks, drafts, style, capture, openDraft] = await Promise.all([
     getT(),
     getMyOpenTasks(access.workspaceId, access.userId),
     listEmailDrafts(access),
     getWritingStyle(access.userId),
     // The caller's own capture only; anyone else's id resolves to nothing.
     captureId ? getCapture(access, captureId) : Promise.resolve(null),
+    draftId ? getEmailDraft(access, draftId) : Promise.resolve(null),
   ]);
   const incoming = capture?.source === "email" ? capture.body : null;
   const options = tasks.map((task) => ({
@@ -45,8 +46,11 @@ export default async function EmailPage({
       <EmailComposer
         tasks={options}
         initialTaskId={options.some((task) => task.id === requestedTask) ? requestedTask! : null}
-        initialDrafts={drafts}
+        initialDrafts={
+          openDraft && !drafts.some((draft) => draft.id === openDraft.id) ? [openDraft, ...drafts] : drafts
+        }
         initialIncoming={incoming}
+        initialDraft={openDraft}
       />
     </div>
   );

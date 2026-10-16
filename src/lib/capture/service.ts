@@ -1,12 +1,8 @@
 import "server-only";
 import { errorMessageFor } from "@/lib/api";
 import type { Prisma } from "@/generated/prisma/client";
-import {
-  AuthError,
-  getUserPreferences,
-  type SessionUser,
-  type WorkspaceAccess,
-} from "@/lib/auth-guard";
+import { getUserPreferences, type SessionUser, type WorkspaceAccess } from "@/lib/auth-guard";
+import { applyChange } from "@/lib/capture/apply-change";
 import { loadCaptureContext } from "@/lib/capture/context";
 import { weekdayOf } from "@/lib/capture/dates";
 import { splitCaptureLines } from "@/lib/capture/lines";
@@ -16,30 +12,14 @@ import {
   CAPTURE_SYSTEM_PROMPT,
 } from "@/lib/capture/prompt";
 import { modelCaptureSchema, type ProposalOverrides } from "@/lib/capture/schemas";
-import {
-  validateCaptureProposals,
-  type AddNotePayload,
-  type CreateTaskPayload,
-  type UpdateTaskPayload,
-} from "@/lib/capture/validate";
+import { validateCaptureProposals } from "@/lib/capture/validate";
 import { prisma } from "@/lib/db";
 import { extractJsonObject } from "@/lib/generation/prompt";
 import { detectReplyLanguage } from "@/lib/language";
 import { getOrCreatePersonalProject } from "@/lib/pm/personal-project";
-import { officialRecordWhere } from "@/lib/pm/rules";
-import { pickStatusForCategory } from "@/lib/pm/status-pick";
 import { storeDocument } from "@/lib/documents/store";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
-import {
-  createTaskCommentRecord,
-  createTaskRecord,
-  findCommentableTask,
-  prepareTaskCreate,
-  prepareTaskUpdate,
-  updateTaskRecord,
-} from "@/lib/pm/task-write";
 import { getChatProvider, type ChatProvider } from "@/lib/providers";
-import { createTaskCommentSchema, createTaskSchema, updateTaskSchema } from "@/lib/schemas";
 import { DEFAULT_TIME_ZONE, localDateString, localToday } from "@/lib/time";
 
 /**
@@ -370,33 +350,15 @@ export type ApplyResult =
   | { proposalId: string; ok: true; taskId: string | null; commentId: string | null }
   | { proposalId: string; ok: false; status: number; error: string };
 
-/**
- * Claims a pending proposal. Runs inside the transaction that performs the
- * write, so of two concurrent Applies exactly one sees count 1 and writes.
- */
-async function claim(
-  tx: Prisma.TransactionClient,
-  access: CaptureAccess,
-  proposalId: string,
-  now: Date,
-) {
-  const { count } = await tx.captureProposal.updateMany({
-    where: { id: proposalId, ...scope(access), state: "pending" },
-    data: { state: "applied", decidedAt: now },
-  });
-  if (count === 0) throw new CaptureError("This suggestion was already applied or dismissed", 409);
-}
-
 function fail(proposalId: string, status: number, error: string): ApplyResult {
   return { proposalId, ok: false, status, error };
 }
 
 /**
- * Applies one proposal as an ordinary manual write — the same `task-write`
- * functions the task routes use — with the person's edits (`overrides`) taking
- * precedence over what the model proposed. New tasks are assigned to the
- * person applying, and land in their personal project unless a project is
- * named.
+ * Applies one capture proposal through the shared `applyChange`, with the
+ * person's edits (`overrides`) taking precedence over what the model proposed.
+ * The claim is a conditional update of this capture proposal, inside the
+ * write's transaction.
  */
 export async function applyProposal(
   access: CaptureAccess,
@@ -420,130 +382,37 @@ export async function applyProposal(
     return fail(proposalId, 409, "This suggestion was already applied or dismissed");
   }
 
-  try {
-    if (proposal.kind === "create_task") {
-      const payload = proposal.payload as unknown as CreateTaskPayload;
-      const projectId = overrides.projectId ?? payload.projectId;
-      const project = projectId
-        ? await prisma.project.findFirst({
-            where: { id: projectId, workspaceId: access.workspaceId },
-            select: { id: true },
-          })
-        : await getOrCreatePersonalProject(
-            access.workspaceId,
-            access.user,
-            (await getUserPreferences(access.userId))?.locale === "en" ? "en" : "zh-Hant",
-          );
-      if (!project) return fail(proposalId, 404, "Project not found");
-
-      const document = proposal.capture.document;
-      const parsed = createTaskSchema.safeParse({
-        title: overrides.title ?? payload.title,
-        description: overrides.description !== undefined ? overrides.description : payload.description,
-        priority: (overrides.priority !== undefined ? overrides.priority : payload.priority) ?? "medium",
-        assigneeId: access.userId,
-        estimatedHours: payload.estimatedHours,
-        dueDate: overrides.dueDate !== undefined ? overrides.dueDate : payload.dueDate,
-        // A document capture links its document when the task lands in the
-        // same project; a task cannot link a document from another project.
-        ...(proposal.capture.documentId && document?.projectId === project.id
-          ? { documentIds: [proposal.capture.documentId] }
-          : {}),
-      });
-      if (!parsed.success) {
-        return fail(proposalId, 400, parsed.error.issues[0]?.message ?? "Invalid task");
-      }
-
-      const prepared = await prepareTaskCreate(access.workspaceId, project.id, parsed.data);
-      if (!prepared.ok) return fail(proposalId, prepared.status, prepared.error);
-
-      const task = await prisma.$transaction(async (tx) => {
-        await claim(tx, access, proposalId, now);
-        const created = await createTaskRecord(tx, prepared.value, access.userId, now);
+  const result = await applyChange(
+    access,
+    {
+      kind: proposal.kind,
+      payload: proposal.payload,
+      taskId: proposal.taskId,
+      document: proposal.capture.documentId
+        ? { id: proposal.capture.documentId, projectId: proposal.capture.document?.projectId ?? null }
+        : null,
+    },
+    overrides,
+    {
+      claim: async (tx) => {
+        const { count } = await tx.captureProposal.updateMany({
+          where: { id: proposalId, ...scope(access), state: "pending" },
+          data: { state: "applied", decidedAt: now },
+        });
+        return count === 1;
+      },
+      record: async (tx, applied) => {
         await tx.captureProposal.update({
           where: { id: proposalId },
-          data: { appliedTaskId: created.id },
+          data: { appliedTaskId: applied.taskId, appliedCommentId: applied.commentId },
         });
-        return created;
-      });
-      return { proposalId, ok: true, taskId: task.id, commentId: null };
-    }
-
-    if (!proposal.taskId) return fail(proposalId, 404, "The task no longer exists");
-
-    if (proposal.kind === "add_note") {
-      const payload = proposal.payload as unknown as AddNotePayload;
-      const parsed = createTaskCommentSchema.safeParse({ body: overrides.note ?? payload.note });
-      if (!parsed.success) return fail(proposalId, 400, "Write a note first");
-      const task = await findCommentableTask(access.workspaceId, proposal.taskId);
-      if (!task) return fail(proposalId, 404, "The task no longer exists");
-
-      const comment = await prisma.$transaction(async (tx) => {
-        await claim(tx, access, proposalId, now);
-        const created = await createTaskCommentRecord(tx, {
-          workspaceId: access.workspaceId,
-          taskId: task.id,
-          authorId: access.userId,
-          body: parsed.data.body,
-        });
-        await tx.captureProposal.update({
-          where: { id: proposalId },
-          data: { appliedTaskId: task.id, appliedCommentId: created.id },
-        });
-        return created;
-      });
-      return { proposalId, ok: true, taskId: task.id, commentId: comment.id };
-    }
-
-    const payload = proposal.payload as unknown as UpdateTaskPayload;
-    const status = overrides.status !== undefined ? overrides.status : payload.status;
-    const priority = overrides.priority !== undefined ? overrides.priority : payload.priority;
-    const dueDate = overrides.dueDate !== undefined ? overrides.dueDate : payload.dueDate;
-
-    const target = await prisma.task.findFirst({
-      where: officialRecordWhere({ id: proposal.taskId, workspaceId: access.workspaceId }),
-      select: { id: true, projectId: true },
-    });
-    if (!target) return fail(proposalId, 404, "The task no longer exists");
-
-    let statusId: string | undefined;
-    if (status) {
-      const statuses = await prisma.projectTaskStatus.findMany({
-        where: { workspaceId: access.workspaceId, projectId: target.projectId },
-        select: { id: true, key: true, category: true, position: true },
-      });
-      const picked = pickStatusForCategory(statuses, status);
-      if (!picked) {
-        return fail(proposalId, 409, `This project has no column for ${status} work`);
-      }
-      statusId = picked.id;
-    }
-
-    const parsed = updateTaskSchema.safeParse({
-      ...(statusId ? { statusId } : {}),
-      ...(priority ? { priority } : {}),
-      ...(dueDate ? { dueDate } : {}),
-    });
-    if (!parsed.success) return fail(proposalId, 409, "Nothing left to change");
-
-    const prepared = await prepareTaskUpdate(access.workspaceId, target.id, parsed.data);
-    if (!prepared.ok) return fail(proposalId, prepared.status, prepared.error);
-
-    await prisma.$transaction(async (tx) => {
-      await claim(tx, access, proposalId, now);
-      await updateTaskRecord(tx, prepared.value, access.userId);
-      await tx.captureProposal.update({
-        where: { id: proposalId },
-        data: { appliedTaskId: target.id },
-      });
-    });
-    return { proposalId, ok: true, taskId: target.id, commentId: null };
-  } catch (error) {
-    if (error instanceof CaptureError) return fail(proposalId, error.status, error.message);
-    // An assignee or project that no longer resolves in this workspace.
-    if (error instanceof AuthError) return fail(proposalId, error.status, error.message);
-    throw error;
-  }
+      },
+    },
+    now,
+  );
+  return result.ok
+    ? { proposalId, ok: true, taskId: result.taskId, commentId: result.commentId }
+    : { proposalId, ...result };
 }
 
 /** Applies several proposals, each on its own: one failure does not undo the rest. */

@@ -43,12 +43,15 @@ export function EmailComposer({
   initialTaskId,
   initialDrafts,
   initialIncoming = null,
+  initialDraft = null,
 }: {
   tasks: EmailTaskOption[];
   initialTaskId: string | null;
   initialDrafts: EmailDraftView[];
   /** An email to reply to, from a Gmail capture. */
   initialIncoming?: string | null;
+  /** A draft to open straight away, e.g. one the assistant saved. */
+  initialDraft?: EmailDraftView | null;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -63,9 +66,9 @@ export function EmailComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState(initialDrafts);
-  const [current, setCurrent] = useState<EmailDraftView | null>(null);
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [current, setCurrent] = useState<EmailDraftView | null>(initialDraft);
+  const [subject, setSubject] = useState(initialDraft?.subject ?? "");
+  const [body, setBody] = useState(initialDraft?.body ?? "");
   const [copied, setCopied] = useState(false);
 
   function show(draft: EmailDraftView) {
