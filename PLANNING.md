@@ -29,12 +29,12 @@ Each phase is one branch and PR, usable on its own.
 | P0a | Foundation | Product docs, i18n (zh-Hant default + en), `User.locale`/`timeZone`, viewer-local "today", Today page, Settings, Tasks as a core tab, `discoveryEnabled` | **Built on `feat/assistant-foundation`** |
 | P0b | Team | Invite links, member roles, workspace switcher, personal project hidden from colleagues' navigation, new tasks assigned to their creator | **Built on `feat/assistant-foundation`** |
 | P1 | Lazy / inaccurate records, forgotten progress | Capture box (paste, browser dictation, file) → cited proposals (create task, update status/date, progress note) applied by click; server-resolved relative dates (聽日, 下星期五) | **Built on `feat/assistant-foundation`** |
-| P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | Next |
-| P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | Planned |
+| P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | **Built on `feat/assistant-foundation`** |
+| P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | Next |
 | P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | Planned |
 | P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | Planned |
 | P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | Planned |
-| P7 | More assistance | Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated | Planned |
+| P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | Planned (after P6, decided 2026-10-16) |
 
 ---
 
@@ -188,6 +188,9 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 44 | The date phrase, not the date, is what the model returns | "聽日" and "下星期五" are where models slip — off by a day, or a guessed year. A pure resolver anchored on the capture's stored local date is testable and stable across retries; the model's own date only raises a flag. |
 | 45 | A capture is not stored as a document | A document is workspace-visible and chat evidence; a person's notes (and later their email) are private, and unreviewed notes behind a citation would be the problem `TaskComment` already avoids. Ingestion would also spend the 60-second budget before the model call. |
 | 46 | OpenCC (`opencc-js@1.4.2`) converts model prose to Hong Kong Traditional | A prompt rule makes Simplified rare, not impossible. Conversion runs after validation and never touches quotes; the Simplified detector excludes the forms OpenCC's HK standard itself produces (户, 脱), so the two agree. |
+| 47 | Staleness is computed from loaded rows, not a query builder | Today already loads every open task of the viewer's, so one pure `isStale()` over those rows gives the badge, the section, and the planner's "quiet" fact from a single definition. A `*Where` twin would be a second definition to keep in step. |
+| 48 | Snooze is its own table; "still working" writes `checkedInAt` | A snooze says nothing happened, so it must not move `updatedAt`; a check-in says something did, so it should. Keeping the two apart is what stops the reminder from being silenced by accident. |
+| 49 | The day plan is stored but never writes to tasks | Re-opening Today should not pay for another model call, and finished work should tick off as the day goes; both come from saving the order and joining live status on read. Ordering is advice, so it stays out of the task records entirely. |
 
 ### Deviations from the original spec (approved)
 

@@ -77,3 +77,39 @@ export function bucketMyTasks<T extends TodayTask>(
   buckets.later.sort(byDueThenPriority);
   return buckets;
 }
+
+export interface RankableTask extends TodayTask {
+  stale?: boolean;
+}
+
+/**
+ * A single ordering of open work for planning a day: what cannot wait first.
+ * Deterministic, so the candidates the day planner sees — and their order —
+ * are the same for the same tasks on the same day.
+ *
+ * Deadlines dominate (overdue, then today, then the coming week, nearer
+ * first), priority adjusts within that, blocked work sinks because it cannot
+ * move without someone else, and work gone quiet rises a little because it
+ * needs a check-in either way.
+ */
+export function taskUrgencyScore(task: RankableTask, today: Date): number {
+  let score = 0;
+  if (task.dueDate) {
+    const days = daysBetween(today, task.dueDate);
+    if (days < 0) score += 100 + Math.min(-days, 30) * 2;
+    else if (days === 0) score += 90;
+    else if (days <= 7) score += 70 - days * 5;
+  }
+  score += { urgent: 40, high: 20, medium: 0, low: -10 }[task.priority];
+  if (task.status.category === "blocked") score -= 30;
+  if (task.stale) score += 10;
+  return score;
+}
+
+export function rankTasks<T extends RankableTask>(tasks: readonly T[], today: Date): T[] {
+  return tasks
+    .filter((task) => isTaskOpen(task.status.category))
+    .map((task) => ({ task, score: taskUrgencyScore(task, today) }))
+    .sort((a, b) => b.score - a.score || byDueThenPriority(a.task, b.task))
+    .map((entry) => entry.task);
+}

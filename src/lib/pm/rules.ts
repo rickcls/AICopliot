@@ -318,6 +318,42 @@ export function wouldCreateDependencyCycle(
   return false;
 }
 
+// --- Needs an update ---------------------------------------------------------
+
+/** Open work untouched for this many days asks for a check-in on Today. */
+export const STALE_DAYS = 5;
+
+export interface ActivityRecord {
+  open: boolean;
+  /** The task row's last write — a status change, an edit, a check-in. */
+  updatedAt: Date;
+  /** The newest comment by anyone, or null. A comment is progress too. */
+  lastCommentAt: Date | null;
+  /** The viewer's snooze, as the last local day it stays hidden, or null. */
+  snoozedUntil: Date | null;
+}
+
+/**
+ * Whether an open task has gone quiet long enough to ask about.
+ *
+ * Activity is an instant and `today` is the viewer's day anchor, so the cutoff
+ * is the start of the day `STALE_DAYS` ago — at worst a few hours early, never
+ * a day late. A snooze covers through its `until` day inclusive.
+ */
+export function isStale(record: ActivityRecord, today: Date): boolean {
+  if (!record.open) return false;
+  if (record.snoozedUntil && daysBetween(today, record.snoozedUntil) >= 0) return false;
+  const cutoff = new Date(startOfUtcDay(today).getTime() - STALE_DAYS * MS_PER_DAY);
+  const last = Math.max(record.updatedAt.getTime(), record.lastCommentAt?.getTime() ?? 0);
+  return last < cutoff.getTime();
+}
+
+/** Whole days since the last activity, for "5 days without an update". */
+export function daysSinceActivity(record: ActivityRecord, today: Date): number {
+  const last = new Date(Math.max(record.updatedAt.getTime(), record.lastCommentAt?.getTime() ?? 0));
+  return Math.max(0, daysBetween(last, today));
+}
+
 // --- Scoped query filters --------------------------------------------------
 //
 // Built here rather than inline so every caller inherits the same definition

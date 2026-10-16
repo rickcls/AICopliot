@@ -42,11 +42,26 @@ export async function getMyOpenTasks(workspaceId: string, userId: string) {
       title: true,
       dueDate: true,
       priority: true,
+      estimatedHours: true,
       updatedAt: true,
       status: { select: { key: true, label: true, category: true } },
       project: { select: { id: true, name: true } },
+      // For the needs-an-update rule: the newest comment by anyone, and this
+      // person's own snooze (another member's snooze is theirs alone).
+      comments: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+      snoozes: { where: { userId }, select: { until: true } },
     },
   });
+}
+
+/** The fields `isStale` reads, from a row of `getMyOpenTasks`. */
+export function activityOf(task: MyOpenTask) {
+  return {
+    open: true,
+    updatedAt: task.updatedAt,
+    lastCommentAt: task.comments[0]?.createdAt ?? null,
+    snoozedUntil: task.snoozes[0]?.until ?? null,
+  };
 }
 
 export type MyOpenTask = Awaited<ReturnType<typeof getMyOpenTasks>>[number];

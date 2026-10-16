@@ -51,6 +51,8 @@ model User {
   acceptedInvites  WorkspaceInvite[] @relation("InviteAcceptor")
   captures         Capture[]
   captureProposals CaptureProposal[]
+  taskSnoozes      TaskSnooze[]
+  dailyPlans       DailyPlan[]
 
   accounts                 Account[]
   ownedWorkspaces          Workspace[]
@@ -129,6 +131,8 @@ model Workspace {
   taskDocuments           TaskDocument[]
   captures                Capture[]
   captureProposals        CaptureProposal[]
+  taskSnoozes             TaskSnooze[]
+  dailyPlans              DailyPlan[]
 
   @@index([ownerId])
 }
@@ -585,6 +589,9 @@ model Task {
   startDate        DateTime?
   dueDate          DateTime?
   completedAt      DateTime?
+  /// When someone last said "still working on it" from Today. Setting it also
+  /// moves updatedAt, which is what takes the task off the needs-an-update list.
+  checkedInAt      DateTime?
   source           RecordSource     @default(manual)
   generationStatus GenerationStatus @default(not_applicable)
   generationRunId  String?
@@ -612,6 +619,8 @@ model Task {
 
   captureTargets CaptureProposal[] @relation("CaptureProposalTarget")
   captureApplied CaptureProposal[] @relation("CaptureProposalTask")
+
+  snoozes TaskSnooze[]
 
   @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])
@@ -1110,4 +1119,51 @@ model CaptureProposal {
 
   @@index([workspaceId, userId, state])
   @@index([captureId, position])
+}
+
+// ---------------------------------------------------------------------------
+// Today: snoozed reminders and the day's plan (private, per person)
+// ---------------------------------------------------------------------------
+
+/// "Ask me again later" for one task's needs-an-update reminder. A separate
+/// table rather than a Task column, because writing to the task would move its
+/// updatedAt and make it look freshly worked on when nothing happened.
+model TaskSnooze {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  taskId      String
+  /// The last day the reminder stays hidden (a local calendar day).
+  until       DateTime @db.Date
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+  @@index([workspaceId, userId])
+}
+
+/// One person's suggested plan for one local day. A suggestion only: it orders
+/// existing tasks and never changes them. Re-planning the same day replaces it.
+model DailyPlan {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  userId           String
+  localDate        DateTime @db.Date
+  availableMinutes Int
+  /// [{ taskId, minutes, reason }] in the suggested order.
+  items            Json
+  summary          String
+  modelName        String
+  promptVersion    String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, localDate])
 }

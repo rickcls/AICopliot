@@ -1,7 +1,6 @@
-import Link from "next/link";
-import { Flag } from "lucide-react";
 import { CaptureWorkspace } from "@/components/capture/capture-workspace";
-import { PRIORITY_FLAG } from "@/components/task-types";
+import { DayPlanCard } from "@/components/today/day-plan-card";
+import { TodayTaskRow, type TodayRowTask } from "@/components/today/today-task-row";
 import { Card, EmptyState, LinkButton, SectionHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { getCaptureProjectOptions, listCaptures } from "@/lib/capture/service";
@@ -10,9 +9,16 @@ import { intlLocale } from "@/lib/i18n/locales";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { displayStatusLabel } from "@/lib/i18n/status-labels";
 import type { MessageKey, Translate } from "@/lib/i18n/translate";
-import { getMyOpenTasks, isSoloWorkspace, type MyOpenTask } from "@/lib/pm/my-work";
+import {
+  activityOf,
+  getMyOpenTasks,
+  isSoloWorkspace,
+  type MyOpenTask,
+} from "@/lib/pm/my-work";
+import { daysSinceActivity, isStale } from "@/lib/pm/rules";
 import { bucketMyTasks } from "@/lib/pm/today";
-import { cn, formatDay } from "@/lib/utils";
+import { getDayPlan } from "@/lib/today/plan-service";
+import { formatDay } from "@/lib/utils";
 import { getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -22,24 +28,24 @@ export const dynamic = "force-dynamic";
  * using the viewer's own calendar day so a task due today in Hong Kong is due
  * today here, not tomorrow until 08:00.
  *
- * Only buckets with something in them are drawn: four headings over "nothing
- * here" would be the page shouting about good news.
- *
- * The capture box sits on top because telling the assistant what happened is
- * the first thing done here, and notes with suggestions still waiting stay
- * beneath it until they are applied or dismissed.
+ * Top to bottom: tell the assistant something (capture), the day's suggested
+ * order (plan), then the work itself in buckets. Only buckets with something
+ * in them are drawn. Work gone quiet is badged where it already appears, and
+ * listed under "Needs an update" only when no other bucket shows it, so no
+ * task is listed twice.
  */
 export default async function TodayPage() {
   const access = await requireWorkspace();
   const { workspaceId, userId } = access;
-  const [t, locale, today, solo, tasks, waiting, captureOptions] = await Promise.all([
+  const today = await getViewerToday();
+  const [t, locale, solo, tasks, waiting, captureOptions, plan] = await Promise.all([
     getT(),
     getLocale(),
-    getViewerToday(),
     isSoloWorkspace(workspaceId),
     getMyOpenTasks(workspaceId, userId),
     listCaptures(access, { pendingOnly: true, limit: 3 }),
     getCaptureProjectOptions(access),
+    getDayPlan(access, today),
   ]);
 
   const dateLocale = intlLocale(locale);
@@ -51,13 +57,20 @@ export default async function TodayPage() {
   }).format(today);
 
   const buckets = bucketMyTasks(tasks, today);
-  const allSections: { key: string; title: MessageKey; tasks: MyOpenTask[] }[] = [
-    { key: "overdue", title: "today.overdue", tasks: buckets.overdue },
-    { key: "dueToday", title: "today.dueToday", tasks: buckets.dueToday },
-    { key: "blocked", title: "today.blocked", tasks: buckets.blocked },
-    { key: "dueSoon", title: "today.dueSoon", tasks: buckets.dueSoon },
+  const toRow = (task: MyOpenTask, overdue: boolean) =>
+    rowFor(task, { t, dateLocale, today, overdue });
+
+  const allSections: { key: string; title: MessageKey; rows: TodayRowTask[] }[] = [
+    { key: "overdue", title: "today.overdue", rows: buckets.overdue.map((task) => toRow(task, true)) },
+    { key: "dueToday", title: "today.dueToday", rows: buckets.dueToday.map((task) => toRow(task, false)) },
+    { key: "blocked", title: "today.blocked", rows: buckets.blocked.map((task) => toRow(task, false)) },
+    { key: "dueSoon", title: "today.dueSoon", rows: buckets.dueSoon.map((task) => toRow(task, false)) },
   ];
-  const sections = allSections.filter((section) => section.tasks.length > 0);
+  const sections = allSections.filter((section) => section.rows.length > 0);
+  const quietLater = buckets.later
+    .map((task) => toRow(task, false))
+    .filter((row) => row.staleDays !== null);
+  const laterCount = buckets.later.length - quietLater.length;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -87,42 +100,37 @@ export default async function TodayPage() {
         />
       ) : (
         <div className="space-y-6">
-          {sections.length === 0 ? (
+          <DayPlanCard initialPlan={plan} />
+
+          {sections.length === 0 && quietLater.length === 0 ? (
             <Card className="p-5">
               <h2 className="text-sm font-semibold text-slate-900">
                 {t("today.allClearTitle")}
               </h2>
               <p className="mt-1 text-sm text-slate-600">{t("today.allClearBody")}</p>
             </Card>
-          ) : (
-            sections.map((section) => (
-              <section key={section.key} aria-labelledby={`today-${section.key}`}>
-                <div id={`today-${section.key}`}>
-                  <SectionHeader
-                    title={`${t(section.title)} · ${section.tasks.length}`}
-                  />
-                </div>
-                <Card className="mt-2 overflow-hidden">
-                  <ul className="divide-y divide-slate-100">
-                    {section.tasks.map((task) => (
-                      <TodayRow
-                        key={task.id}
-                        task={task}
-                        t={t}
-                        dateLocale={dateLocale}
-                        overdue={section.key === "overdue"}
-                      />
-                    ))}
-                  </ul>
-                </Card>
-              </section>
-            ))
-          )}
+          ) : null}
 
-          {buckets.later.length > 0 ? (
-            <p className="text-sm text-slate-500">
-              {t("today.later", { count: buckets.later.length })}
-            </p>
+          {sections.map((section) => (
+            <TaskSection
+              key={section.key}
+              id={`today-${section.key}`}
+              title={`${t(section.title)} · ${section.rows.length}`}
+              rows={section.rows}
+            />
+          ))}
+
+          {quietLater.length > 0 ? (
+            <TaskSection
+              id="today-needs-update"
+              title={`${t("today.needsUpdate")} · ${quietLater.length}`}
+              description={t("today.needsUpdateLead")}
+              rows={quietLater}
+            />
+          ) : null}
+
+          {laterCount > 0 ? (
+            <p className="text-sm text-slate-500">{t("today.later", { count: laterCount })}</p>
           ) : null}
         </div>
       )}
@@ -130,58 +138,57 @@ export default async function TodayPage() {
   );
 }
 
-/**
- * One line per task: priority flag, title, project, and the date or status
- * that put it in this bucket. Opens the task in its own project's board.
- */
-function TodayRow({
-  task,
-  t,
-  dateLocale,
-  overdue,
+function TaskSection({
+  id,
+  title,
+  description,
+  rows,
 }: {
-  task: MyOpenTask;
-  t: Translate;
-  dateLocale: string;
-  overdue: boolean;
+  id: string;
+  title: string;
+  description?: string;
+  rows: TodayRowTask[];
 }) {
-  const priority = t(`priority.${task.priority}`);
-  const blocked = task.status.category === "blocked";
-
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:flex-nowrap">
-      <span title={t("priority.flag", { level: priority })} className="shrink-0">
-        <span className="sr-only">{t("priority.flag", { level: priority })}</span>
-        <Flag
-          aria-hidden
-          fill="currentColor"
-          className={cn("size-3.5", PRIORITY_FLAG[task.priority])}
-        />
-      </span>
-      <Link
-        href={`/projects/${task.project.id}/tasks?task=${task.id}`}
-        className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 hover:underline"
-      >
-        {task.title}
-      </Link>
-      <span className="flex shrink-0 items-center gap-3 text-xs text-slate-500">
-        {blocked ? (
-          <span className="font-medium text-red-700">
-            {displayStatusLabel(task.status, t)}
-          </span>
-        ) : null}
-        <span className="max-w-40 truncate">{task.project.name}</span>
-        {task.dueDate ? (
-          <span
-            className={cn(
-              "tabular-nums",
-              overdue ? "font-medium text-red-700" : undefined,
-            )}
-          >
-            {t("today.dueOn", { date: formatDay(task.dueDate, dateLocale) })}
-          </span>
-        ) : null}
-      </span>
-    </li>
+    <section aria-labelledby={id}>
+      <div id={id}>
+        <SectionHeader title={title} description={description} />
+      </div>
+      <Card className="mt-2 overflow-hidden">
+        <ul className="divide-y divide-slate-100">
+          {rows.map((row) => (
+            <TodayTaskRow key={row.id} task={row} />
+          ))}
+        </ul>
+      </Card>
+    </section>
   );
+}
+
+/**
+ * Everything a row shows, decided here on the server: the due date in the
+ * viewer's language, the blocked column's label, and whether the task has gone
+ * quiet — so the client row only renders and reports.
+ */
+function rowFor(
+  task: MyOpenTask,
+  {
+    t,
+    dateLocale,
+    today,
+    overdue,
+  }: { t: Translate; dateLocale: string; today: Date; overdue: boolean },
+): TodayRowTask {
+  const activity = activityOf(task);
+  return {
+    id: task.id,
+    title: task.title,
+    projectId: task.project.id,
+    projectName: task.project.name,
+    priority: task.priority,
+    dueLabel: task.dueDate ? t("today.dueOn", { date: formatDay(task.dueDate, dateLocale) }) : null,
+    overdue,
+    blockedLabel: task.status.category === "blocked" ? displayStatusLabel(task.status, t) : null,
+    staleDays: isStale(activity, today) ? daysSinceActivity(activity, today) : null,
+  };
 }

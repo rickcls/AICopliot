@@ -546,6 +546,23 @@ export const updateMemberSchema = z.object({
   role: workspaceRoleSchema,
 });
 
+// --- Today ------------------------------------------------------------------
+
+export const CHECK_IN_ACTIONS = ["done", "progress", "blocked", "snooze"] as const;
+
+/** A one-click report on a task from Today, with an optional note. */
+export const checkInSchema = z.object({
+  action: z.enum(CHECK_IN_ACTIONS),
+  note: z.string().trim().max(4000).optional(),
+  /** Snooze only: how many days to stop asking. */
+  days: z.number().int().min(1).max(30).optional(),
+});
+
+export const dayPlanRequestSchema = z.object({
+  availableHours: z.number().min(0.5).max(14),
+  note: z.string().trim().max(500).optional(),
+});
+
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),

@@ -596,6 +596,30 @@ earliest rule first: overdue, due today, blocked, due in 7 days, later. A
 blocked task due today is "due today" — the deadline is the fact that needs
 attention — and the row still says it is blocked. Empty buckets are not drawn.
 
+**Work that has gone quiet asks for a check-in.** `isStale()` in `rules.ts`
+is the only definition: open, and no task write or comment by anyone for
+`STALE_DAYS` (5) days, unless the viewer snoozed it through today.
+`getMyOpenTasks` carries the newest comment and the viewer's own snooze so the
+rule runs on loaded rows. A quiet task is badged where it already appears and
+listed under "Needs an update" only if no other bucket shows it. Each Today
+row's Update strip posts to `POST /api/tasks/[id]/check-in`
+(`src/lib/today/check-in.ts`): done and blocked move the task by category
+through `task-write`; "still working" moves a blocked task back to an open
+column, or on an open task only sets `Task.checkedInAt` — which moves
+`updatedAt` and so clears the reminder; a note becomes the person's comment in
+the same transaction. **Snooze is a separate `TaskSnooze` row, never a task
+write**, because writing to the task would make it look worked on.
+
+**The day plan is a suggestion that changes nothing.** `POST /api/today/plan`
+ranks the viewer's open tasks with the pure `rankTasks()` (deadlines first,
+priority within, blocked sinks, quiet rises a little), sends the top 40 as `T`
+labels with relative due facts, and `validateDayPlan()` keeps known labels
+once each, uses the person's own estimate over the model's, clamps blocks, and
+cuts from the end at the first block that would overrun the hours given. It is
+stored per person per local day (`DailyPlan`, re-planning replaces it) and read
+back joined with each task's live status, so a finished task is ticked without
+the plan remembering anything.
+
 **"Mine" depends on the workspace.** In a workspace of one, every task is that
 person's, set assignee or not (`isSoloWorkspace`), so unassigned tasks are
 included. With colleagues, only tasks assigned to the viewer count.
