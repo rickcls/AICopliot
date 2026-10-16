@@ -725,6 +725,37 @@ the lexical grounding path (and its `english` configuration) is unchanged.
 outlines it. Chat source cards and search results link there. A ready
 document's page offers "Ask about this document" (`/chat?docs={id}`).
 
+## Email draft notes
+
+`/email` drafts emails in the person's own voice; **nothing is ever sent.** A
+draft leaves only by Copy, Gmail's compose window (`gmailComposeUrl`, which
+fills `view=cm` and waits for the person), or `mailto:` — all in
+`src/lib/email/links.ts`, and a name is never put in "to" unless it is an
+address.
+
+- **Tone is per person, across workspaces.** `WritingStyle` (unique on
+  `userId`) holds up to ten of their own emails, a signature, and a tone
+  description derived from the samples by one call (`deriveStyleProfile`, at
+  least two samples) and editable by them. Drafts use up to three samples *in
+  the target language* as examples.
+- **Facts come only from what the person gave.** The prompt says so, and
+  `findUnsupportedFacts()` (`src/lib/email/facts.ts`, pure) checks: every
+  date, time, weekday, amount, percentage, two-digit-plus number, address,
+  and link in the draft must appear in the key points, the email being
+  answered, the recipient, the task's own facts, or the signature — otherwise
+  it is flagged above the draft. The example emails are deliberately *not*
+  in that list: they shape tone, never facts. Bracketed placeholders are
+  flagged as "fill in". The draft text is never altered by the check.
+- **Task facts** come from the official task (workspace-scoped) and its three
+  newest comments — this is the person's own outgoing message, not a cited
+  answer, so comments are fair context here.
+- **Model:** `getWritingProvider()` uses `OPENROUTER_WRITING_MODEL` when set,
+  otherwise the chat model, so tone can get a stronger model without moving
+  every feature. Chinese drafts pass through `toTraditional`.
+- `EmailDraft` keeps the last drafts per person (private, triple-scoped), so a
+  reload does not lose one. The task panel's approach tab links to
+  `/email?task={id}`.
+
 ## Team workspace notes
 
 A person may belong to several workspaces. `getOrCreateDefaultWorkspace()`

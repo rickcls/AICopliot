@@ -9,6 +9,7 @@ import {
   FileText,
   FolderKanban,
   LogOut,
+  Mail,
   MessageSquare,
   NotebookPen,
   Settings,
@@ -60,6 +61,7 @@ const GLOBAL_LINKS = [
   // /projects/<id> the project row below already carries aria-current, and a
   // second one on "Projects" would announce two current pages in one nav.
   { href: "/chat", labelKey: "nav.ask", icon: MessageSquare, matchChildren: true },
+  { href: "/email", labelKey: "nav.email", icon: Mail },
 ] as const;
 
 /** Hidden on the rail, shown once there is room for text. */

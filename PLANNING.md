@@ -32,8 +32,8 @@ Each phase is one branch and PR, usable on its own.
 | P2 | No clear priorities | Full Today: ranking, stale-task check-ins, snooze, AI day plan within available hours | **Built on `feat/assistant-foundation`** |
 | P3 | Messy files | Multi-file upload, AI title/summary/tags/suggested project, content search that works for Chinese, citation deep links | **Built on `feat/assistant-foundation`** |
 | P4 | Don't know how to solve a task | Task approach: cited steps from documents, general-knowledge steps labelled as such | **Built on `feat/assistant-foundation`** |
-| P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | Next |
-| P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | Planned |
+| P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | **Built on `feat/assistant-foundation`** |
+| P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | Next |
 | P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | Planned (after P6, decided 2026-10-16) |
 
 ---
@@ -196,6 +196,8 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 52 | `storeDocument()` is the only way bytes become a Document | A second, server-side path (saving a capture) appeared; keeping validation and the id-based storage key in one function means it cannot skip either (invariant 6). |
 | 53 | Task approaches may answer without evidence; nothing else may | Refusing "how do I tackle this?" whenever the files are silent would leave the person exactly as stuck as before. The guard moves from refusing to labelling: a step's basis is computed from valid citations, never taken from the model, and general steps stay visibly marked wherever they are copied. |
 | 54 | A step becomes a task at most once | `createdSteps` is claimed with `NOT has` + `push` in the task's transaction — the same conditional-claim idea as capture proposals and invite links, without a table per step. |
+| 55 | Email drafts never send, and facts are checked rather than trusted | Sending from the app would make it a system that acts on the outside world, which it is not. The fact check flags rather than strips, because the person may know a date the inputs omitted — the goal is that nothing reaches a client unread. |
+| 56 | Writing style is per person, not per workspace | A voice belongs to the person and follows them between workspaces; nobody else's drafts may borrow it. |
 
 ### Deviations from the original spec (approved)
 

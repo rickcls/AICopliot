@@ -601,6 +601,28 @@ export const createTasksFromStepsSchema = z.object({
   stepIndexes: z.array(z.number().int().min(0).max(29)).min(1).max(10),
 });
 
+// --- Email drafts -------------------------------------------------------------
+
+export const writingStyleSchema = z
+  .object({
+    samples: z.array(z.string().trim().min(1).max(4000)).max(10).optional(),
+    profile: z.string().trim().max(2000).nullable().optional(),
+    signature: z.string().trim().max(500).nullable().optional(),
+  })
+  .refine(
+    (value) => Object.values(value).some((field) => field !== undefined),
+    "Provide samples, a profile, or a signature",
+  );
+
+export const emailDraftRequestSchema = z.object({
+  purpose: z.enum(["reply", "follow_up", "update", "request", "thanks", "other"]),
+  recipient: z.string().trim().max(200).optional(),
+  keyPoints: z.string().trim().min(1, "Say what the email should say").max(2000),
+  incoming: z.string().trim().max(8000).optional(),
+  taskId: z.string().trim().min(1).optional(),
+  language: z.enum(["auto", "zh-Hant", "en"]).default("auto"),
+});
+
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),

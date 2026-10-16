@@ -54,6 +54,8 @@ model User {
   taskSnoozes      TaskSnooze[]
   dailyPlans       DailyPlan[]
   taskSuggestions  TaskSuggestion[]
+  writingStyle     WritingStyle?
+  emailDrafts      EmailDraft[]
 
   accounts                 Account[]
   ownedWorkspaces          Workspace[]
@@ -135,6 +137,7 @@ model Workspace {
   taskSnoozes             TaskSnooze[]
   dailyPlans              DailyPlan[]
   taskSuggestions         TaskSuggestion[]
+  emailDrafts             EmailDraft[]
 
   @@index([ownerId])
 }
@@ -639,6 +642,8 @@ model Task {
   snoozes TaskSnooze[]
 
   suggestions TaskSuggestion[]
+
+  emailDrafts EmailDraft[]
 
   @@index([workspaceId, projectId, statusId])
   @@index([workspaceId, dueDate])
@@ -1214,4 +1219,49 @@ model TaskSuggestion {
   task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, userId, taskId, createdAt(sort: Desc)])
+}
+
+// ---------------------------------------------------------------------------
+// Email drafts in the person's own voice (private, per person)
+// ---------------------------------------------------------------------------
+
+/// How one person writes, across every workspace they belong to: emails they
+/// pasted as examples, and a short description of their tone derived from
+/// them (editable). Never shared — a colleague's drafts never borrow it.
+model WritingStyle {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  /// ["…", "…"] — up to ten of the person's own emails.
+  samples   Json     @default("[]")
+  profile   String?
+  signature String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// A drafted email, kept so it survives a reload. Never sent by the app: it
+/// leaves by copy, mailto:, or a compose link the person opens themselves.
+model EmailDraft {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  taskId      String?
+  purpose     String
+  recipient   String?
+  subject     String
+  body        String
+  /// [{ kind, text }] — dates, amounts, and names in the draft that were not
+  /// in anything the person gave, to check before sending.
+  flags       Json     @default("[]")
+  language    String
+  modelName   String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, userId, createdAt(sort: Desc)])
 }

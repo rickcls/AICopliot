@@ -20,6 +20,9 @@ const envSchema = z.object({
   OPENROUTER_EMBEDDING_MODEL: z
     .string()
     .default("openai/text-embedding-3-small"),
+  // Optional: a stronger model for writing in the person's own voice (email
+  // drafts). Unset, the chat model writes them too.
+  OPENROUTER_WRITING_MODEL: z.string().optional(),
 
   EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
 

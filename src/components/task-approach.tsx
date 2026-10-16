@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Lightbulb } from "lucide-react";
+import { BookOpen, Lightbulb, Mail } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import type { TaskRow } from "@/components/task-types";
 import { useToast } from "@/components/toast";
@@ -119,7 +119,16 @@ export function TaskApproach({
 
   return (
     <div className="space-y-4 p-4">
-      <p className="text-xs text-slate-500">{t("approach.lead")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="min-w-0 flex-1 text-xs text-slate-500">{t("approach.lead")}</p>
+        <Link
+          href={`/email?task=${taskId}`}
+          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900"
+        >
+          <Mail className="size-3.5" aria-hidden />
+          {t("approach.draftEmail")}
+        </Link>
+      </div>
 
       {error ? <ErrorState message={error} /> : null}
 
