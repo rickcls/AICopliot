@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { Badge, Card, ProgressBar, SectionHeader, StatCard } from "@/components/ui";
+import { intlLocale } from "@/lib/i18n/locales";
+import { getLocale, getT } from "@/lib/i18n/server";
+import type { Translate } from "@/lib/i18n/translate";
 import { percentOf } from "@/lib/pm/progress";
 import {
   getDashboardSummary,
@@ -24,12 +27,14 @@ function WorkList({
   tasks,
   dateTone,
   empty,
+  dateLocale,
 }: {
   id: string;
   title: string;
   tasks: DashboardTaskRef[];
   dateTone?: "danger";
   empty: string;
+  dateLocale: string;
 }) {
   return (
     <Card id={id} className="scroll-mt-6 p-5">
@@ -59,7 +64,7 @@ function WorkList({
                         dateTone === "danger" ? "text-red-700" : undefined
                       }
                     >
-                      {formatDay(task.dueDate)}
+                      {formatDay(task.dueDate, dateLocale)}
                     </span>
                   </>
                 ) : null}
@@ -77,7 +82,7 @@ function WorkList({
  * nothing late, blocked, or uncovered shows only its name and progress, so the
  * ones that need attention are the ones with colour.
  */
-function ProjectHealthList({ rows }: { rows: ProjectHealthRow[] }) {
+function ProjectHealthList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate }) {
   return (
     <Card className="overflow-hidden">
       <ul className="divide-y divide-slate-100">
@@ -98,39 +103,47 @@ function ProjectHealthList({ rows }: { rows: ProjectHealthRow[] }) {
               <div className="flex flex-wrap items-center gap-1.5">
                 {row.overdueTasks > 0 ? (
                   <Link href={`/projects/${row.id}/tasks?filter=overdue`}>
-                    <Badge tone="danger">{row.overdueTasks} overdue</Badge>
+                    <Badge tone="danger">
+                      {t("workspaceOverview.overdueBadge", { count: row.overdueTasks })}
+                    </Badge>
                   </Link>
                 ) : null}
                 {row.blockedTasks > 0 ? (
                   <Link href={`/projects/${row.id}/tasks?filter=blocked`}>
-                    <Badge tone="warning">{row.blockedTasks} blocked</Badge>
+                    <Badge tone="warning">
+                      {t("workspaceOverview.blockedBadge", { count: row.blockedTasks })}
+                    </Badge>
                   </Link>
                 ) : null}
                 {row.uncoveredRequirements > 0 ? (
                   <Link href={`/projects/${row.id}/requirements?filter=gaps`}>
                     <Badge tone="danger">
-                      {row.uncoveredRequirements} uncovered
+                      {t("workspaceOverview.uncoveredBadge", {
+                        count: row.uncoveredRequirements,
+                      })}
                     </Badge>
                   </Link>
                 ) : null}
                 {row.pendingPlanRuns > 0 ? (
                   <Link href={`/projects/${row.id}/review`}>
-                    <Badge tone="info">plan to review</Badge>
+                    <Badge tone="info">{t("workspaceOverview.planBadge")}</Badge>
                   </Link>
                 ) : null}
               </div>
               <div className="flex w-full items-center gap-2 sm:w-44">
                 {total === 0 ? (
-                  <span className="text-xs text-slate-400">No tasks yet</span>
+                  <span className="text-xs text-slate-400">
+                    {t("workspaceOverview.noTasks")}
+                  </span>
                 ) : (
                   <>
                     <ProgressBar
                       percent={percent}
-                      label={`${row.name}: tasks done`}
+                      label={t("workspaceOverview.tasksDone", { name: row.name })}
                       className="flex-1"
                     />
                     <span className="w-16 text-right text-xs text-slate-500 tabular-nums">
-                      {row.doneTasks}/{total} done
+                      {t("workspaceOverview.doneFraction", { done: row.doneTasks, total })}
                     </span>
                   </>
                 )}
@@ -148,7 +161,7 @@ function ProjectHealthList({ rows }: { rows: ProjectHealthRow[] }) {
  * (drafts to review) and on the client (open questions). Exceptions are
  * badged; a project with nothing waiting shows only its agreed count.
  */
-function DiscoveryList({ rows }: { rows: ProjectHealthRow[] }) {
+function DiscoveryList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate }) {
   return (
     <Card className="overflow-hidden">
       <ul className="divide-y divide-slate-100">
@@ -168,21 +181,25 @@ function DiscoveryList({ rows }: { rows: ProjectHealthRow[] }) {
               <div className="flex flex-wrap items-center gap-1.5">
                 {row.toReview > 0 ? (
                   <Link href={`/projects/${row.id}/requirements?filter=draft`}>
-                    <Badge tone="info">{row.toReview} to review</Badge>
+                    <Badge tone="info">
+                      {t("workspaceOverview.toReview", { count: row.toReview })}
+                    </Badge>
                   </Link>
                 ) : null}
                 {row.askClient > 0 ? (
                   <Link
                     href={`/projects/${row.id}/requirements?filter=needs_clarification`}
                   >
-                    <Badge tone="warning">{row.askClient} ask client</Badge>
+                    <Badge tone="warning">
+                      {t("workspaceOverview.askClient", { count: row.askClient })}
+                    </Badge>
                   </Link>
                 ) : null}
               </div>
               <span className="w-full text-xs text-slate-500 tabular-nums sm:w-36 sm:text-right">
                 {live === 0
-                  ? "No requirements yet"
-                  : `${row.agreed} of ${live} agreed`}
+                  ? t("workspaceOverview.noRequirements")
+                  : t("workspaceOverview.agreedOf", { agreed: row.agreed, total: live })}
               </span>
             </li>
           );
@@ -201,7 +218,8 @@ export async function DashboardSummary({
 }) {
   // The viewer's day: every use below is a day comparison, and Today must
   // agree with this page between 00:00 and 08:00 in Hong Kong.
-  const now = await getViewerToday();
+  const [now, t, locale] = await Promise.all([getViewerToday(), getT(), getLocale()]);
+  const dateLocale = intlLocale(locale);
   const [summary, projects] = await Promise.all([
     getDashboardSummary(workspaceId, viewerId, now),
     getProjectHealthRows(workspaceId, viewerId, now),
@@ -220,23 +238,27 @@ export async function DashboardSummary({
   // renders when some project has delivery tools on — otherwise it would be
   // a wall of zeros about work this workspace does not track here.
   return (
-    <section aria-label="Project summary" className="mb-8 space-y-6">
+    <section aria-label={t("workspaceOverview.summaryLabel")} className="mb-8 space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Projects" value={projects.length} href="#discovery" />
         <StatCard
-          label="Requirements to review"
+          label={t("workspaceOverview.statProjects")}
+          value={projects.length}
+          href="#discovery"
+        />
+        <StatCard
+          label={t("workspaceOverview.statToReview")}
           value={total("toReview")}
           tone="warning"
           href="#discovery"
         />
         <StatCard
-          label="Questions for clients"
+          label={t("workspaceOverview.statQuestions")}
           value={total("askClient")}
           tone="warning"
           href="#discovery"
         />
         <StatCard
-          label="Agreed requirements"
+          label={t("workspaceOverview.statAgreed")}
           value={total("agreed")}
           tone="success"
           href="#discovery"
@@ -245,38 +267,38 @@ export async function DashboardSummary({
 
       <div id="discovery" className="scroll-mt-6 space-y-3">
         <SectionHeader
-          title="Discovery"
-          description="What is waiting on you, and on the client. Badges open the rows they count."
+          title={t("workspaceOverview.discovery")}
+          description={t("workspaceOverview.discoveryLead")}
         />
-        <DiscoveryList rows={projects} />
+        <DiscoveryList rows={projects} t={t} />
       </div>
 
       {deliveryProjects.length > 0 ? (
         <div className="space-y-4">
           <SectionHeader
-            title="Delivery"
-            description={`Across ${deliveryProjects.length} project${deliveryProjects.length === 1 ? "" : "s"} with delivery tools on.`}
+            title={t("workspaceOverview.delivery")}
+            description={t("workspaceOverview.deliveryLead", { count: deliveryProjects.length })}
           />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              label="Active projects"
+              label={t("workspaceOverview.activeProjects")}
               value={summary.activeProjects}
               href="#projects"
             />
             <StatCard
-              label="Overdue tasks"
+              label={t("workspaceOverview.overdueTasks")}
               value={summary.overdueTasks}
               href="#overdue"
               tone="danger"
             />
             <StatCard
-              label="Blocked tasks"
+              label={t("workspaceOverview.blockedTasks")}
               value={summary.blockedTasks}
               href="#blocked"
               tone="warning"
             />
             <StatCard
-              label="Upcoming milestones"
+              label={t("workspaceOverview.upcomingMilestones")}
               value={summary.upcomingMilestones}
               href="#milestones"
             />
@@ -286,40 +308,45 @@ export async function DashboardSummary({
             <Card className="flex items-center gap-3 border-emerald-200 bg-emerald-50/60 px-5 py-4">
               <CheckCircle2 className="size-5 shrink-0 text-emerald-600" aria-hidden />
               <p className="text-sm text-emerald-900">
-                Nothing is overdue, blocked, or due in the next 7 days.
+                {t("workspaceOverview.allClear")}
               </p>
             </Card>
           ) : (
             <div className="grid gap-3 lg:grid-cols-3">
               <WorkList
                 id="overdue"
-                title="Overdue right now"
+                title={t("workspaceOverview.overdueNow")}
                 tasks={summary.overdueTaskList}
                 dateTone="danger"
-                empty="Nothing is past its due date."
+                empty={t("workspaceOverview.overdueEmpty")}
+                dateLocale={dateLocale}
               />
               <WorkList
                 id="due-soon"
-                title="Due in 7 days"
+                title={t("workspaceOverview.dueSoon")}
                 tasks={summary.dueSoonTaskList}
-                empty="Nothing due this week."
+                empty={t("workspaceOverview.dueSoonEmpty")}
+                dateLocale={dateLocale}
               />
               <WorkList
                 id="blocked"
-                title="Blocked"
+                title={t("workspaceOverview.blocked")}
                 tasks={summary.blockedTaskList}
-                empty="Nothing is blocked."
+                empty={t("workspaceOverview.blockedEmpty")}
+                dateLocale={dateLocale}
               />
             </div>
           )}
 
           <div id="projects" className="scroll-mt-6">
-            <ProjectHealthList rows={deliveryProjects} />
+            <ProjectHealthList rows={deliveryProjects} t={t} />
           </div>
 
           {summary.upcomingMilestoneList.length > 0 ? (
             <Card id="milestones" className="scroll-mt-6 p-5">
-              <h2 className="text-sm font-semibold">Next milestones</h2>
+              <h2 className="text-sm font-semibold">
+                {t("workspaceOverview.nextMilestones")}
+              </h2>
               <ul className="mt-3 space-y-2">
                 {summary.upcomingMilestoneList.map((milestone) => (
                   <li
@@ -335,8 +362,8 @@ export async function DashboardSummary({
                     <span className="shrink-0 text-xs text-slate-500">
                       {milestone.project.name} ·{" "}
                       {milestone.targetDate
-                        ? formatDay(milestone.targetDate)
-                        : "No date"}
+                        ? formatDay(milestone.targetDate, dateLocale)
+                        : t("common.noDate")}
                     </span>
                   </li>
                 ))}

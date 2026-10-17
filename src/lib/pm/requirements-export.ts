@@ -1,4 +1,4 @@
-import type { MessageKey, Translate } from "@/lib/i18n/translate";
+import { labelOr, type Translate } from "@/lib/i18n/translate";
 import { requirementStatusLabel } from "./labels";
 import { formatRequirementCode } from "./rules";
 import { deliveryState, type TracedLink } from "./traceability";
@@ -51,9 +51,7 @@ function words(value: string) {
  * not know — an export should never print a raw dictionary key.
  */
 function enumLabel(t: Translate, family: string, value: string): string {
-  const key = `${family}.${value}` as MessageKey;
-  const label = t(key);
-  return label === key ? words(value) : label;
+  return labelOr(t, `${family}.${value}`, words(value));
 }
 
 export const typeLabel = (t: Translate, value: string) =>

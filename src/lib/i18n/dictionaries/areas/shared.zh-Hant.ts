@@ -51,6 +51,25 @@ export const sharedZhHant = {
     mitigated: "已緩解",
     accepted: "已接受",
   },
+  reportHealth: {
+    green: "進展正常",
+    amber: "需要留意",
+    red: "有風險",
+  },
+  runStatus: {
+    processing: "處理中",
+    draft: "待審閱",
+    approved: "已批核",
+    partially_approved: "部分批核",
+    rejected: "已否決",
+    failed: "失敗",
+  },
+  generationStatus: {
+    not_applicable: "手動",
+    draft: "草稿",
+    approved: "已批核",
+    rejected: "已否決",
+  },
   statusCategory: {
     open: "未完成",
     blocked: "受阻",

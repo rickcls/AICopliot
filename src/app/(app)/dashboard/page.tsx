@@ -36,8 +36,10 @@ export default async function DashboardPage() {
         </h1>
         <p className="mt-1 text-sm text-slate-600">
           <span className="font-medium text-slate-900">{workspaceName}</span> ·{" "}
-          {projectCount} project{projectCount === 1 ? "" : "s"} ·{" "}
-          {documentCount} document{documentCount === 1 ? "" : "s"}
+          {t("workspaceOverview.counts", {
+            projects: t("workspaceOverview.projects", { count: projectCount }),
+            documents: t("workspaceOverview.documents", { count: documentCount }),
+          })}
         </p>
       </div>
 
@@ -45,14 +47,16 @@ export default async function DashboardPage() {
           thing five times; the empty state alone says it once. */}
       {projectCount === 0 ? (
         <EmptyState
-          title="Nothing here yet"
-          description="Create a project to hold its documents, tasks, milestones, and risks. Everything on this page is a summary of work across your projects."
-          action={<LinkButton href="/projects">Create a project</LinkButton>}
+          title={t("workspaceOverview.emptyTitle")}
+          description={t("workspaceOverview.emptyBody")}
+          action={
+            <LinkButton href="/projects">{t("workspaceOverview.createProject")}</LinkButton>
+          }
         />
       ) : (
         // The summary is the slow half of the page (a dozen grouped reads), so
         // the heading streams first instead of waiting on all of it.
-        <Suspense fallback={<SummarySkeleton />}>
+        <Suspense fallback={<SummarySkeleton label={t("workspaceOverview.loading")} />}>
           <DashboardSummary workspaceId={workspaceId} viewerId={userId} />
         </Suspense>
       )}
@@ -60,9 +64,9 @@ export default async function DashboardPage() {
   );
 }
 
-function SummarySkeleton() {
+function SummarySkeleton({ label }: { label: string }) {
   return (
-    <SkeletonRegion label="Loading summary" className="space-y-6">
+    <SkeletonRegion label={label} className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-20 bg-slate-100" />

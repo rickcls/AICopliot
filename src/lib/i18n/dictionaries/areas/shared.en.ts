@@ -56,6 +56,25 @@ export const sharedEn = {
     mitigated: "Mitigated",
     accepted: "Accepted",
   },
+  reportHealth: {
+    green: "On track",
+    amber: "Needs attention",
+    red: "At risk",
+  },
+  runStatus: {
+    processing: "Running",
+    draft: "To review",
+    approved: "Approved",
+    partially_approved: "Partly approved",
+    rejected: "Rejected",
+    failed: "Failed",
+  },
+  generationStatus: {
+    not_applicable: "Manual",
+    draft: "Draft",
+    approved: "Approved",
+    rejected: "Rejected",
+  },
   statusCategory: {
     open: "Open",
     blocked: "Blocked",

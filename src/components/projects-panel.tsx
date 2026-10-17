@@ -14,6 +14,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 
 interface ProjectRow {
@@ -41,6 +42,8 @@ export function ProjectsPanel({
   const router = useRouter();
   const confirm = useConfirm();
   const toast = useToast();
+  const t = useT();
+  const dateLocale = useDateLocale();
 
   async function createProject(event: React.FormEvent) {
     event.preventDefault();
@@ -59,7 +62,7 @@ export function ProjectsPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not create the project.");
+        setError(data.error ?? t("projects.createFailed"));
         return;
       }
 
@@ -80,7 +83,7 @@ export function ProjectsPanel({
       );
       setName("");
       setDescription("");
-      toast.success(`Created “${data.project.name}”`);
+      toast.success(t("projects.created", { name: data.project.name }));
       // The sidebar's project list comes from the layout, not this panel's
       // local state — same reason delete calls refresh below. Push first: a
       // navigation discards any router action still pending, so a refresh
@@ -89,7 +92,7 @@ export function ProjectsPanel({
       router.push(`/projects/${data.project.id}`);
       router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setSaving(false);
     }
@@ -105,35 +108,31 @@ export function ProjectsPanel({
       [project.milestoneCount, "milestone"],
       [project.riskCount, "risk"],
     ] as const;
-    const destroyedLabel = destroyed
-      .filter(([count]) => count > 0)
-      .map(([count, noun]) => `${count} ${noun}${count === 1 ? "" : "s"}`)
-      .join(", ");
+    const destroyedLabel = new Intl.ListFormat(dateLocale, { type: "conjunction" }).format(
+      destroyed
+        .filter(([count]) => count > 0)
+        .map(([count, noun]) => t(`projects.nouns.${noun}`, { count })),
+    );
 
     // An empty project has nothing to warn about, and an empty container still
     // occupies its margin — leaving a gap that reads as content failing to load.
     const hasConsequences = destroyedLabel !== "" || project.documentCount > 0;
 
     const confirmed = await confirm({
-      title: `Delete “${project.name}”?`,
+      title: t("projects.deleteTitle", { name: project.name }),
       body: hasConsequences ? (
         <div className="space-y-2">
           {destroyedLabel ? (
-            <p>
-              <span className="font-medium text-red-700">{destroyedLabel}</span>{" "}
-              will be permanently deleted.
+            <p className="font-medium text-red-700">
+              {t("projects.deleteDestroyed", { items: destroyedLabel })}
             </p>
           ) : null}
           {project.documentCount ? (
-            <p>
-              {project.documentCount} document
-              {project.documentCount === 1 ? "" : "s"} will become unassigned
-              and remain available.
-            </p>
+            <p>{t("projects.deleteDocuments", { count: project.documentCount })}</p>
           ) : null}
         </div>
       ) : undefined,
-      confirmLabel: "Delete project",
+      confirmLabel: t("projects.deleteConfirm"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -146,20 +145,20 @@ export function ProjectsPanel({
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        setError(data.error ?? "Could not delete the project.");
+        setError(data.error ?? t("projects.deleteFailed"));
         return;
       }
       setProjects((previous) =>
         previous.filter((item) => item.id !== project.id),
       );
-      toast.success(`Deleted “${project.name}”`);
+      toast.success(t("projects.deleted", { name: project.name }));
       // The sidebar's project list is rendered by the layout above this page,
       // so removing the card locally leaves a nav entry pointing at a project
       // that no longer exists. Local state already dropped the row, so this
       // refetch changes nothing visible here.
       router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setDeletingId(null);
     }
@@ -171,13 +170,13 @@ export function ProjectsPanel({
         <form onSubmit={createProject} className="space-y-3">
           <div>
             <label htmlFor="project-name" className="mb-1.5 block text-sm font-medium">
-              Project name
+              {t("projects.name")}
             </label>
             <Input
               id="project-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. Airport Display Upgrade"
+              placeholder={t("projects.namePlaceholder")}
               maxLength={120}
               disabled={saving}
             />
@@ -187,13 +186,14 @@ export function ProjectsPanel({
               htmlFor="project-description"
               className="mb-1.5 block text-sm font-medium"
             >
-              Description <span className="font-normal text-slate-500">(optional)</span>
+              {t("projects.description")}{" "}
+              <span className="font-normal text-slate-500">{t("projects.optional")}</span>
             </label>
             <Textarea
               id="project-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="What operational work belongs in this project?"
+              placeholder={t("projects.descriptionPlaceholder")}
               rows={2}
               maxLength={1000}
               disabled={saving}
@@ -204,10 +204,10 @@ export function ProjectsPanel({
               {saving ? (
                 <>
                   <Spinner className="border-white/40 border-t-white" />
-                  Creating…
+                  {t("projects.creating")}
                 </>
               ) : (
-                "Create project"
+                t("projects.create")
               )}
             </Button>
           </div>
@@ -218,8 +218,8 @@ export function ProjectsPanel({
 
       {projects.length === 0 ? (
         <EmptyState
-          title="No projects yet"
-          description="Create a project to separate document libraries and restrict answers to the right operational context."
+          title={t("projects.emptyTitle")}
+          description={t("projects.emptyBody")}
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -232,24 +232,25 @@ export function ProjectsPanel({
                 {project.name}
               </Link>
               <p className="mt-1 flex-1 text-sm text-pretty text-slate-600">
-                {project.description || "No description."}
+                {project.description || t("projects.noDescription")}
               </p>
               <p className="mt-4 text-xs text-slate-500">
-                {project.documentCount} document
-                {project.documentCount === 1 ? "" : "s"} · {project.taskCount}{" "}
-                task{project.taskCount === 1 ? "" : "s"} ·{" "}
-                {project.riskCount} risk{project.riskCount === 1 ? "" : "s"}
+                {[
+                  t("projects.nouns.document", { count: project.documentCount }),
+                  t("projects.nouns.task", { count: project.taskCount }),
+                  t("projects.nouns.risk", { count: project.riskCount }),
+                ].join(" · ")}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
                 <LinkButton href={`/projects/${project.id}`} size="sm">
-                  Open project
+                  {t("projects.open")}
                 </LinkButton>
                 <LinkButton
                   href={`/chat?project=${project.id}`}
                   variant="secondary"
                   size="sm"
                 >
-                  Ask
+                  {t("projects.ask")}
                 </LinkButton>
                 <Button
                   type="button"
@@ -259,7 +260,7 @@ export function ProjectsPanel({
                   disabled={deletingId === project.id}
                   onClick={() => void deleteProject(project)}
                 >
-                  Delete
+                  {t("common.delete")}
                 </Button>
               </div>
             </Card>

@@ -22,6 +22,8 @@ import {
 } from "@/components/ui";
 import { Check, ChevronRight, X } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDateLocale, useT } from "@/components/i18n-provider";
+import type { MessageKey, Translate } from "@/lib/i18n/translate";
 import { worstRiskLevel } from "@/lib/pm/filters";
 import { cn, formatDate, formatDay } from "@/lib/utils";
 
@@ -171,6 +173,7 @@ function itemKey(item: { kind: ItemKind; id: string }) {
 }
 
 function CitationList({ citations }: { citations: EvidenceCitation[] }) {
+  const t = useT();
   if (citations.length === 0) return null;
   return (
     <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
@@ -184,13 +187,13 @@ function CitationList({ citations }: { citations: EvidenceCitation[] }) {
               {citation.chunk.document.originalFilename}
             </Link>
             {citation.chunk.pageNumber !== null ? (
-              <span>· page {citation.chunk.pageNumber}</span>
+              <span>· {t("planReview.page", { page: citation.chunk.pageNumber })}</span>
             ) : null}
             {citation.chunk.sectionTitle ? (
               <span>· {citation.chunk.sectionTitle}</span>
             ) : null}
             {citation.purpose === "milestone_link" ? (
-              <Badge tone="info">Milestone link</Badge>
+              <Badge tone="info">{t("planReview.milestoneLink")}</Badge>
             ) : null}
           </div>
           {citation.excerpt ? (
@@ -216,6 +219,7 @@ function SummarySection({
     { filename: string; pageNumber: number | null; sectionTitle: string | null }
   >;
 }) {
+  const t = useT();
   if (rows.length === 0) return null;
   return (
     <div>
@@ -239,7 +243,7 @@ function SummarySection({
                       {location ? ` · ${location.filename}` : ""}
                       {location?.pageNumber !== null &&
                       location?.pageNumber !== undefined
-                        ? ` · page ${location.pageNumber}`
+                        ? ` · ${t("planReview.page", { page: location.pageNumber })}`
                         : ""}
                       {location?.sectionTitle
                         ? ` · ${location.sectionTitle}`
@@ -272,10 +276,6 @@ const MILESTONE_STATUSES = [
 ];
 const RISK_STATUSES = ["open", "monitoring", "mitigated", "accepted"];
 const RISK_LEVELS = ["low", "medium", "high"];
-
-function words(value: string) {
-  return value.replaceAll("_", " ");
-}
 
 function initialValues(proposal: Proposal): Record<string, string> {
   if (proposal.kind === "milestone") {
@@ -314,10 +314,13 @@ function initialValues(proposal: Proposal): Record<string, string> {
 }
 
 /** The one line a collapsed row shows: what the proposal *is*. */
-function headline(proposal: Proposal): string {
+function headline(proposal: Proposal, t: Translate): string {
   if (proposal.kind === "risk") return proposal.description;
   if (proposal.kind === "dependency") {
-    return `${proposal.task.title} → after ${proposal.dependsOnTask.title}`;
+    return t("planReview.dependencyHeadline", {
+      task: proposal.task.title,
+      prerequisite: proposal.dependsOnTask.title,
+    });
   }
   return proposal.title;
 }
@@ -384,6 +387,10 @@ function ProposalRow({
   const baseline = useMemo(() => initialValues(proposal), [proposal]);
   const dirty = Object.keys(values).some((key) => values[key] !== baseline[key]);
   const idPrefix = `proposal-${proposal.kind}-${proposal.id}`;
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const title = headline(proposal, t);
+  const label = (family: string) => (value: string) => t(`${family}.${value}` as MessageKey);
 
   function set(name: string, value: string) {
     setValues((previous) => ({ ...previous, [name]: value }));
@@ -446,28 +453,28 @@ function ProposalRow({
   const dateText =
     proposal.kind === "task"
       ? proposal.dueDate
-        ? `due ${formatDay(proposal.dueDate)}`
+        ? t("planReview.due", { date: formatDay(proposal.dueDate, dateLocale) })
         : null
       : proposal.kind === "milestone"
         ? proposal.targetDate
-          ? formatDay(proposal.targetDate)
-          : "no date"
+          ? formatDay(proposal.targetDate, dateLocale)
+          : t("planReview.noDate")
         : null;
 
   function select(
     name: string,
-    label: string,
+    fieldLabel: string,
     options: string[],
-    format: (value: string) => string = words,
+    format: (value: string) => string,
   ) {
     return (
-      <EditRow label={label} htmlFor={`${idPrefix}-${name}`}>
+      <EditRow label={fieldLabel} htmlFor={`${idPrefix}-${name}`}>
         <Select
           id={`${idPrefix}-${name}`}
           value={values[name]}
           onChange={(event) => set(name, event.target.value)}
           disabled={disabled}
-          className="h-9 w-full max-w-sm capitalize"
+          className="h-9 w-full max-w-sm"
         >
           {options.map((option) => (
             <option key={option} value={option}>
@@ -481,7 +488,7 @@ function ProposalRow({
 
   function milestoneSelect() {
     return (
-      <EditRow label="Milestone" htmlFor={`${idPrefix}-milestone`}>
+      <EditRow label={t("planReview.milestone")} htmlFor={`${idPrefix}-milestone`}>
         <Select
           id={`${idPrefix}-milestone`}
           value={values.milestoneId}
@@ -489,7 +496,7 @@ function ProposalRow({
           disabled={disabled}
           className="h-9 w-full max-w-sm"
         >
-          <option value="">No milestone</option>
+          <option value="">{t("planReview.noMilestone")}</option>
           {milestoneOptions.map((milestone) => (
             <option key={milestone.id} value={milestone.id}>
               {milestone.title}
@@ -514,7 +521,7 @@ function ProposalRow({
             checked={selected}
             onChange={onToggle}
             disabled={disabled}
-            aria-label={`Select “${headline(proposal)}”`}
+            aria-label={t("planReview.select", { title })}
             className={CHECKBOX}
           />
         ) : null}
@@ -535,18 +542,18 @@ function ProposalRow({
             )}
           />
           <span className="min-w-0 truncate text-sm text-slate-900">
-            {headline(proposal)}
+            {title}
           </span>
         </button>
 
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-6 sm:pl-0">
           {proposal.kind === "risk" ? (
             <Badge tone={LEVEL_TONE[worstRiskLevel(proposal)]}>
-              {proposal.impact} · {proposal.likelihood}
+              {t(`riskLevel.${proposal.impact}`)} · {t(`riskLevel.${proposal.likelihood}`)}
             </Badge>
           ) : null}
           {proposal.kind === "task" && proposal.priority === "urgent" ? (
-            <Badge tone="danger">urgent</Badge>
+            <Badge tone="danger">{t("planReview.urgent")}</Badge>
           ) : null}
           {dateText ? (
             <span className="text-xs text-slate-500 tabular-nums">{dateText}</span>
@@ -554,14 +561,13 @@ function ProposalRow({
           {/* A proposal with no evidence cannot exist (validation drops it),
               so the count is information, never a warning. */}
           <span className="text-xs text-slate-400">
-            {proposal.citations.length} source
-            {proposal.citations.length === 1 ? "" : "s"}
+            {t("planReview.sources", { count: proposal.citations.length })}
           </span>
           {!editable ? (
             <Badge
               tone={proposal.generationStatus === "approved" ? "success" : "neutral"}
             >
-              {words(proposal.generationStatus)}
+              {t(`generationStatus.${proposal.generationStatus}`)}
             </Badge>
           ) : (
             <>
@@ -570,8 +576,8 @@ function ProposalRow({
                 size="icon"
                 variant="ghost"
                 disabled={disabled}
-                aria-label={`Approve “${headline(proposal)}”`}
-                title="Approve"
+                aria-label={t("planReview.approveLabel", { title })}
+                title={t("planReview.approve")}
                 onClick={() => void onApprove()}
                 className="text-emerald-700 hover:bg-emerald-50"
               >
@@ -582,8 +588,8 @@ function ProposalRow({
                 size="icon"
                 variant="ghost"
                 disabled={disabled}
-                aria-label={`Reject “${headline(proposal)}”`}
-                title="Reject"
+                aria-label={t("planReview.rejectLabel", { title })}
+                title={t("planReview.reject")}
                 onClick={() => void onReject()}
                 className="text-slate-500 hover:bg-red-50 hover:text-red-700"
               >
@@ -599,7 +605,7 @@ function ProposalRow({
           {editable ? (
             <div className="space-y-2.5">
               {proposal.kind === "milestone" || proposal.kind === "task" ? (
-                <EditRow label="Title" htmlFor={`${idPrefix}-title`}>
+                <EditRow label={t("planReview.title")} htmlFor={`${idPrefix}-title`}>
                   <Input
                     id={`${idPrefix}-title`}
                     value={values.title}
@@ -613,7 +619,7 @@ function ProposalRow({
 
               {proposal.kind === "dependency" ? (
                 <>
-                  <EditRow label="Task" htmlFor={`${idPrefix}-task`}>
+                  <EditRow label={t("planReview.task")} htmlFor={`${idPrefix}-task`}>
                     <Select
                       id={`${idPrefix}-task`}
                       value={values.taskId}
@@ -628,7 +634,7 @@ function ProposalRow({
                       ))}
                     </Select>
                   </EditRow>
-                  <EditRow label="Depends on" htmlFor={`${idPrefix}-prereq`}>
+                  <EditRow label={t("planReview.dependsOn")} htmlFor={`${idPrefix}-prereq`}>
                     <Select
                       id={`${idPrefix}-prereq`}
                       value={values.dependsOnTaskId}
@@ -648,7 +654,9 @@ function ProposalRow({
                 </>
               ) : (
                 <EditRow
-                  label={proposal.kind === "risk" ? "Risk" : "Description"}
+                  label={
+                    proposal.kind === "risk" ? t("planReview.risk") : t("planReview.description")
+                  }
                   htmlFor={`${idPrefix}-description`}
                 >
                   <Textarea
@@ -664,7 +672,7 @@ function ProposalRow({
 
               {proposal.kind === "milestone" ? (
                 <>
-                  <EditRow label="Target date" htmlFor={`${idPrefix}-target`}>
+                  <EditRow label={t("planReview.targetDate")} htmlFor={`${idPrefix}-target`}>
                     <Input
                       id={`${idPrefix}-target`}
                       type="date"
@@ -674,18 +682,23 @@ function ProposalRow({
                       className="h-9 w-auto"
                     />
                   </EditRow>
-                  {select("status", "Status", MILESTONE_STATUSES)}
+                  {select(
+                    "status",
+                    t("planReview.status"),
+                    MILESTONE_STATUSES,
+                    label("milestoneStatus"),
+                  )}
                 </>
               ) : null}
 
               {proposal.kind === "task" ? (
                 <>
-                  <EditRow label="Dates" htmlFor={`${idPrefix}-start`}>
+                  <EditRow label={t("planReview.dates")} htmlFor={`${idPrefix}-start`}>
                     <div className="flex flex-wrap items-center gap-2">
                       <Input
                         id={`${idPrefix}-start`}
                         type="date"
-                        aria-label="Start date"
+                        aria-label={t("planReview.startDate")}
                         value={values.startDate}
                         onChange={(event) => set("startDate", event.target.value)}
                         disabled={disabled}
@@ -696,7 +709,7 @@ function ProposalRow({
                       </span>
                       <Input
                         type="date"
-                        aria-label="Due date"
+                        aria-label={t("planReview.dueDate")}
                         value={values.dueDate}
                         onChange={(event) => set("dueDate", event.target.value)}
                         disabled={disabled}
@@ -704,28 +717,38 @@ function ProposalRow({
                       />
                     </div>
                   </EditRow>
-                  {select("status", "Status", TASK_STATUSES)}
-                  {select("priority", "Priority", TASK_PRIORITY_VALUES)}
+                  {select("status", t("planReview.status"), TASK_STATUSES, label("taskStatus"))}
+                  {select(
+                    "priority",
+                    t("planReview.priority"),
+                    TASK_PRIORITY_VALUES,
+                    label("priority"),
+                  )}
                   {milestoneSelect()}
                 </>
               ) : null}
 
               {proposal.kind === "risk" ? (
                 <>
-                  <EditRow label="Mitigation" htmlFor={`${idPrefix}-mitigation`}>
+                  <EditRow label={t("planReview.mitigation")} htmlFor={`${idPrefix}-mitigation`}>
                     <Textarea
                       id={`${idPrefix}-mitigation`}
                       value={values.mitigation}
                       onChange={(event) => set("mitigation", event.target.value)}
                       disabled={disabled}
-                      placeholder="How this will be reduced or handled"
+                      placeholder={t("planReview.mitigationPlaceholder")}
                       rows={2}
                       maxLength={4000}
                     />
                   </EditRow>
-                  {select("impact", "Impact", RISK_LEVELS)}
-                  {select("likelihood", "Likelihood", RISK_LEVELS)}
-                  {select("status", "Status", RISK_STATUSES)}
+                  {select("impact", t("planReview.impact"), RISK_LEVELS, label("riskLevel"))}
+                  {select(
+                    "likelihood",
+                    t("planReview.likelihood"),
+                    RISK_LEVELS,
+                    label("riskLevel"),
+                  )}
+                  {select("status", t("planReview.status"), RISK_STATUSES, label("riskStatus"))}
                   {milestoneSelect()}
                 </>
               ) : null}
@@ -739,7 +762,7 @@ function ProposalRow({
                     disabled={disabled}
                     onClick={() => setValues(baseline)}
                   >
-                    Discard changes
+                    {t("planReview.discard")}
                   </Button>
                 ) : null}
                 <Button
@@ -749,43 +772,45 @@ function ProposalRow({
                   onClick={() => void save()}
                   disabled={disabled || !dirty}
                 >
-                  Save edit
+                  {t("planReview.saveEdit")}
                 </Button>
               </div>
             </div>
           ) : (
             <DescriptionList>
               {proposal.kind === "task" || proposal.kind === "milestone" ? (
-                <Field name="Description">
+                <Field name={t("planReview.description")}>
                   {proposal.description || (
-                    <span className="text-slate-400">None</span>
+                    <span className="text-slate-400">{t("planReview.none")}</span>
                   )}
                 </Field>
               ) : null}
               {proposal.kind === "task" ? (
                 <>
-                  <Field name="Dates">
-                    {proposal.startDate ? formatDay(proposal.startDate) : "—"} →{" "}
-                    {proposal.dueDate ? formatDay(proposal.dueDate) : "—"}
+                  <Field name={t("planReview.dates")}>
+                    {proposal.startDate ? formatDay(proposal.startDate, dateLocale) : "—"} →{" "}
+                    {proposal.dueDate ? formatDay(proposal.dueDate, dateLocale) : "—"}
                   </Field>
-                  <Field name="Priority">
-                    <span className="capitalize">{proposal.priority}</span>
+                  <Field name={t("planReview.priority")}>
+                    {t(`priority.${proposal.priority}`)}
                   </Field>
                 </>
               ) : null}
               {proposal.kind === "risk" ? (
-                <Field name="Mitigation">
+                <Field name={t("planReview.mitigation")}>
                   {proposal.mitigation || (
-                    <span className="text-slate-400">None</span>
+                    <span className="text-slate-400">{t("planReview.none")}</span>
                   )}
                 </Field>
               ) : null}
               {(proposal.kind === "task" || proposal.kind === "risk") &&
               proposal.milestone ? (
-                <Field name="Milestone">{proposal.milestone.title}</Field>
+                <Field name={t("planReview.milestone")}>{proposal.milestone.title}</Field>
               ) : null}
               {proposal.reviewedAt ? (
-                <Field name="Reviewed">{formatDate(proposal.reviewedAt)}</Field>
+                <Field name={t("planReview.reviewed")}>
+                  {formatDate(proposal.reviewedAt, dateLocale)}
+                </Field>
               ) : null}
             </DescriptionList>
           )}
@@ -822,6 +847,8 @@ export function ReviewPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
+  const t = useT();
+  const dateLocale = useDateLocale();
 
   const run = initialRuns.find((candidate) => candidate.id === runId) ?? initialRuns[0];
   const proposals = useMemo<Proposal[]>(
@@ -854,14 +881,14 @@ export function ReviewPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not generate the draft plan.");
+        setError(data.error ?? t("planReview.generateFailed"));
         router.refresh();
         return;
       }
       setRunId(data.run.id);
       router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusy(false);
     }
@@ -882,14 +909,14 @@ export function ReviewPanel({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not review the proposal.");
+        setError(data.error ?? t("planReview.reviewFailed"));
         return false;
       }
       setSelected(new Set());
       router.refresh();
       return true;
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
       return false;
     } finally {
       setBusy(false);
@@ -912,8 +939,8 @@ export function ReviewPanel({
     <div className="space-y-6">
       <Card className="p-5">
         <SectionHeader
-          title="Generate a cited draft plan"
-          description="ScopePilot proposes work only from selected ready documents. Nothing enters Tasks, Timeline, or Risks until you approve it here."
+          title={t("planReview.generateTitle")}
+          description={t("planReview.generateLead")}
         >
           <Button
             type="button"
@@ -926,13 +953,13 @@ export function ReviewPanel({
             }
           >
             {busy ? <Spinner className="border-white/40 border-t-white" /> : null}
-            Generate draft plan
+            {t("planReview.generate")}
           </Button>
         </SectionHeader>
 
         {activeRun ? (
           <p className="mt-3 text-xs text-amber-700">
-            Finish reviewing the active draft before generating another plan.
+            {t("planReview.finishFirst")}
           </p>
         ) : null}
         {error ? <div className="mt-3"><ErrorState message={error} /></div> : null}
@@ -940,14 +967,14 @@ export function ReviewPanel({
         {readyDocuments.length === 0 ? (
           <div className="mt-4">
             <EmptyState
-              title="No ready project documents"
-              description="Upload and finish processing at least one document before generating a plan."
+              title={t("planReview.noDocumentsTitle")}
+              description={t("planReview.noDocumentsBody")}
               action={
                 <LinkButton
                   href={`/projects/${projectId}/documents`}
                   variant="secondary"
                 >
-                  Open Documents
+                  {t("planReview.openDocuments")}
                 </LinkButton>
               }
             />
@@ -956,7 +983,7 @@ export function ReviewPanel({
           <div className="mt-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-medium text-slate-600">
-                Selected documents ({documentIds.size}/20)
+                {t("planReview.selectedDocuments", { count: documentIds.size, max: 20 })}
               </p>
               {readyDocuments.length > 20 ? (
                 <button
@@ -964,7 +991,7 @@ export function ReviewPanel({
                   className="text-xs font-medium text-blue-700 hover:underline"
                   onClick={() => setDocumentIds(new Set())}
                 >
-                  Clear selection
+                  {t("planReview.clearSelection")}
                 </button>
               ) : null}
             </div>
@@ -994,7 +1021,7 @@ export function ReviewPanel({
                       {document.originalFilename}
                     </span>
                     <span className="text-xs text-slate-500">
-                      {document.chunkCount} indexed chunks
+                      {t("planReview.chunks", { count: document.chunkCount })}
                     </span>
                   </span>
                 </label>
@@ -1006,15 +1033,15 @@ export function ReviewPanel({
 
       {initialRuns.length === 0 ? (
         <EmptyState
-          title="No generated plans yet"
-          description="Select the project evidence above to create the first reviewable draft."
+          title={t("planReview.noRunsTitle")}
+          description={t("planReview.noRunsBody")}
         />
       ) : (
         <>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <label htmlFor="review-run" className="mb-1 block text-xs text-slate-500">
-                Plan run history
+                {t("planReview.history")}
               </label>
               <Select
                 id="review-run"
@@ -1026,14 +1053,15 @@ export function ReviewPanel({
               >
                 {initialRuns.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
-                    {formatDate(candidate.createdAt)} · {candidate.status.replace("_", " ")}
+                    {formatDate(candidate.createdAt, dateLocale)} ·{" "}
+                    {t(`runStatus.${candidate.status}`)}
                   </option>
                 ))}
               </Select>
             </div>
             {run ? (
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <Badge tone={RUN_TONE[run.status]}>{run.status.replace("_", " ")}</Badge>
+                <Badge tone={RUN_TONE[run.status]}>{t(`runStatus.${run.status}`)}</Badge>
                 <span>{run.model}</span>
                 {run.latencyMs !== null ? <span>· {(run.latencyMs / 1000).toFixed(1)}s</span> : null}
               </div>
@@ -1044,13 +1072,25 @@ export function ReviewPanel({
 
           {summary ? (
             <Card className="grid gap-5 p-5 lg:grid-cols-3">
-              <SummarySection title="Scope" rows={summary.scopeStatements ?? []} locations={locations} />
-              <SummarySection title="Deliverables" rows={summary.deliverables ?? []} locations={locations} />
-              <SummarySection title="Acceptance criteria" rows={summary.acceptanceCriteria ?? []} locations={locations} />
+              <SummarySection
+                title={t("planReview.scope")}
+                rows={summary.scopeStatements ?? []}
+                locations={locations}
+              />
+              <SummarySection
+                title={t("planReview.deliverables")}
+                rows={summary.deliverables ?? []}
+                locations={locations}
+              />
+              <SummarySection
+                title={t("planReview.acceptance")}
+                rows={summary.acceptanceCriteria ?? []}
+                locations={locations}
+              />
               {(summary.warnings?.length ?? 0) > 0 ? (
                 <details className="lg:col-span-3">
                   <summary className="cursor-pointer text-xs font-medium text-amber-700">
-                    {summary.warnings!.length} validation warnings
+                    {t("planReview.warnings", { count: summary.warnings!.length })}
                   </summary>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-500">
                     {summary.warnings!.map((warning, index) => <li key={index}>{warning}</li>)}
@@ -1063,7 +1103,10 @@ export function ReviewPanel({
           {run?.status === "draft" && draftItems.length > 0 ? (
             <div className="sticky top-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50/95 p-3 shadow-sm backdrop-blur">
               <span className="text-sm text-blue-900">
-                {selected.size} selected · {draftItems.length} awaiting review
+                {t("planReview.selectedAwaiting", {
+                  selected: selected.size,
+                  count: draftItems.length,
+                })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -1079,10 +1122,10 @@ export function ReviewPanel({
                     )
                   }
                 >
-                  Approve selected
+                  {t("planReview.approveSelected")}
                 </Button>
                 <Button type="button" size="sm" disabled={busy} onClick={() => void approve(draftItems)}>
-                  Approve all
+                  {t("planReview.approveAll")}
                 </Button>
               </div>
             </div>
@@ -1090,14 +1133,8 @@ export function ReviewPanel({
 
           {run && proposals.length > 0 ? (
             <div className="space-y-5">
-              {(
-                [
-                  ["milestone", "Milestones"],
-                  ["task", "Tasks"],
-                  ["risk", "Risks"],
-                  ["dependency", "Dependencies"],
-                ] as const
-              ).map(([kind, title]) => {
+              {(["milestone", "task", "risk", "dependency"] as const).map((kind) => {
+                const title = t(`planReview.groups.${kind}`);
                 const group = proposals.filter((proposal) => proposal.kind === kind);
                 if (group.length === 0) return null;
                 const draftKeys = group
@@ -1129,7 +1166,7 @@ export function ReviewPanel({
                               setSelected(next);
                             }}
                             disabled={busy}
-                            aria-label={`Select all draft ${title.toLowerCase()}`}
+                            aria-label={t(`planReview.selectGroup.${kind}`)}
                             className={CHECKBOX}
                           />
                         ) : null}
@@ -1142,7 +1179,7 @@ export function ReviewPanel({
                         <span className="text-xs text-slate-400 tabular-nums">
                           {group.length}
                           {draftKeys.length > 0 && draftKeys.length < group.length
-                            ? ` · ${draftKeys.length} awaiting review`
+                            ? ` · ${t("planReview.awaiting", { count: draftKeys.length })}`
                             : ""}
                         </span>
                       </div>
@@ -1173,9 +1210,9 @@ export function ReviewPanel({
                               }}
                               onReject={async () => {
                                 const confirmed = await confirm({
-                                  title: "Reject this suggestion?",
-                                  body: "It stays in this run's history but will never become an official project record.",
-                                  confirmLabel: "Reject",
+                                  title: t("planReview.rejectTitle"),
+                                  body: t("planReview.rejectBody"),
+                                  confirmLabel: t("planReview.reject"),
                                   tone: "danger",
                                 });
                                 if (!confirmed) return;
@@ -1194,7 +1231,10 @@ export function ReviewPanel({
               })}
             </div>
           ) : run?.status !== "failed" && run?.status !== "processing" ? (
-            <EmptyState title="No surviving proposals" description="This run did not retain any reviewable project records." />
+            <EmptyState
+              title={t("planReview.noneSurvivedTitle")}
+              description={t("planReview.noneSurvivedBody")}
+            />
           ) : null}
         </>
       )}

@@ -3,7 +3,7 @@ import { Card, Skeleton, SkeletonRegion } from "@/components/ui";
 /** The board is columns, not a list, so it gets its own placeholder. */
 export default function TasksLoading() {
   return (
-    <SkeletonRegion label="Loading tasks" className="space-y-4">
+    <SkeletonRegion className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <Skeleton className="h-5 w-24" />
         <Skeleton className="h-8 w-40 bg-slate-100" />

@@ -1,5 +1,7 @@
-import { sharedEn } from "@/lib/i18n/dictionaries/areas/shared.en";
+import { deliveryEn } from "@/lib/i18n/dictionaries/areas/delivery.en";
+import { overviewEn } from "@/lib/i18n/dictionaries/areas/overview.en";
 import { requirementsEn } from "@/lib/i18n/dictionaries/areas/requirements.en";
+import { sharedEn } from "@/lib/i18n/dictionaries/areas/shared.en";
 import { tasksEn } from "@/lib/i18n/dictionaries/areas/tasks.en";
 
 /**
@@ -15,6 +17,8 @@ export const en = {
   ...sharedEn,
   ...tasksEn,
   ...requirementsEn,
+  ...overviewEn,
+  ...deliveryEn,
   app: {
     name: "ScopePilot",
     tagline: "AI work assistant",
@@ -92,6 +96,9 @@ export const en = {
     goToToday: "Go to Today",
     browseProjects: "Browse projects",
     backHome: "Back to home",
+    sectionFailedTitle: "This section could not be loaded",
+    sectionFailedBody: "Something went wrong while loading this project. Your data has not been changed.",
+    backToProjects: "Back to projects",
   },
   nav: {
     main: "Main",

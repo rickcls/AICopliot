@@ -83,8 +83,9 @@ function daysInUtcMonth(month: Date): number {
   ).getUTCDate();
 }
 
-export function formatUtcMonth(month: Date): string {
-  return month.toLocaleDateString(undefined, {
+/** An explicit locale for the same hydration reason as the Gantt axis. */
+export function formatUtcMonth(month: Date, locale = "en-GB"): string {
+  return month.toLocaleDateString(locale, {
     timeZone: "UTC",
     month: "long",
     year: "numeric",
@@ -102,6 +103,7 @@ export function buildCalendarMonth(
   items: readonly CalendarInput[],
   month: Date,
   now: Date,
+  locale = "en-GB",
 ): CalendarMonth {
   const first = startOfUtcMonth(month);
   const today = startOfUtcDay(now).getTime();
@@ -146,7 +148,7 @@ export function buildCalendarMonth(
     else weeks[weeks.length - 1].push(cell);
   }
 
-  return { month: first, label: formatUtcMonth(first), weeks, inMonthCount };
+  return { month: first, label: formatUtcMonth(first, locale), weeks, inMonthCount };
 }
 
 /**

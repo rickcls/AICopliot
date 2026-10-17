@@ -1,6 +1,8 @@
 import type { Dictionary } from "@/lib/i18n/translate";
-import { sharedZhHant } from "@/lib/i18n/dictionaries/areas/shared.zh-Hant";
+import { deliveryZhHant } from "@/lib/i18n/dictionaries/areas/delivery.zh-Hant";
+import { overviewZhHant } from "@/lib/i18n/dictionaries/areas/overview.zh-Hant";
 import { requirementsZhHant } from "@/lib/i18n/dictionaries/areas/requirements.zh-Hant";
+import { sharedZhHant } from "@/lib/i18n/dictionaries/areas/shared.zh-Hant";
 import { tasksZhHant } from "@/lib/i18n/dictionaries/areas/tasks.zh-Hant";
 
 /**
@@ -12,6 +14,8 @@ export const zhHant = {
   ...sharedZhHant,
   ...tasksZhHant,
   ...requirementsZhHant,
+  ...overviewZhHant,
+  ...deliveryZhHant,
   app: {
     name: "ScopePilot",
     tagline: "AI 工作助理",
@@ -89,6 +93,9 @@ export const zhHant = {
     goToToday: "前往今日",
     browseProjects: "瀏覽專案",
     backHome: "返回首頁",
+    sectionFailedTitle: "無法載入此部分",
+    sectionFailedBody: "載入此專案時出現問題，你的資料沒有任何改動。",
+    backToProjects: "返回專案",
   },
   nav: {
     main: "主選單",

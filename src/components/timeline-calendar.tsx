@@ -1,4 +1,8 @@
+"use client";
+
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import type { CalendarCell, CalendarInput, CalendarMonth } from "@/lib/pm/calendar";
+import { labelOr } from "@/lib/i18n/translate";
 import { cn, formatDay } from "@/lib/utils";
 
 /**
@@ -38,11 +42,19 @@ function chipTone(item: CalendarInput): string {
 
 function Chip({ item }: { item: CalendarInput }) {
   const finished = !item.open;
+  const t = useT();
+  const dateLocale = useDateLocale();
+  // Tasks carry a category, milestones their own status; both have labels.
+  const statusLabel = labelOr(
+    t,
+    item.kind === "milestone" ? `milestoneStatus.${item.status}` : `statusCategory.${item.status}`,
+    item.status.replace("_", " "),
+  );
 
   return (
     <li>
       <span
-        title={`${item.title} — ${item.date ? formatDay(item.date) : ""} · ${item.status.replace("_", " ")}`}
+        title={`${item.title} — ${item.date ? formatDay(item.date, dateLocale) : ""} · ${statusLabel}`}
         className={cn(
           "flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] leading-tight",
           chipTone(item),
@@ -108,8 +120,12 @@ function Day({ cell }: { cell: CalendarCell }) {
 }
 
 export function TimelineCalendar({ month }: { month: CalendarMonth }) {
+  const t = useT();
+  // An explicit locale: `undefined` resolves differently on the server and in
+  // the browser, and these headers render during hydration.
+  const dateLocale = useDateLocale();
   const weekdays = month.weeks[0].map((cell) =>
-    cell.date.toLocaleDateString(undefined, { timeZone: "UTC", weekday: "short" }),
+    cell.date.toLocaleDateString(dateLocale, { timeZone: "UTC", weekday: "short" }),
   );
 
   return (
@@ -118,7 +134,7 @@ export function TimelineCalendar({ month }: { month: CalendarMonth }) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[44rem] table-fixed border-collapse">
           <caption className="sr-only">
-            Tasks and milestones in {month.label}, by the date they are due
+            {t("timeline.calendarCaption", { month: month.label })}
           </caption>
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/60">
@@ -149,23 +165,25 @@ export function TimelineCalendar({ month }: { month: CalendarMonth }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-500">
-        <span>Placed on the due or target date.</span>
+        <span>{t("timeline.legendPlaced")}</span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-blue-500" aria-hidden /> open
+          <span className="size-2 rounded-full bg-blue-500" aria-hidden />{" "}
+          {t("timeline.legendOpen")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-emerald-500" aria-hidden /> done
+          <span className="size-2 rounded-full bg-emerald-500" aria-hidden />{" "}
+          {t("timeline.legendDone")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-red-500" aria-hidden /> overdue or
-          blocked
+          <span className="size-2 rounded-full bg-red-500" aria-hidden />{" "}
+          {t("timeline.legendOverdue")}
         </span>
         <span className="flex items-center gap-1.5">
           <span
             className="size-2 rotate-45 rounded-[1px] bg-purple-500"
             aria-hidden
           />{" "}
-          milestone
+          {t("timeline.legendMilestone")}
         </span>
       </div>
     </>

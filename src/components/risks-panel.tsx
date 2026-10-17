@@ -20,6 +20,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
 import type {
@@ -58,12 +59,7 @@ export interface RiskRow {
 }
 
 const LEVELS: RiskLevel[] = ["low", "medium", "high"];
-const STATUSES: Array<{ value: RiskStatus; label: string }> = [
-  { value: "open", label: "Open" },
-  { value: "monitoring", label: "Monitoring" },
-  { value: "mitigated", label: "Mitigated" },
-  { value: "accepted", label: "Accepted" },
-];
+const STATUSES: RiskStatus[] = ["open", "monitoring", "mitigated", "accepted"];
 
 const LEVEL_TONE = { low: "neutral", medium: "warning", high: "danger" } as const;
 const STATUS_TONE = {
@@ -131,6 +127,8 @@ export function RisksPanel({
   const [query, setQuery] = useState("");
   const confirm = useConfirm();
   const toast = useToast();
+  const t = useT();
+  const level = (value: RiskLevel) => t(`riskLevel.${value}`);
 
   function toggleExpanded(id: string) {
     setExpanded((previous) => {
@@ -185,14 +183,14 @@ export function RisksPanel({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not save the risk.");
+        setError(data.error ?? t("risks.saveFailed"));
         return;
       }
       upsert(data.risk);
       setDraft(null);
       setEditingId(null);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setSaving(false);
     }
@@ -209,12 +207,12 @@ export function RisksPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not update the risk.");
+        setError(data.error ?? t("risks.updateFailed"));
         return;
       }
       upsert(data.risk);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -226,9 +224,9 @@ export function RisksPanel({
         ? `${risk.description.slice(0, 60)}…`
         : risk.description;
     const confirmed = await confirm({
-      title: "Delete this risk?",
+      title: t("risks.deleteTitle"),
       body: <p className="italic">“{label}”</p>,
-      confirmLabel: "Delete risk",
+      confirmLabel: t("risks.deleteConfirm"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -239,13 +237,13 @@ export function RisksPanel({
       const response = await fetch(`/api/risks/${risk.id}`, { method: "DELETE" });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        setError(data.error ?? "Could not delete the risk.");
+        setError(data.error ?? t("risks.deleteFailed"));
         return;
       }
       setRisks((previous) => previous.filter((item) => item.id !== risk.id));
-      toast.success("Deleted risk");
+      toast.success(t("risks.deleted"));
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -254,14 +252,12 @@ export function RisksPanel({
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Risks"
-        description={
-          <>
-            {risks.length} recorded
-            {openRisks > 0 ? ` · ${openRisks} still open` : null} · open a row for
-            its mitigation and sources
-          </>
-        }
+        title={t("risks.title")}
+        description={[
+          t("risks.recorded", { count: risks.length }),
+          ...(openRisks > 0 ? [t("risks.stillOpen", { count: openRisks })] : []),
+          t("risks.rowHint"),
+        ].join(" · ")}
       >
         <Button
           type="button"
@@ -270,7 +266,7 @@ export function RisksPanel({
             setDraft({ ...EMPTY });
           }}
         >
-          New risk
+          {t("risks.new")}
         </Button>
       </SectionHeader>
 
@@ -280,7 +276,7 @@ export function RisksPanel({
         <Card className="p-4">
           <form onSubmit={save} className="space-y-3">
             <p className="text-sm font-medium">
-              {editingId ? "Edit risk" : "New risk"}
+              {editingId ? t("risks.editTitle") : t("risks.newTitle")}
             </p>
 
             <div>
@@ -288,7 +284,7 @@ export function RisksPanel({
                 htmlFor="risk-description"
                 className="mb-1.5 block text-sm font-medium"
               >
-                Description
+                {t("risks.description")}
               </label>
               <Textarea
                 id="risk-description"
@@ -296,7 +292,7 @@ export function RisksPanel({
                 onChange={(event) =>
                   setDraft({ ...draft, description: event.target.value })
                 }
-                placeholder="e.g. The failover procedure has never been tested against production data volumes"
+                placeholder={t("risks.descriptionPlaceholder")}
                 rows={2}
                 maxLength={4000}
                 disabled={saving}
@@ -309,7 +305,7 @@ export function RisksPanel({
                   htmlFor="risk-milestone"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Milestone
+                  {t("risks.milestone")}
                 </label>
                 <Select
                   id="risk-milestone"
@@ -320,7 +316,7 @@ export function RisksPanel({
                   }
                   disabled={saving}
                 >
-                  <option value="">None</option>
+                  <option value="">{t("common.none")}</option>
                   {milestones.map((milestone) => (
                     <option key={milestone.id} value={milestone.id}>
                       {milestone.title}
@@ -334,7 +330,7 @@ export function RisksPanel({
                   htmlFor="risk-impact"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Impact
+                  {t("risks.impact")}
                 </label>
                 <Select
                   id="risk-impact"
@@ -345,9 +341,9 @@ export function RisksPanel({
                   }
                   disabled={saving}
                 >
-                  {LEVELS.map((level) => (
-                    <option key={level} value={level}>
-                      {level}
+                  {LEVELS.map((value) => (
+                    <option key={value} value={value}>
+                      {level(value)}
                     </option>
                   ))}
                 </Select>
@@ -358,7 +354,7 @@ export function RisksPanel({
                   htmlFor="risk-likelihood"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Likelihood
+                  {t("risks.likelihood")}
                 </label>
                 <Select
                   id="risk-likelihood"
@@ -372,9 +368,9 @@ export function RisksPanel({
                   }
                   disabled={saving}
                 >
-                  {LEVELS.map((level) => (
-                    <option key={level} value={level}>
-                      {level}
+                  {LEVELS.map((value) => (
+                    <option key={value} value={value}>
+                      {level(value)}
                     </option>
                   ))}
                 </Select>
@@ -385,7 +381,7 @@ export function RisksPanel({
                   htmlFor="risk-status"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Status
+                  {t("risks.status")}
                 </label>
                 <Select
                   id="risk-status"
@@ -397,8 +393,8 @@ export function RisksPanel({
                   disabled={saving}
                 >
                   {STATUSES.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
+                    <option key={status} value={status}>
+                      {t(`riskStatus.${status}`)}
                     </option>
                   ))}
                 </Select>
@@ -410,8 +406,8 @@ export function RisksPanel({
                 htmlFor="risk-mitigation"
                 className="mb-1.5 block text-sm font-medium"
               >
-                Mitigation{" "}
-                <span className="font-normal text-slate-500">(optional)</span>
+                {t("risks.mitigation")}{" "}
+                <span className="font-normal text-slate-500">{t("risks.optional")}</span>
               </label>
               <Textarea
                 id="risk-mitigation"
@@ -435,7 +431,7 @@ export function RisksPanel({
                 }}
                 disabled={saving}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -444,12 +440,12 @@ export function RisksPanel({
                 {saving ? (
                   <>
                     <Spinner className="border-white/40 border-t-white" />
-                    Saving…
+                    {t("common.saving")}
                   </>
                 ) : editingId ? (
-                  "Save changes"
+                  t("risks.saveChanges")
                 ) : (
-                  "Create risk"
+                  t("risks.create")
                 )}
               </Button>
             </div>
@@ -459,8 +455,8 @@ export function RisksPanel({
 
       {risks.length === 0 && !draft ? (
         <EmptyState
-          title="No risks recorded"
-          description="Record what could derail this project, how likely it is, and what is being done about it."
+          title={t("risks.emptyTitle")}
+          description={t("risks.emptyBody")}
           action={
             <Button
               type="button"
@@ -469,7 +465,7 @@ export function RisksPanel({
                 setDraft({ ...EMPTY });
               }}
             >
-              Record the first risk
+              {t("risks.recordFirst")}
             </Button>
           }
         />
@@ -477,7 +473,7 @@ export function RisksPanel({
         <Card className="overflow-hidden">
           <div
             role="search"
-            aria-label="Filter risks"
+            aria-label={t("risks.filterLabel")}
             className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
           >
             <div className="flex flex-wrap items-center gap-1.5">
@@ -486,41 +482,41 @@ export function RisksPanel({
                 count={risks.length}
                 onClick={() => setStatusFilter("all")}
               >
-                All
+                {t("common.all")}
               </FilterChip>
               {STATUSES.map((status) => (
                 <FilterChip
-                  key={status.value}
-                  pressed={statusFilter === status.value}
-                  count={risks.filter((risk) => risk.status === status.value).length}
-                  onClick={() => setStatusFilter(status.value)}
+                  key={status}
+                  pressed={statusFilter === status}
+                  count={risks.filter((risk) => risk.status === status).length}
+                  onClick={() => setStatusFilter(status)}
                 >
-                  {status.label}
+                  {t(`riskStatus.${status}`)}
                 </FilterChip>
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
               <SearchField
-                label="Search risks"
-                placeholder="Search risks"
+                label={t("risks.search")}
+                placeholder={t("risks.search")}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 className="w-full sm:w-52"
               />
               <Select
-                aria-label="Sort risks"
+                aria-label={t("risks.sortLabel")}
                 value={sort}
                 onChange={(event) => setSort(event.target.value as RiskSort)}
                 className="h-8 text-xs"
               >
-                <option value="exposure">Highest exposure first</option>
-                <option value="recent">Newest first</option>
+                <option value="exposure">{t("risks.sortExposure")}</option>
+                <option value="recent">{t("risks.sortRecent")}</option>
               </Select>
             </div>
           </div>
           {visibleRisks.length === 0 ? (
             <p className="px-6 py-10 text-center text-sm text-slate-500">
-              No risks match this filter.
+              {t("risks.noMatch")}
             </p>
           ) : null}
           <ul className="divide-y divide-slate-100">
@@ -559,15 +555,23 @@ export function RisksPanel({
 
                     <div className="flex shrink-0 basis-full items-center gap-1.5 pl-6 sm:basis-auto sm:pl-0">
                       {risk.source === "ai_suggested" ? (
-                        <Badge tone="info">AI</Badge>
+                        <Badge tone="info">{t("risks.ai")}</Badge>
                       ) : null}
                       <Badge
                         tone={exposureTone(risk.impact, risk.likelihood)}
-                        title={`Impact ${risk.impact}, likelihood ${risk.likelihood}`}
+                        title={t("risks.exposureTitle", {
+                          impact: level(risk.impact),
+                          likelihood: level(risk.likelihood),
+                        })}
                       >
-                        {risk.impact} × {risk.likelihood}
+                        {t("risks.exposureChip", {
+                          impact: level(risk.impact),
+                          likelihood: level(risk.likelihood),
+                        })}
                       </Badge>
-                      <Badge tone={STATUS_TONE[risk.status]}>{risk.status}</Badge>
+                      <Badge tone={STATUS_TONE[risk.status]}>
+                        {t(`riskStatus.${risk.status}`)}
+                      </Badge>
                     </div>
                   </div>
 
@@ -576,32 +580,35 @@ export function RisksPanel({
                       {/* A two-column list gives the prose one wide measure
                           instead of stacking four narrow labelled blocks. */}
                       <DescriptionList className="text-sm">
-                        <Field name="Risk">
+                        <Field name={t("risks.risk")}>
                           <p className="max-w-3xl text-pretty">
                             {risk.description}
                           </p>
                         </Field>
 
-                        <Field name="Mitigation">
+                        <Field name={t("risks.mitigation")}>
                           {risk.mitigation ? (
                             <p className="max-w-3xl text-pretty">
                               {risk.mitigation}
                             </p>
                           ) : (
                             <span className="text-amber-700">
-                              None recorded — nothing is being done about this yet.
+                              {t("risks.noMitigation")}
                             </span>
                           )}
                         </Field>
 
-                        <Field name="Exposure">
+                        <Field name={t("risks.exposure")}>
                           <span className="text-slate-600">
-                            Impact {risk.impact} · likelihood {risk.likelihood}
+                            {t("risks.exposureValue", {
+                              impact: level(risk.impact),
+                              likelihood: level(risk.likelihood),
+                            })}
                           </span>
                         </Field>
 
                         {risk.milestone ? (
-                          <Field name="Milestone">
+                          <Field name={t("risks.milestone")}>
                             <span className="text-slate-600">
                               {risk.milestone.title}
                             </span>
@@ -609,7 +616,7 @@ export function RisksPanel({
                         ) : null}
 
                         {risk.requirementLinks.length > 0 ? (
-                          <Field name="Requirements">
+                          <Field name={t("risks.requirements")}>
                             <TracedRequirements
                               projectId={projectId}
                               links={risk.requirementLinks}
@@ -618,7 +625,7 @@ export function RisksPanel({
                         ) : null}
 
                         {risk.citations.length > 0 ? (
-                          <Field name="Sources">
+                          <Field name={t("risks.sources")}>
                             <ul className="space-y-1.5">
                               {risk.citations.map((citation) => (
                                 <li key={citation.id}>
@@ -628,7 +635,7 @@ export function RisksPanel({
                                   >
                                     {citation.chunk.document.originalFilename}
                                     {citation.chunk.pageNumber
-                                      ? ` p.${citation.chunk.pageNumber}`
+                                      ? ` ${t("common.page", { page: citation.chunk.pageNumber })}`
                                       : ""}
                                     {citation.chunk.sectionTitle
                                       ? ` · ${citation.chunk.sectionTitle}`
@@ -636,7 +643,7 @@ export function RisksPanel({
                                   </a>
                                   {citation.purpose === "milestone_link" ? (
                                     <Badge tone="info" className="ml-1.5">
-                                      Milestone link
+                                      {t("risks.milestoneLink")}
                                     </Badge>
                                   ) : null}
                                   {citation.excerpt ? (
@@ -653,7 +660,9 @@ export function RisksPanel({
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <Select
-                          aria-label={`Status for risk: ${risk.description.slice(0, 40)}`}
+                          aria-label={t("risks.statusFor", {
+                            description: risk.description.slice(0, 40),
+                          })}
                           className="h-8 text-xs"
                           value={risk.status}
                           disabled={busy}
@@ -662,8 +671,8 @@ export function RisksPanel({
                           }
                         >
                           {STATUSES.map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
+                            <option key={status} value={status}>
+                              {t(`riskStatus.${status}`)}
                             </option>
                           ))}
                         </Select>
@@ -683,7 +692,7 @@ export function RisksPanel({
                             });
                           }}
                         >
-                          Edit
+                          {t("risks.edit")}
                         </Button>
                         <Button
                           size="sm"
@@ -692,7 +701,7 @@ export function RisksPanel({
                           disabled={busy}
                           onClick={() => void remove(risk)}
                         >
-                          Delete
+                          {t("common.delete")}
                         </Button>
                       </div>
                     </div>
