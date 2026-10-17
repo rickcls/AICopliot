@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { ThreadSummary } from "@/lib/chat/history";
 import { formatThreadTime } from "@/lib/chat/relative-time";
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Badge, FOCUS_RING, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,8 @@ export function ThreadRail({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const t = useT();
+  const dateLocale = useDateLocale();
 
   async function commit(thread: ThreadSummary) {
     const title = draftTitle.trim();
@@ -153,7 +156,7 @@ export function ThreadRail({
                       </Badge>
                     ) : null}
                     <span className="text-xs text-slate-400">
-                      {formatThreadTime(thread.lastMessageAt, nowIso)}
+                      {formatThreadTime(thread.lastMessageAt, nowIso, t, dateLocale)}
                     </span>
                   </span>
                 </Link>

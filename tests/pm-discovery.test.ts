@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { translatorFor } from "@/lib/i18n/dictionaries";
 import { nextDiscoveryStep, type DiscoveryCounts } from "@/lib/pm/discovery";
 import { requirementStatusLabel } from "@/lib/pm/labels";
 
@@ -59,13 +60,17 @@ describe("nextDiscoveryStep", () => {
 });
 
 describe("requirementStatusLabel", () => {
+  const en = translatorFor("en");
+  const zh = translatorFor("zh-Hant");
+
   it("names statuses for the job, not the model", () => {
-    expect(requirementStatusLabel("needs_clarification")).toBe("Ask client");
-    expect(requirementStatusLabel("approved")).toBe("Agreed");
-    expect(requirementStatusLabel("draft")).toBe("To review");
+    expect(requirementStatusLabel("needs_clarification", en)).toBe("Ask client");
+    expect(requirementStatusLabel("approved", en)).toBe("Agreed");
+    expect(requirementStatusLabel("draft", en)).toBe("To review");
+    expect(requirementStatusLabel("needs_clarification", zh)).toBe("要問客戶");
   });
 
   it("falls back to readable words for an unknown value", () => {
-    expect(requirementStatusLabel("on_hold")).toBe("on hold");
+    expect(requirementStatusLabel("on_hold", en)).toBe("on hold");
   });
 });

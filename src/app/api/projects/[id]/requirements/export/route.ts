@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireProject, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { translatorFor } from "@/lib/i18n/dictionaries";
+import { getFileLocale } from "@/lib/i18n/server";
 import {
   buildPack,
   exportFilename,
@@ -51,12 +53,13 @@ export async function GET(request: Request, { params }: Params) {
       select: requirementSelect,
     });
 
+    const t = translatorFor(await getFileLocale(search.get("lang")));
     const now = new Date();
     const body = pack
-      ? packToMarkdown(pack, project.name, buildPack(pack, requirements), now)
+      ? packToMarkdown(pack, project.name, buildPack(pack, requirements, t), now, t)
       : format === "csv"
-        ? requirementsToCsv(requirements)
-        : requirementsToMarkdown(project.name, requirements, now);
+        ? requirementsToCsv(requirements, t)
+        : requirementsToMarkdown(project.name, requirements, now, t);
     const filename = exportFilename(
       project.name,
       format,

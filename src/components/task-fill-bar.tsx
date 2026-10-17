@@ -1,15 +1,11 @@
 "use client";
 
 import { Sparkles, X } from "lucide-react";
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Button, Spinner } from "@/components/ui";
 import type { FillSummary } from "@/components/task-fill-client";
-import { fillFieldLabel, type TaskFillField } from "@/lib/pm/task-fill-apply";
-
-function list(fields: TaskFillField[]) {
-  const labels = fields.map(fillFieldLabel);
-  if (labels.length <= 1) return labels.join("");
-  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
-}
+import type { Translate } from "@/lib/i18n/translate";
+import type { TaskFillField } from "@/lib/pm/task-fill-apply";
 
 /**
  * Why a fill cannot run yet. A linked document still indexing has no text to
@@ -18,14 +14,15 @@ function list(fields: TaskFillField[]) {
 export function fillBlockedReason(
   title: string,
   linked: ReadonlyArray<{ originalFilename: string; status: string }>,
+  t: Translate,
 ): string | null {
-  if (title.trim().length < 3) return "Name the task first.";
+  if (title.trim().length < 3) return t("tasks.fill.nameFirst");
   const indexing = linked.find(
     (document) => document.status === "uploaded" || document.status === "processing",
   );
-  if (indexing) return `Waiting for ${indexing.originalFilename} to finish indexing.`;
+  if (indexing) return t("tasks.fill.indexing", { filename: indexing.originalFilename });
   const failed = linked.find((document) => document.status === "failed");
-  if (failed) return `${failed.originalFilename} failed to process. Unlink it or retry it from Documents.`;
+  if (failed) return t("tasks.fill.failed", { filename: failed.originalFilename });
   return null;
 }
 
@@ -57,6 +54,13 @@ export function TaskFillBar({
   onFill: () => void;
   onRemoveRequirement: (requirementId: string) => void;
 }) {
+  const t = useT();
+  const dateLocale = useDateLocale();
+  // "description, priority and due date" in English, 「描述、優先度和到期日」 in Chinese.
+  const list = (fields: TaskFillField[]) =>
+    new Intl.ListFormat(dateLocale, { type: "conjunction" }).format(
+      fields.map((field) => t(`tasks.fill.fieldNames.${field}`)),
+    );
   const nothingNew =
     summary !== null &&
     summary.filled.length === 0 &&
@@ -77,14 +81,14 @@ export function TaskFillBar({
           ) : (
             <Sparkles className="size-3.5 text-violet-600" aria-hidden />
           )}
-          {filling ? "Reading documents…" : "Fill blanks with AI"}
+          {filling ? t("tasks.fill.reading") : t("tasks.fill.button")}
         </Button>
         <span className="text-xs text-slate-500">
           {blockedReason
             ? blockedReason
             : hasLinkedDocuments
-              ? "Reads the linked documents. Only empty fields are filled."
-              : "Searches this project's documents. Only empty fields are filled."}
+              ? t("tasks.fill.readsLinked")
+              : t("tasks.fill.searchesProject")}
         </span>
       </div>
 
@@ -100,25 +104,24 @@ export function TaskFillBar({
           className="space-y-2 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-xs text-slate-700"
         >
           <p>
-            {nothingNew ? (
-              "The documents had nothing to add to the empty fields."
-            ) : summary.filled.length > 0 ? (
-              <>
-                Filled <strong className="font-semibold">{list(summary.filled)}</strong>{" "}
-                from the {summary.evidence === "linked" ? "linked" : "project's"} documents.
-                Check them, then save.
-              </>
-            ) : (
-              "Suggested requirement links below. Check them, then save."
-            )}
-            {summary.kept.length > 0 ? (
-              <> Left your {list(summary.kept)} as you set {summary.kept.length === 1 ? "it" : "them"}.</>
-            ) : null}
+            {nothingNew
+              ? t("tasks.fill.nothingNew")
+              : summary.filled.length > 0
+                ? t(
+                    summary.evidence === "linked"
+                      ? "tasks.fill.filledLinked"
+                      : "tasks.fill.filledProject",
+                    { fields: list(summary.filled) },
+                  )
+                : t("tasks.fill.suggestedOnly")}
+            {summary.kept.length > 0
+              ? ` ${t("tasks.fill.kept", { count: summary.kept.length, fields: list(summary.kept) })}`
+              : null}
           </p>
 
           {summary.requirements.length > 0 ? (
             <div>
-              <p className="mb-1 font-medium text-slate-500">Delivers</p>
+              <p className="mb-1 font-medium text-slate-500">{t("tasks.detail.delivers")}</p>
               <ul className="flex flex-wrap gap-1.5">
                 {summary.requirements.map((requirement) => (
                   <li
@@ -130,7 +133,7 @@ export function TaskFillBar({
                     <button
                       type="button"
                       onClick={() => onRemoveRequirement(requirement.id)}
-                      aria-label={`Do not link ${requirement.code}`}
+                      aria-label={t("tasks.fill.doNotLink", { code: requirement.code })}
                       className="rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                     >
                       <X className="size-3" aria-hidden />
@@ -143,13 +146,15 @@ export function TaskFillBar({
 
           {summary.sources.length > 0 ? (
             <div>
-              <p className="mb-1 font-medium text-slate-500">Sources</p>
+              <p className="mb-1 font-medium text-slate-500">{t("tasks.detail.sources")}</p>
               <ul className="space-y-1.5">
                 {summary.sources.map((source) => (
                   <li key={source.chunkId}>
                     <span className="font-medium text-slate-800">
                       {source.filename}
-                      {source.pageNumber ? ` · p.${source.pageNumber}` : ""}
+                      {source.pageNumber
+                        ? ` · ${t("common.page", { page: source.pageNumber })}`
+                        : ""}
                     </span>
                     <span className="text-slate-500"> — {list(source.fields)}</span>
                     <p className="mt-0.5 text-slate-600 italic">“{source.excerpt}”</p>

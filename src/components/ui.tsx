@@ -1,5 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
+import { LoadingText } from "@/components/loading-text";
 import { cn } from "@/lib/utils";
 
 /**
@@ -525,12 +526,13 @@ export function Spinner({ className }: { className?: string }) {
   return (
     <span
       role="status"
-      aria-label="Loading"
       className={cn(
         "inline-block size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900",
         className,
       )}
-    />
+    >
+      <LoadingText />
+    </span>
   );
 }
 
@@ -552,7 +554,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 /** Wraps a set of `Skeleton`s so the wait is announced exactly once. */
 export function SkeletonRegion({
-  label = "Loading",
+  label,
   className,
   children,
 }: {
@@ -562,7 +564,7 @@ export function SkeletonRegion({
 }) {
   return (
     <div role="status" aria-busy className={className}>
-      <span className="sr-only">{label}</span>
+      {label ? <span className="sr-only">{label}</span> : <LoadingText />}
       {children}
     </div>
   );

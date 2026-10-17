@@ -11,8 +11,8 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
-export function formatDate(value: string | Date): string {
-  return new Date(value).toLocaleString(undefined, {
+export function formatDate(value: string | Date, locale?: string): string {
+  return new Date(value).toLocaleString(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   });

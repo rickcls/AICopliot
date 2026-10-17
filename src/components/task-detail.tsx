@@ -49,6 +49,7 @@ import {
   type TaskRow,
   type TaskStatusOption,
 } from "@/components/task-types";
+import { displayStatusLabel } from "@/lib/i18n/status-labels";
 import type { TaskProposal } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { TracedRequirements } from "@/components/traced-requirements";
@@ -141,7 +142,7 @@ export function TaskDetail({
     documents,
     task.documents,
   );
-  const fillBlocked = fillBlockedReason(draft.title, linked);
+  const fillBlocked = fillBlockedReason(draft.title, linked, t);
 
   /**
    * Every other field here saves as it changes, but a fill must not: it would
@@ -159,6 +160,7 @@ export function TaskDetail({
         linkedRequirementIds: task.requirementLinks.map(
           (link) => link.requirement.id,
         ),
+        t,
       });
       onExpand(result.draft, result.summary);
     } catch (caught) {
@@ -178,7 +180,7 @@ export function TaskDetail({
       const response = await request();
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not update the task's documents.");
+        setError(data.error ?? t("tasks.detail.documentsFailed"));
         return;
       }
       // Kept in step with the server so "expand to form" cannot hand the form
@@ -186,7 +188,7 @@ export function TaskDetail({
       setDraft((current) => ({ ...current, documentIds }));
       onTaskChange(data.task);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setSaving(false);
     }
@@ -217,14 +219,14 @@ export function TaskDetail({
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setDraft(before);
-        setError(data.error ?? "Could not save that change.");
+        setError(data.error ?? t("tasks.row.saveFailed"));
         return false;
       }
       onTaskChange(data.task);
       return true;
     } catch {
       setDraft(before);
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
       return false;
     } finally {
       setSaving(false);
@@ -272,14 +274,14 @@ export function TaskDetail({
     <div className="fixed inset-0 z-50 flex justify-end">
       <button
         type="button"
-        aria-label="Close task details"
+        aria-label={t("tasks.detail.closeDetails")}
         onClick={onClose}
         className="absolute inset-0 bg-slate-900/30"
       />
 
       <div
         role="dialog"
-        aria-label={`Task: ${task.title}`}
+        aria-label={t("tasks.detail.dialogLabel", { title: task.title })}
         aria-modal="true"
         className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-slate-200 bg-white shadow-xl"
       >
@@ -290,7 +292,7 @@ export function TaskDetail({
             value={draft.title}
             onChange={(event) => setDraft({ ...draft, title: event.target.value })}
             onBlur={(event) => commitText("title", event.target.value)}
-            aria-label="Task name"
+            aria-label={t("tasks.fields.name")}
             maxLength={200}
             disabled={disabled}
             className="h-auto min-w-0 flex-1 border-transparent bg-transparent px-0 py-0 text-base font-semibold text-pretty text-slate-900 focus-visible:border-transparent disabled:bg-transparent"
@@ -301,8 +303,8 @@ export function TaskDetail({
           <button
             type="button"
             onClick={() => onExpand(draft)}
-            aria-label="Expand to form view"
-            title="Expand to form view"
+            aria-label={t("tasks.detail.expand")}
+            title={t("tasks.detail.expand")}
             className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
           >
             <Maximize2 className="size-4" aria-hidden />
@@ -310,7 +312,7 @@ export function TaskDetail({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.close")}
             className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
           >
             <X className="size-4" aria-hidden />
@@ -319,11 +321,11 @@ export function TaskDetail({
           {/* A real tablist: both panels live in this component and swap in
               place, unlike the project tabs, which are separate routes. It
               wraps onto its own line inside the sticky header. */}
-          <div role="tablist" aria-label="Task views" className="-ml-1 flex basis-full gap-1">
+          <div role="tablist" aria-label={t("tasks.detail.views")} className="-ml-1 flex basis-full gap-1">
             {(
               [
-                ["details", "Details"],
-                ["ai", "Ask AI"],
+                ["details", t("tasks.detail.tabDetails")],
+                ["ai", t("tasks.detail.tabAi")],
                 ["approach", t("approach.tab")],
               ] as const
             ).map(([value, label]) => (
@@ -416,7 +418,7 @@ export function TaskDetail({
               icon gutter as the create form so the controls share one edge. */}
           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
             <label htmlFor="detail-status" className={ROW_LABEL}>
-              Status
+              {t("tasks.fields.status")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               <span aria-hidden className={ROW_ICON}>
@@ -435,14 +437,14 @@ export function TaskDetail({
               >
                 {statuses.map((status) => (
                   <option key={status.id} value={status.id}>
-                    {status.label}
+                    {displayStatusLabel(status, t)}
                   </option>
                 ))}
               </Select>
             </div>
 
             <label htmlFor="detail-assignee" className={ROW_LABEL}>
-              Assignee
+              {t("tasks.fields.assignee")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               {assignee ? (
@@ -459,7 +461,7 @@ export function TaskDetail({
                 disabled={disabled}
                 onChange={(event) => void save({ assigneeId: event.target.value })}
               >
-                <option value="">Unassigned</option>
+                <option value="">{t("common.unassigned")}</option>
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.name}
@@ -469,7 +471,7 @@ export function TaskDetail({
             </div>
 
             <label htmlFor="detail-priority" className={ROW_LABEL}>
-              Priority
+              {t("tasks.fields.priority")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               <span aria-hidden className={ROW_ICON}>
@@ -480,7 +482,7 @@ export function TaskDetail({
               </span>
               <Select
                 id="detail-priority"
-                className={cn(QUIET_CONTROL, "capitalize")}
+                className={QUIET_CONTROL}
                 value={draft.priority}
                 disabled={disabled}
                 onChange={(event) =>
@@ -488,15 +490,15 @@ export function TaskDetail({
                 }
               >
                 {TASK_PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority} className="capitalize">
-                    {priority}
+                  <option key={priority} value={priority}>
+                    {t(`priority.${priority}`)}
                   </option>
                 ))}
               </Select>
             </div>
 
             <label htmlFor="detail-milestone" className={ROW_LABEL}>
-              Milestone
+              {t("tasks.fields.milestone")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               <span aria-hidden className={ROW_ICON} />
@@ -507,7 +509,7 @@ export function TaskDetail({
                 disabled={disabled}
                 onChange={(event) => void save({ milestoneId: event.target.value })}
               >
-                <option value="">None</option>
+                <option value="">{t("common.none")}</option>
                 {milestones.map((milestone) => (
                   <option key={milestone.id} value={milestone.id}>
                     {milestone.title}
@@ -517,7 +519,7 @@ export function TaskDetail({
             </div>
 
             <label htmlFor="detail-start" className={ROW_LABEL}>
-              Dates
+              {t("tasks.fields.dates")}
             </label>
             <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
               <span aria-hidden className={ROW_ICON} />
@@ -527,7 +529,7 @@ export function TaskDetail({
                 className={cn(QUIET_CONTROL, "max-w-none px-2")}
                 value={draft.startDate}
                 disabled={disabled}
-                aria-label="Start date"
+                aria-label={t("tasks.fields.startDate")}
                 aria-invalid={datesInverted || undefined}
                 onChange={(event) =>
                   setDraft({ ...draft, startDate: event.target.value })
@@ -552,7 +554,7 @@ export function TaskDetail({
                 )}
                 value={draft.dueDate}
                 disabled={disabled}
-                aria-label="Due date"
+                aria-label={t("tasks.fields.dueDate")}
                 aria-invalid={datesInverted || undefined}
                 onChange={(event) =>
                   setDraft({ ...draft, dueDate: event.target.value })
@@ -564,12 +566,14 @@ export function TaskDetail({
                 }}
               />
               {isTaskOverdue(task, todayIso) ? (
-                <span className="text-xs font-medium text-red-700">overdue</span>
+                <span className="text-xs font-medium text-red-700">
+                  {t("tasks.fields.overdue")}
+                </span>
               ) : null}
             </div>
 
             <label htmlFor="detail-estimate" className={ROW_LABEL}>
-              Estimate
+              {t("tasks.fields.estimate")}
             </label>
             <div className="flex items-center gap-1.5">
               <span aria-hidden className={ROW_ICON} />
@@ -592,21 +596,23 @@ export function TaskDetail({
                   void save({ estimatedHours: event.target.value });
                 }}
               />
-              <span className="text-xs text-slate-400">hours</span>
+              <span className="text-xs text-slate-400">{t("tasks.fields.hours")}</span>
             </div>
 
-            <span className={ROW_LABEL}>Origin</span>
+            <span className={ROW_LABEL}>{t("tasks.fields.origin")}</span>
             <div className="flex items-center gap-2">
               <span aria-hidden className={ROW_ICON} />
               <Badge tone={task.source === "manual" ? "neutral" : "info"}>
-                {task.source === "manual" ? "Manual" : "AI suggested"}
+                {task.source === "manual"
+                  ? t("tasks.fields.manual")
+                  : t("tasks.fields.aiSuggested")}
               </Badge>
             </div>
           </div>
 
           {datesInverted ? (
             <p role="alert" className="text-xs font-medium text-red-700">
-              Start date must be on or before the due date.
+              {t("tasks.fields.datesInverted")}
             </p>
           ) : null}
 
@@ -615,7 +621,7 @@ export function TaskDetail({
               htmlFor="detail-description"
               className="mb-1.5 block text-xs font-medium text-slate-500"
             >
-              Description
+              {t("tasks.fields.description")}
             </label>
             <textarea
               id="detail-description"
@@ -624,7 +630,7 @@ export function TaskDetail({
                 setDraft({ ...draft, description: event.target.value })
               }
               onBlur={(event) => commitText("description", event.target.value)}
-              placeholder="What does this task involve?"
+              placeholder={t("tasks.fields.descriptionPlaceholder")}
               maxLength={4000}
               disabled={disabled}
               className={cn(
@@ -648,17 +654,16 @@ export function TaskDetail({
               ) : (
                 <Sparkles className="size-3.5 text-violet-600" aria-hidden />
               )}
-              {filling ? "Reading documents…" : "Fill blanks with AI"}
+              {filling ? t("tasks.fill.reading") : t("tasks.fill.button")}
             </Button>
             <span className="text-xs text-slate-500">
-              {fillBlocked ?? "Opens the result for review before anything is saved."}
+              {fillBlocked ?? t("tasks.detail.fillReview")}
             </span>
           </div>
 
           {task.status.category !== "done" && blockedBy.length > 0 ? (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Waiting on {blockedBy.length} unfinished task
-              {blockedBy.length === 1 ? "" : "s"}.
+              {t("tasks.detail.waitingOn", { count: blockedBy.length })}
             </p>
           ) : null}
 
@@ -666,18 +671,18 @@ export function TaskDetail({
               fields of this draft — each saves on its own. */}
           <div>
             <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              Delivers
+              {t("tasks.detail.delivers")}
             </h3>
             <TracedRequirements
               projectId={task.projectId}
               links={task.requirementLinks}
-              empty="No requirement links this task. Link it from the Requirements tab."
+              empty={t("tasks.detail.noRequirement")}
             />
           </div>
 
           <div>
             <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              Documents
+              {t("tasks.fields.documents")}
             </h3>
             <TaskDocumentsField
               projectId={task.projectId}
@@ -710,7 +715,7 @@ export function TaskDetail({
 
           <div>
             <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              Dependencies
+              {t("tasks.detail.dependencies")}
             </h3>
             <TaskDependencies
               task={task}
@@ -723,7 +728,7 @@ export function TaskDetail({
           {task.citations.length > 0 ? (
             <div>
               <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                Sources
+                {t("tasks.detail.sources")}
               </h3>
               <ul className="space-y-2">
                 {task.citations.map((citation) => (
@@ -737,7 +742,7 @@ export function TaskDetail({
                     >
                       {citation.chunk.document.originalFilename}
                       {citation.chunk.pageNumber
-                        ? ` · p.${citation.chunk.pageNumber}`
+                        ? ` · ${t("common.page", { page: citation.chunk.pageNumber })}`
                         : ""}
                       {citation.chunk.sectionTitle
                         ? ` · ${citation.chunk.sectionTitle}`
@@ -745,7 +750,7 @@ export function TaskDetail({
                     </a>
                     {citation.purpose === "milestone_link" ? (
                       <Badge tone="info" className="ml-1.5">
-                        Milestone link
+                        {t("tasks.detail.milestoneLink")}
                       </Badge>
                     ) : null}
                     {citation.excerpt ? (
@@ -774,10 +779,10 @@ export function TaskDetail({
             {saving ? (
               <span className="inline-flex items-center gap-1.5">
                 <Spinner className="size-3" />
-                Saving…
+                {t("common.saving")}
               </span>
             ) : (
-              "Changes save as you make them."
+              t("tasks.detail.autosave")
             )}
           </span>
           <Button
@@ -787,7 +792,7 @@ export function TaskDetail({
             onClick={onDelete}
             disabled={disabled}
           >
-            Delete
+            {t("common.delete")}
           </Button>
         </div>
       </div>

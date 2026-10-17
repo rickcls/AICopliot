@@ -19,6 +19,7 @@ import {
   Select,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { TaskCard } from "@/components/task-card";
 import { TaskDetail } from "@/components/task-detail";
@@ -46,6 +47,7 @@ import {
   type TaskFilter,
   type TaskQuickFilter,
 } from "@/lib/pm/filters";
+import { displayStatusLabel } from "@/lib/i18n/status-labels";
 import { cn } from "@/lib/utils";
 
 export type { TaskRow } from "@/components/task-types";
@@ -66,12 +68,6 @@ const BOARD_GRID: Record<number, string> = {
   6: "xl:grid-cols-6",
   7: "xl:grid-cols-7",
   8: "xl:grid-cols-8",
-};
-
-const CATEGORY_LABEL: Record<TaskStatusCategory, string> = {
-  open: "Open",
-  blocked: "Blocked",
-  done: "Done",
 };
 
 /**
@@ -156,6 +152,8 @@ export function TaskBoard({
   const selectAllRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
   const toast = useToast();
+  const t = useT();
+  const statusLabel = (status: TaskStatusOption) => displayStatusLabel(status, t);
 
   useEffect(() => {
     if (!statusesOpen) return;
@@ -260,7 +258,7 @@ export function TaskBoard({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not save the task.");
+        setError(data.error ?? t("tasks.board.saveFailed"));
         return;
       }
       upsert(data.task);
@@ -268,7 +266,7 @@ export function TaskBoard({
       setEditingId(null);
       setDraftFill(null);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setSaving(false);
     }
@@ -339,8 +337,8 @@ export function TaskBoard({
       );
       setError(
         failures.length === movers.length
-          ? "Could not move the selected tasks."
-          : `Could not move ${failures.length} of ${movers.length} tasks.`,
+          ? t("tasks.board.moveFailedAll")
+          : t("tasks.board.moveFailedSome", { failed: failures.length, total: movers.length }),
       );
     }
 
@@ -362,18 +360,17 @@ export function TaskBoard({
     const confirmed = await confirm({
       title:
         targets.length === 1
-          ? `Delete “${targets[0].title}”?`
-          : `Delete ${targets.length} tasks?`,
+          ? t("tasks.board.deleteOneTitle", { title: targets[0].title })
+          : t("tasks.board.deleteManyTitle", { count: targets.length }),
       body: blocks ? (
-        <p>
-          <span className="font-medium text-red-700">
-            {blocks} task{blocks === 1 ? "" : "s"}
-          </span>{" "}
-          depend on {targets.length === 1 ? "it" : "a selected task"} and will
-          lose that dependency.
+        <p className="font-medium text-red-700">
+          {targets.length === 1
+            ? t("tasks.board.dependentsOfOne", { count: blocks })
+            : t("tasks.board.dependentsOfMany", { count: blocks })}
         </p>
       ) : undefined,
-      confirmLabel: targets.length === 1 ? "Delete task" : "Delete tasks",
+      confirmLabel:
+        targets.length === 1 ? t("tasks.board.deleteTask") : t("tasks.board.deleteTasks"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -421,16 +418,18 @@ export function TaskBoard({
       if (openTaskId && deletedSet.has(openTaskId)) setOpenTaskId(null);
       toast.success(
         deleted.length === 1
-          ? `Deleted “${targets.find((task) => task.id === deleted[0])?.title}”`
-          : `Deleted ${deleted.length} tasks`,
+          ? t("tasks.board.deletedOne", {
+              title: targets.find((task) => task.id === deleted[0])?.title ?? "",
+            })
+          : t("tasks.board.deletedMany", { count: deleted.length }),
       );
     }
 
     if (failures.length > 0) {
       setError(
         failures.length === targets.length
-          ? "Could not delete the selected tasks."
-          : `Could not delete ${failures.length} of ${targets.length} tasks.`,
+          ? t("tasks.board.deleteFailedAll")
+          : t("tasks.board.deleteFailedSome", { failed: failures.length, total: targets.length }),
       );
     }
 
@@ -453,15 +452,15 @@ export function TaskBoard({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not create the status.");
+        setError(data.error ?? t("tasks.board.statusCreateFailed"));
         return;
       }
       upsertStatus(data.status);
       setNewStatusLabel("");
       setNewStatusCategory("open");
-      toast.success(`Added “${data.status.label}”`);
+      toast.success(t("tasks.board.statusAdded", { label: data.status.label }));
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setCreatingStatus(false);
     }
@@ -471,22 +470,15 @@ export function TaskBoard({
     const taskCount = tasks.filter((task) => task.statusId === status.id).length;
     if (taskCount > 0) {
       setError(
-        `Move or delete the ${taskCount} task${
-          taskCount === 1 ? "" : "s"
-        } in “${status.label}” before removing it.`,
+        t("tasks.board.statusHasTasks", { count: taskCount, label: statusLabel(status) }),
       );
       return;
     }
 
     const confirmed = await confirm({
-      title: `Remove “${status.label}”?`,
-      body: (
-        <p>
-          This removes the column from the board and list. You need at least one
-          Open and one Done status.
-        </p>
-      ),
-      confirmLabel: "Remove status",
+      title: t("tasks.board.removeStatusTitle", { label: statusLabel(status) }),
+      body: <p>{t("tasks.board.removeStatusBody")}</p>,
+      confirmLabel: t("tasks.board.removeStatus"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -499,14 +491,14 @@ export function TaskBoard({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not remove the status.");
+        setError(data.error ?? t("tasks.board.statusRemoveFailed"));
         return;
       }
       setStatuses((previous) => previous.filter((item) => item.id !== status.id));
       if (statusFilter === status.id) setStatusFilter("all");
-      toast.success(`Removed “${status.label}”`);
+      toast.success(t("tasks.board.statusRemoved", { label: statusLabel(status) }));
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setStatusBusyId(null);
     }
@@ -614,15 +606,10 @@ export function TaskBoard({
   return (
     <div className="space-y-4">
       <SectionHeader
-        title={view === "board" ? "Board" : "Task list"}
-        description={
-          <>
-            {tasks.length} task{tasks.length === 1 ? "" : "s"}
-            {view === "board"
-              ? " · drag a card between columns to change its status"
-              : " · double-click a value to edit · open icon for details"}
-          </>
-        }
+        title={view === "board" ? t("tasks.board.boardTitle") : t("tasks.board.listTitle")}
+        description={`${t("tasks.count", { count: tasks.length })} · ${
+          view === "board" ? t("tasks.board.boardHint") : t("tasks.board.listHint")
+        }`}
       >
         <div className="flex items-center gap-2">
           {/* One segmented control for view + status columns. Statuses used to
@@ -632,7 +619,7 @@ export function TaskBoard({
           <div ref={statusesMenuRef} className="relative">
             <div
               className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
-              aria-label="Task view"
+              aria-label={t("tasks.board.viewLabel")}
               role="group"
             >
               <button
@@ -651,7 +638,7 @@ export function TaskBoard({
                 )}
               >
                 <LayoutGrid className="size-3.5" aria-hidden />
-                Board
+                {t("tasks.board.board")}
               </button>
               <button
                 type="button"
@@ -668,7 +655,7 @@ export function TaskBoard({
                 )}
               >
                 <List className="size-3.5" aria-hidden />
-                List
+                {t("tasks.board.list")}
               </button>
               <button
                 type="button"
@@ -684,18 +671,17 @@ export function TaskBoard({
                 )}
               >
                 <Columns3 className="size-3.5" aria-hidden />
-                Statuses
+                {t("tasks.board.statuses")}
               </button>
             </div>
             {statusesOpen ? (
               <div
                 role="dialog"
-                aria-label="Manage statuses"
+                aria-label={t("tasks.board.manageStatuses")}
                 className="absolute right-0 z-20 mt-1.5 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
               >
                 <p className="px-1 text-xs text-slate-500">
-                  Add or remove board columns. Every project needs at least one
-                  Open and one Done status.
+                  {t("tasks.board.statusesHelp")}
                 </p>
                 <ul className="mt-2 max-h-56 space-y-0.5 overflow-y-auto">
                   {statuses.map((status) => {
@@ -713,16 +699,16 @@ export function TaskBoard({
                           className={cn("size-1.5 rounded-full", STATUS_DOT[tone])}
                         />
                         <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
-                          {status.label}
+                          {statusLabel(status)}
                           <span className="ml-1.5 text-[11px] text-slate-400">
-                            {CATEGORY_LABEL[status.category]}
+                            {t(`statusCategory.${status.category}`)}
                             {taskCount > 0 ? ` · ${taskCount}` : ""}
                           </span>
                         </span>
                         <button
                           type="button"
                           disabled={statusBusyId === status.id}
-                          aria-label={`Remove ${status.label}`}
+                          aria-label={t("tasks.board.removeStatusLabel", { label: statusLabel(status) })}
                           onClick={() => void removeStatus(status)}
                           className={cn(
                             "inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50",
@@ -745,10 +731,10 @@ export function TaskBoard({
                   <Input
                     value={newStatusLabel}
                     onChange={(event) => setNewStatusLabel(event.target.value)}
-                    placeholder="New status name"
+                    placeholder={t("tasks.board.newStatusName")}
                     maxLength={40}
                     disabled={creatingStatus}
-                    aria-label="New status name"
+                    aria-label={t("tasks.board.newStatusName")}
                     className="h-8 text-sm"
                   />
                   <div className="flex gap-2">
@@ -760,12 +746,12 @@ export function TaskBoard({
                         )
                       }
                       disabled={creatingStatus}
-                      aria-label="Status category"
+                      aria-label={t("tasks.board.statusCategory")}
                       className="h-8 flex-1 text-xs"
                     >
-                      <option value="open">Open</option>
-                      <option value="blocked">Blocked</option>
-                      <option value="done">Done</option>
+                      <option value="open">{t("statusCategory.open")}</option>
+                      <option value="blocked">{t("statusCategory.blocked")}</option>
+                      <option value="done">{t("statusCategory.done")}</option>
                     </Select>
                     <Button
                       type="submit"
@@ -773,7 +759,7 @@ export function TaskBoard({
                       disabled={creatingStatus || newStatusLabel.trim() === ""}
                     >
                       <Plus className="size-3.5" aria-hidden />
-                      Add
+                      {t("common.add")}
                     </Button>
                   </div>
                 </form>
@@ -783,7 +769,7 @@ export function TaskBoard({
 
           <Button type="button" onClick={() => openCreate()} disabled={!defaultStatusId}>
             <Plus className="size-4" aria-hidden />
-            New task
+            {t("tasks.board.newTask")}
           </Button>
         </div>
       </SectionHeader>
@@ -806,29 +792,29 @@ export function TaskBoard({
 
       {tasks.length === 0 ? (
         <EmptyState
-          title="No tasks yet"
-          description="Break the work in this project's documents into tasks. Every task here is one you entered — nothing is generated."
+          title={t("tasks.board.emptyTitle")}
+          description={t("tasks.board.emptyBody")}
           action={
             <Button
               type="button"
               onClick={() => openCreate()}
               disabled={!defaultStatusId}
             >
-              Create the first task
+              {t("tasks.board.createFirst")}
             </Button>
           }
         />
       ) : filterActive && matchingTasks.length === 0 ? (
         <EmptyState
-          title="No tasks match these filters"
-          description="Nothing in this project fits every filter at once. Clear them to see the whole board."
+          title={t("tasks.board.noMatchTitle")}
+          description={t("tasks.board.noMatchBody")}
           action={
             <Button
               type="button"
               variant="secondary"
               onClick={() => setFilter(EMPTY_TASK_FILTER)}
             >
-              Clear filters
+              {t("tasks.board.clearFilters")}
             </Button>
           }
         />
@@ -849,7 +835,7 @@ export function TaskBoard({
             return (
               <section
                 key={status.id}
-                aria-label={status.label}
+                aria-label={statusLabel(status)}
                 {...groupDropHandlers(status.id)}
                 className={cn(
                   "flex min-h-40 flex-col rounded-xl border border-transparent bg-slate-50 p-2 transition-colors",
@@ -862,7 +848,7 @@ export function TaskBoard({
                       aria-hidden
                       className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[tone])}
                     />
-                    <span className="truncate">{status.label}</span>
+                    <span className="truncate">{statusLabel(status)}</span>
                   </h3>
                   <span className="rounded-full bg-white px-1.5 text-xs text-slate-500 tabular-nums">
                     {columnTasks.length}
@@ -893,7 +879,7 @@ export function TaskBoard({
                   className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-white hover:text-slate-900"
                 >
                   <Plus className="size-3.5" aria-hidden />
-                  Add
+                  {t("common.add")}
                 </button>
               </section>
             );
@@ -903,7 +889,7 @@ export function TaskBoard({
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div
             role="group"
-            aria-label="Filter task list by status"
+            aria-label={t("tasks.board.filterByStatus")}
             className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
           >
             <button
@@ -917,7 +903,7 @@ export function TaskBoard({
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
               )}
             >
-              All
+              {t("common.all")}
               <span
                 className={cn(
                   "tabular-nums",
@@ -951,7 +937,7 @@ export function TaskBoard({
                     aria-hidden
                     className={cn("size-1.5 rounded-full", STATUS_DOT[tone])}
                   />
-                  {status.label}
+                  {statusLabel(status)}
                   <span
                     className={cn(
                       "tabular-nums",
@@ -968,10 +954,10 @@ export function TaskBoard({
           {selectedIds.size > 0 ? (
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-100 px-3 py-2">
               <span className="text-xs font-medium text-slate-700">
-                {selectedIds.size} selected
+                {t("tasks.board.selected", { count: selectedIds.size })}
               </span>
               <Select
-                aria-label="Move selected tasks to status"
+                aria-label={t("tasks.board.moveSelected")}
                 className="h-8 text-xs"
                 defaultValue=""
                 disabled={busyIds.size > 0}
@@ -983,11 +969,11 @@ export function TaskBoard({
                 }}
               >
                 <option value="" disabled>
-                  Move to…
+                  {t("tasks.board.moveTo")}
                 </option>
                 {statuses.map((status) => (
                   <option key={status.id} value={status.id}>
-                    {status.label}
+                    {statusLabel(status)}
                   </option>
                 ))}
               </Select>
@@ -998,7 +984,7 @@ export function TaskBoard({
                 disabled={busyIds.size > 0}
                 onClick={() => void deleteTasks([...selectedIds])}
               >
-                Delete
+                {t("common.delete")}
               </Button>
               <Button
                 type="button"
@@ -1006,16 +992,18 @@ export function TaskBoard({
                 variant="ghost"
                 onClick={clearSelection}
               >
-                Clear
+                {t("common.clear")}
               </Button>
             </div>
           ) : null}
 
           {taskGroups.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <p className="text-sm font-medium text-slate-900">No statuses yet</p>
+              <p className="text-sm font-medium text-slate-900">
+                {t("tasks.board.noStatuses")}
+              </p>
               <p className="mt-1 text-xs text-slate-500">
-                Add a status to start organising work.
+                {t("tasks.board.noStatusesBody")}
               </p>
             </div>
           ) : (
@@ -1024,36 +1012,36 @@ export function TaskBoard({
                 <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
                   <tr>
                     <th scope="col" className="w-10 px-2 py-2.5">
-                      <span className="sr-only">Select</span>
+                      <span className="sr-only">{t("tasks.board.selectColumn")}</span>
                       <input
                         ref={selectAllRef}
                         type="checkbox"
                         checked={allVisibleSelected}
                         onChange={toggleSelectAll}
-                        aria-label="Select all visible tasks"
+                        aria-label={t("tasks.board.selectAll")}
                         className="size-3.5 rounded border-slate-300 text-slate-900 focus-visible:ring-slate-900"
                       />
                     </th>
                     <th scope="col" className="w-8 px-1 py-2.5">
-                      <span className="sr-only">Drag</span>
+                      <span className="sr-only">{t("tasks.board.dragColumn")}</span>
                     </th>
                     <th scope="col" className="px-2 py-2.5 font-medium">
-                      Task
+                      {t("tasks.board.taskColumn")}
                     </th>
                     <th scope="col" className="w-40 px-3 py-2.5 font-medium">
-                      Assignee
+                      {t("tasks.board.assigneeColumn")}
                     </th>
                     <th scope="col" className="w-28 px-3 py-2.5 font-medium">
-                      Priority
+                      {t("tasks.board.priorityColumn")}
                     </th>
                     <th scope="col" className="w-32 px-3 py-2.5 font-medium">
-                      Due
+                      {t("tasks.board.dueColumn")}
                     </th>
                     <th
                       scope="col"
                       className="w-24 px-4 py-2.5 text-right font-medium"
                     >
-                      Estimate
+                      {t("tasks.board.estimateColumn")}
                     </th>
                   </tr>
                 </thead>
@@ -1102,7 +1090,7 @@ export function TaskBoard({
                                   STATUS_PILL[tone],
                                 )}
                               >
-                                {group.status.label}
+                                {statusLabel(group.status)}
                               </span>
                               <span className="text-xs text-slate-500 tabular-nums">
                                 {group.tasks.length}
@@ -1117,7 +1105,7 @@ export function TaskBoard({
                               )}
                             >
                               <Plus className="size-3.5" aria-hidden />
-                              Add
+                              {t("common.add")}
                             </button>
                           </div>
                         </th>
@@ -1168,7 +1156,7 @@ export function TaskBoard({
                             colSpan={7}
                             className="px-4 py-6 text-center text-xs text-slate-400"
                           >
-                            Drop a task here, or add one.
+                            {t("tasks.board.dropHere")}
                           </td>
                         </tr>
                       ) : null}

@@ -123,15 +123,3 @@ export function applyTaskFill<T extends FillableDraft>(
 
   return { draft: next, filled, kept, requirements, sources };
 }
-
-const FIELD_LABELS: Record<TaskFillField, string> = {
-  description: "description",
-  priority: "priority",
-  estimatedHours: "estimate",
-  startDate: "start date",
-  dueDate: "due date",
-};
-
-export function fillFieldLabel(field: TaskFillField): string {
-  return FIELD_LABELS[field];
-}

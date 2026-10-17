@@ -1,4 +1,7 @@
 import type { Dictionary } from "@/lib/i18n/translate";
+import { sharedZhHant } from "@/lib/i18n/dictionaries/areas/shared.zh-Hant";
+import { requirementsZhHant } from "@/lib/i18n/dictionaries/areas/requirements.zh-Hant";
+import { tasksZhHant } from "@/lib/i18n/dictionaries/areas/tasks.zh-Hant";
 
 /**
  * 繁體中文（香港用字）介面文字。Written Chinese rather than Cantonese, which is
@@ -6,6 +9,9 @@ import type { Dictionary } from "@/lib/i18n/translate";
  * rejected by tests/i18n-dictionaries.test.ts.
  */
 export const zhHant = {
+  ...sharedZhHant,
+  ...tasksZhHant,
+  ...requirementsZhHant,
   app: {
     name: "ScopePilot",
     tagline: "AI 工作助理",
@@ -53,8 +59,23 @@ export const zhHant = {
   common: {
     couldNotReach: "無法連接伺服器。",
     saved: "已儲存",
+    saving: "儲存中…",
     noDate: "未定日期",
     unassigned: "未指派",
+    none: "無",
+    loading: "載入中",
+    close: "關閉",
+    cancel: "取消",
+    confirm: "確定",
+    delete: "刪除",
+    remove: "移除",
+    clear: "清除",
+    add: "新增",
+    all: "全部",
+    notifications: "通知",
+    dismissNotification: "關閉通知",
+    page: "第 {page} 頁",
+    hours: "{hours} 小時",
   },
   errors: {
     notFoundTitle: "找不到頁面",

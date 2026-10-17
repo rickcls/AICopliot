@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
 import { Button, FilterChip, SearchField, Select } from "@/components/ui";
 import {
   TASK_PRIORITIES,
@@ -9,7 +10,6 @@ import {
 import {
   EMPTY_TASK_FILTER,
   isTaskFilterActive,
-  TASK_QUICK_FILTER_LABEL,
   TASK_QUICK_FILTERS,
   type TaskFilter,
   type TaskQuickFilter,
@@ -38,16 +38,17 @@ export function TaskFilterBar({
   total: number;
 }) {
   const active = isTaskFilterActive(filter);
+  const t = useT();
 
   return (
     <div
       role="search"
-      aria-label="Filter tasks"
+      aria-label={t("tasks.filter.label")}
       className="flex flex-wrap items-center gap-x-3 gap-y-2"
     >
       <SearchField
-        label="Search tasks"
-        placeholder="Search tasks"
+        label={t("tasks.filter.search")}
+        placeholder={t("tasks.filter.search")}
         value={filter.query}
         onChange={(event) => onChange({ ...filter, query: event.target.value })}
         className="w-full sm:w-56"
@@ -67,39 +68,39 @@ export function TaskFilterBar({
               })
             }
           >
-            {TASK_QUICK_FILTER_LABEL[quick]}
+            {t(`taskQuickFilter.${quick}`)}
           </FilterChip>
         ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Select
-          aria-label="Filter by priority"
+          aria-label={t("tasks.filter.byPriority")}
           value={filter.priority ?? ""}
           onChange={(event) =>
             onChange({ ...filter, priority: event.target.value || null })
           }
-          className="h-8 text-xs capitalize"
+          className="h-8 text-xs"
         >
-          <option value="">Any priority</option>
+          <option value="">{t("tasks.filter.anyPriority")}</option>
           {[...TASK_PRIORITIES].reverse().map((priority) => (
             <option key={priority} value={priority}>
-              {priority}
+              {t(`priority.${priority}`)}
             </option>
           ))}
         </Select>
 
         {milestones.length > 0 ? (
           <Select
-            aria-label="Filter by milestone"
+            aria-label={t("tasks.filter.byMilestone")}
             value={filter.milestoneId ?? ""}
             onChange={(event) =>
               onChange({ ...filter, milestoneId: event.target.value || null })
             }
             className="h-8 max-w-48 text-xs"
           >
-            <option value="">Any milestone</option>
-            <option value="none">No milestone</option>
+            <option value="">{t("tasks.filter.anyMilestone")}</option>
+            <option value="none">{t("tasks.filter.noMilestone")}</option>
             {milestones.map((milestone) => (
               <option key={milestone.id} value={milestone.id}>
                 {milestone.title}
@@ -111,7 +112,7 @@ export function TaskFilterBar({
         {active ? (
           <>
             <span className="text-xs text-slate-500 tabular-nums" aria-live="polite">
-              {shown} of {total}
+              {t("tasks.filter.shown", { shown, total })}
             </span>
             <Button
               type="button"
@@ -120,7 +121,7 @@ export function TaskFilterBar({
               onClick={() => onChange(EMPTY_TASK_FILTER)}
             >
               <X className="size-3.5" aria-hidden />
-              Clear
+              {t("common.clear")}
             </Button>
           </>
         ) : null}

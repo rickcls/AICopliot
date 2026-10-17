@@ -1,10 +1,7 @@
+import type { MessageKey, Translate } from "@/lib/i18n/translate";
 import { requirementStatusLabel } from "./labels";
 import { formatRequirementCode } from "./rules";
-import {
-  deliveryState,
-  DELIVERY_STATE_LABEL,
-  type TracedLink,
-} from "./traceability";
+import { deliveryState, type TracedLink } from "./traceability";
 
 /**
  * Requirement register exports.
@@ -12,6 +9,10 @@ import {
  * Pure: the route loads the rows, these turn them into text. Delivery state
  * comes from `deliveryState`, the same definition the matrix view renders, so a
  * spreadsheet handed to a client says what the screen says.
+ *
+ * Every function takes the translator for the file's language, which the
+ * caller picks — usually the viewer's, but a pack may go to a client who reads
+ * the other one. Text lifted from the client's documents is never translated.
  */
 
 export interface ExportableRequirement {
@@ -45,20 +46,38 @@ function words(value: string) {
   return value.replaceAll("_", " ");
 }
 
-/** Delivery is only claimed for agreed scope — see the matrix view. */
-function deliveryLabel(requirement: ExportableRequirement): string {
-  return requirement.status === "approved"
-    ? DELIVERY_STATE_LABEL[deliveryState(requirement.links)]
-    : "Not agreed";
+/**
+ * An enum value's label, or its words when the value is one this build does
+ * not know — an export should never print a raw dictionary key.
+ */
+function enumLabel(t: Translate, family: string, value: string): string {
+  const key = `${family}.${value}` as MessageKey;
+  const label = t(key);
+  return label === key ? words(value) : label;
 }
 
-function evidence(requirement: ExportableRequirement): string[] {
+export const typeLabel = (t: Translate, value: string) =>
+  enumLabel(t, "requirementType", value);
+export const priorityLabel = (t: Translate, value: string) =>
+  enumLabel(t, "requirementPriority", value);
+const confidenceLabel = (t: Translate, value: string) => enumLabel(t, "confidence", value);
+
+/** Delivery is only claimed for agreed scope — see the matrix view. */
+function deliveryLabel(requirement: ExportableRequirement, t: Translate): string {
+  return requirement.status === "approved"
+    ? t(`deliveryState.${deliveryState(requirement.links)}`)
+    : t("requirementsExport.notAgreed");
+}
+
+function evidence(requirement: ExportableRequirement, t: Translate): string[] {
   return [
     ...new Set(
       requirement.citations.map(
         (citation) =>
           citation.chunk.document.originalFilename +
-          (citation.chunk.pageNumber !== null ? ` p.${citation.chunk.pageNumber}` : ""),
+          (citation.chunk.pageNumber !== null
+            ? ` ${t("requirementsExport.page", { page: citation.chunk.pageNumber })}`
+            : ""),
       ),
     ),
   ];
@@ -91,56 +110,60 @@ export function csvCell(value: string | number | null | undefined): string {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-export const REQUIREMENT_CSV_HEADERS = [
-  "Code",
-  "Title",
-  "Type",
-  "Priority",
-  "Status",
-  "Confidence",
-  "Stakeholder",
-  "Description",
-  "Acceptance criteria",
-  "Assumptions",
-  "Source",
-  "Delivery",
-  "Tasks",
-  "Milestones",
-  "Risks",
-  "Evidence",
+const CSV_COLUMNS = [
+  "code",
+  "title",
+  "type",
+  "priority",
+  "status",
+  "confidence",
+  "stakeholder",
+  "description",
+  "acceptanceCriteria",
+  "assumptions",
+  "source",
+  "delivery",
+  "tasks",
+  "milestones",
+  "risks",
+  "evidence",
 ] as const;
 
 /**
  * CRLF line endings and a UTF-8 byte-order mark, because that is what makes
- * Excel on Windows open a CSV with curly quotes and accents intact.
+ * Excel on Windows open a CSV with curly quotes, accents, and Chinese intact.
  */
-export function requirementsToCsv(requirements: ExportableRequirement[]): string {
+export function requirementsToCsv(
+  requirements: ExportableRequirement[],
+  t: Translate,
+): string {
+  const headers = CSV_COLUMNS.map((column) => t(`requirementsExport.headers.${column}`));
   const rows = requirements.map((requirement) => {
     const { tasks, milestones, risks } = linked(requirement);
     return [
       formatRequirementCode(requirement.sequence),
       requirement.title,
-      words(requirement.type),
-      requirement.priority,
-      requirementStatusLabel(requirement.status),
-      requirement.confidence,
+      typeLabel(t, requirement.type),
+      priorityLabel(t, requirement.priority),
+      requirementStatusLabel(requirement.status, t),
+      confidenceLabel(t, requirement.confidence),
       requirement.stakeholder,
       requirement.description,
       requirement.acceptanceCriteria,
       requirement.assumptions,
-      requirement.source === "manual" ? "manual" : "AI suggested",
-      deliveryLabel(requirement),
+      requirement.source === "manual"
+        ? t("requirementsExport.sourceManual")
+        : t("requirementsExport.sourceAi"),
+      deliveryLabel(requirement, t),
       tasks.join("; "),
       milestones.join("; "),
       risks.join("; "),
-      evidence(requirement).join("; "),
+      evidence(requirement, t).join("; "),
     ];
   });
   return (
     "﻿" +
-    [REQUIREMENT_CSV_HEADERS, ...rows]
-      .map((row) => row.map(csvCell).join(","))
-      .join("\r\n") +
+    [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n") +
     "\r\n"
   );
 }
@@ -154,40 +177,73 @@ export function requirementsToMarkdown(
   projectName: string,
   requirements: ExportableRequirement[],
   exportedAt: Date,
+  t: Translate,
 ): string {
   const approved = requirements.filter((item) => item.status === "approved");
   const lines = [
-    `# ${inline(projectName)} — Requirements`,
+    `# ${t("requirementsExport.registerTitle", { project: inline(projectName) })}`,
     "",
-    `Exported ${exportedAt.toISOString().slice(0, 10)} · ${requirements.length} requirement${requirements.length === 1 ? "" : "s"} · ${approved.length} agreed`,
+    t("requirementsExport.registerSummary", {
+      date: exportedAt.toISOString().slice(0, 10),
+      count: requirements.length,
+      agreed: approved.length,
+    }),
     "",
   ];
 
   for (const requirement of requirements) {
     const { tasks, milestones, risks } = linked(requirement);
+    const meta = [
+      `**${priorityLabel(t, requirement.priority)}**`,
+      typeLabel(t, requirement.type),
+      requirementStatusLabel(requirement.status, t),
+      t("requirementsExport.confidenceLine", {
+        level: confidenceLabel(t, requirement.confidence),
+      }),
+      ...(requirement.stakeholder
+        ? [t("requirementsExport.ownerLine", { name: inline(requirement.stakeholder) })]
+        : []),
+    ];
     lines.push(
       `## ${formatRequirementCode(requirement.sequence)} ${inline(requirement.title)}`,
       "",
-      `**${requirement.priority.toUpperCase()}** · ${words(requirement.type)} · ${requirementStatusLabel(requirement.status)} · confidence ${requirement.confidence}` +
-        (requirement.stakeholder ? ` · owner ${inline(requirement.stakeholder)}` : ""),
+      meta.join(" · "),
       "",
     );
     if (requirement.description) lines.push(requirement.description.trim(), "");
     if (requirement.acceptanceCriteria) {
-      lines.push("**Acceptance criteria**", "", requirement.acceptanceCriteria.trim(), "");
+      lines.push(
+        `**${t("requirementsExport.headers.acceptanceCriteria")}**`,
+        "",
+        requirement.acceptanceCriteria.trim(),
+        "",
+      );
     }
     if (requirement.assumptions) {
-      lines.push("**Assumptions**", "", requirement.assumptions.trim(), "");
+      lines.push(
+        `**${t("requirementsExport.headers.assumptions")}**`,
+        "",
+        requirement.assumptions.trim(),
+        "",
+      );
     }
-    lines.push(`**Delivery:** ${deliveryLabel(requirement)}`, "");
-    for (const [label, items] of [
-      ["Tasks", tasks],
-      ["Milestones", milestones],
-      ["Risks", risks],
-      ["Evidence", evidence(requirement)],
+    lines.push(
+      `**${t("requirementsExport.deliveryLabel")}** ${deliveryLabel(requirement, t)}`,
+      "",
+    );
+    for (const [column, items] of [
+      ["tasks", tasks],
+      ["milestones", milestones],
+      ["risks", risks],
+      ["evidence", evidence(requirement, t)],
     ] as const) {
       if (items.length === 0) continue;
-      lines.push(`**${label}**`, "", ...items.map((item) => `- ${inline(item)}`), "");
+      lines.push(
+        `**${t(`requirementsExport.headers.${column}`)}**`,
+        "",
+        ...items.map((item) => `- ${inline(item)}`),
+        "",
+      );
     }
   }
 
@@ -207,16 +263,13 @@ export function parsePackKind(value: unknown): PackKind | null {
   return value === "questions" || value === "signoff" ? value : null;
 }
 
-export const PACK_TITLE: Record<PackKind, string> = {
-  questions: "Open questions",
-  signoff: "Requirements for sign-off",
-};
-
 export interface PackItem {
   code: string;
   title: string;
   description: string | null;
+  /** The stored MoSCoW value, for styling. */
   priority: string;
+  priorityLabel: string;
   type: string;
   acceptanceCriteria: string | null;
   /** What the client needs to answer. Questions pack only. */
@@ -239,16 +292,21 @@ function byPriorityThenSequence(a: ExportableRequirement, b: ExportableRequireme
   );
 }
 
-function packItem(requirement: ExportableRequirement, question: string | null): PackItem {
+function packItem(
+  requirement: ExportableRequirement,
+  question: string | null,
+  t: Translate,
+): PackItem {
   return {
     code: formatRequirementCode(requirement.sequence),
     title: requirement.title,
     description: requirement.description,
     priority: requirement.priority,
-    type: words(requirement.type),
+    priorityLabel: priorityLabel(t, requirement.priority),
+    type: typeLabel(t, requirement.type),
     acceptanceCriteria: requirement.acceptanceCriteria,
     question,
-    evidence: evidence(requirement),
+    evidence: evidence(requirement, t),
   };
 }
 
@@ -258,12 +316,12 @@ function packItem(requirement: ExportableRequirement, question: string | null): 
  * kind of answer is needed. Never invents a specific — the same rule the
  * extraction prompt follows.
  */
-function questionFor(requirement: ExportableRequirement): string {
+function questionFor(requirement: ExportableRequirement, t: Translate): string {
   if (requirement.assumptions) return requirement.assumptions.trim();
   if (requirement.status === "needs_clarification") {
-    return "Please confirm this requirement and the detail it needs.";
+    return t("requirementsPack.questionConfirm");
   }
-  return "The source states this only in general terms. Please confirm the specifics you expect.";
+  return t("requirementsPack.questionSpecifics");
 }
 
 /**
@@ -272,7 +330,7 @@ function questionFor(requirement: ExportableRequirement): string {
  * rejected rows are settled, so they never appear. Grouped by stakeholder, so
  * each person gets the questions that are theirs.
  */
-export function questionsPack(rows: ExportableRequirement[]): PackGroup[] {
+export function questionsPack(rows: ExportableRequirement[], t: Translate): PackGroup[] {
   const open = rows
     .filter(
       (row) =>
@@ -286,7 +344,7 @@ export function questionsPack(rows: ExportableRequirement[]): PackGroup[] {
   for (const row of open) {
     const heading = row.stakeholder?.trim() || null;
     const items = groups.get(heading) ?? [];
-    items.push(packItem(row, questionFor(row)));
+    items.push(packItem(row, questionFor(row, t), t));
     groups.set(heading, items);
   }
   // Named stakeholders first, alphabetically; the unassigned group last.
@@ -298,16 +356,16 @@ export function questionsPack(rows: ExportableRequirement[]): PackGroup[] {
 }
 
 /** Agreed scope only, Must first — the order a client reads a contract in. */
-export function signOffPack(rows: ExportableRequirement[]): PackGroup[] {
+export function signOffPack(rows: ExportableRequirement[], t: Translate): PackGroup[] {
   const agreed = rows
     .filter((row) => row.status === "approved")
     .sort(byPriorityThenSequence)
-    .map((row) => packItem(row, null));
+    .map((row) => packItem(row, null, t));
   return agreed.length === 0 ? [] : [{ heading: null, items: agreed }];
 }
 
-export function buildPack(kind: PackKind, rows: ExportableRequirement[]) {
-  return kind === "questions" ? questionsPack(rows) : signOffPack(rows);
+export function buildPack(kind: PackKind, rows: ExportableRequirement[], t: Translate) {
+  return kind === "questions" ? questionsPack(rows, t) : signOffPack(rows, t);
 }
 
 export function packToMarkdown(
@@ -315,48 +373,60 @@ export function packToMarkdown(
   projectName: string,
   groups: PackGroup[],
   exportedAt: Date,
+  t: Translate,
 ): string {
   const count = groups.reduce((total, group) => total + group.items.length, 0);
   const lines = [
-    `# ${inline(projectName)} — ${PACK_TITLE[kind]}`,
+    `# ${inline(projectName)} — ${t(`requirementsPack.title.${kind}`)}`,
     "",
-    `${exportedAt.toISOString().slice(0, 10)} · ${count} item${count === 1 ? "" : "s"}`,
+    t("requirementsPack.summary", { date: exportedAt.toISOString().slice(0, 10), count }),
     "",
     kind === "questions"
-      ? "Each item below is something we understood from your documents but could not confirm. Please answer the point under each one."
-      : "The requirements below are the agreed scope. Please review and sign below to confirm.",
+      ? t("requirementsPack.questionsIntro")
+      : t("requirementsPack.signoffIntro"),
     "",
   ];
 
   for (const group of groups) {
-    if (group.heading) lines.push(`## For ${inline(group.heading)}`, "");
+    if (group.heading) {
+      lines.push(`## ${t("requirementsPack.forStakeholder", { name: inline(group.heading) })}`, "");
+    }
     for (const item of group.items) {
       lines.push(
         `### ${item.code} ${inline(item.title)}`,
         "",
-        `${item.priority.toUpperCase()} · ${item.type}`,
+        `${item.priorityLabel} · ${item.type}`,
         "",
       );
       if (item.description) lines.push(item.description.trim(), "");
-      if (item.question) lines.push(`**To confirm:** ${inline(item.question)}`, "");
+      if (item.question) {
+        lines.push(`**${t("requirementsPack.toConfirm")}** ${inline(item.question)}`, "");
+      }
       if (item.acceptanceCriteria) {
-        lines.push(`**Acceptance:** ${inline(item.acceptanceCriteria)}`, "");
+        lines.push(
+          `**${t("requirementsPack.acceptance")}** ${inline(item.acceptanceCriteria)}`,
+          "",
+        );
       }
       if (item.evidence.length > 0) {
-        lines.push(`_Source: ${item.evidence.map(inline).join("; ")}_`, "");
+        lines.push(
+          `_${t("requirementsPack.source", { sources: item.evidence.map(inline).join("; ") })}_`,
+          "",
+        );
       }
     }
   }
 
   if (kind === "signoff") {
+    const blank = "______________________________";
     lines.push(
       "---",
       "",
-      "Approved by: ______________________________",
+      `${t("requirementsPack.approvedBy")}: ${blank}`,
       "",
-      "Role: ______________________________",
+      `${t("requirementsPack.role")}: ${blank}`,
       "",
-      "Date: ______________________________",
+      `${t("requirementsPack.date")}: ${blank}`,
       "",
     );
   }

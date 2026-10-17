@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo } from "react";
 import { DICTIONARIES } from "@/lib/i18n/dictionaries";
-import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/locales";
+import { DEFAULT_LOCALE, intlLocale, type Locale } from "@/lib/i18n/locales";
 import { createTranslator, type Translate } from "@/lib/i18n/translate";
 
 const LocaleContext = createContext<Locale>(DEFAULT_LOCALE);
@@ -32,4 +32,9 @@ export function useT(): Translate {
     () => createTranslator(locale, DICTIONARIES[locale], DICTIONARIES.en),
     [locale],
   );
+}
+
+/** The `Intl` locale for dates and lists, e.g. `zh-HK` for `zh-Hant`. */
+export function useDateLocale(): string {
+  return intlLocale(useLocale());
 }

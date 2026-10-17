@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/i18n-provider";
 import { Select } from "@/components/ui";
 import type { TaskRow } from "@/components/task-types";
 
@@ -23,6 +24,7 @@ export function TaskDependencies({
   onError: (message: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   const existing = new Set(task.dependencies.map((d) => d.dependsOnTaskId));
   const candidates = allTasks.filter(
@@ -41,12 +43,12 @@ export function TaskDependencies({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        onError(data.error ?? "Could not add the dependency.");
+        onError(data.error ?? t("tasks.dependencies.addFailed"));
         return;
       }
       onChange({ ...task, dependencies: [...task.dependencies, data.dependency] });
     } catch {
-      onError("Could not reach the server.");
+      onError(t("common.couldNotReach"));
     } finally {
       setBusy(false);
     }
@@ -62,7 +64,7 @@ export function TaskDependencies({
       );
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        onError(data.error ?? "Could not remove the dependency.");
+        onError(data.error ?? t("tasks.dependencies.removeFailed"));
         return;
       }
       onChange({
@@ -70,7 +72,7 @@ export function TaskDependencies({
         dependencies: task.dependencies.filter((d) => d.id !== dependencyId),
       });
     } catch {
-      onError("Could not reach the server.");
+      onError(t("common.couldNotReach"));
     } finally {
       setBusy(false);
     }
@@ -79,9 +81,7 @@ export function TaskDependencies({
   return (
     <div>
       {task.dependencies.length === 0 ? (
-        <p className="text-xs text-slate-500">
-          This task does not depend on anything.
-        </p>
+        <p className="text-xs text-slate-500">{t("tasks.dependencies.none")}</p>
       ) : (
         <ul className="space-y-1">
           {task.dependencies.map((dependency) => (
@@ -104,7 +104,7 @@ export function TaskDependencies({
                   </span>
                   {dependency.source === "ai_suggested" ? (
                     <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-                      AI suggested
+                      {t("tasks.fields.aiSuggested")}
                     </span>
                   ) : null}
                 </span>
@@ -113,9 +113,11 @@ export function TaskDependencies({
                   className="shrink-0 text-slate-500 hover:text-red-700 disabled:opacity-50"
                   disabled={busy}
                   onClick={() => void removeDependency(dependency.id)}
-                  aria-label={`Remove dependency on ${dependency.dependsOnTask.title}`}
+                  aria-label={t("tasks.dependencies.removeLabel", {
+                    title: dependency.dependsOnTask.title,
+                  })}
                 >
-                  Remove
+                  {t("common.remove")}
                 </button>
               </div>
               {dependency.citations.length > 0 ? (
@@ -128,7 +130,7 @@ export function TaskDependencies({
                       >
                         {citation.chunk.document.originalFilename}
                         {citation.chunk.pageNumber !== null
-                          ? ` · page ${citation.chunk.pageNumber}`
+                          ? ` · ${t("common.page", { page: citation.chunk.pageNumber })}`
                           : ""}
                         {citation.chunk.sectionTitle
                           ? ` · ${citation.chunk.sectionTitle}`
@@ -148,17 +150,17 @@ export function TaskDependencies({
 
       {candidates.length === 0 ? (
         <p className="mt-2 text-xs text-slate-500">
-          No other task is available to depend on.
+          {t("tasks.dependencies.noCandidates")}
         </p>
       ) : (
         <Select
-          aria-label={`Add a dependency for ${task.title}`}
+          aria-label={t("tasks.dependencies.addLabel", { title: task.title })}
           className="mt-2 h-8 w-full text-xs"
           value=""
           disabled={busy}
           onChange={(event) => void addDependency(event.target.value)}
         >
-          <option value="">Add a dependency…</option>
+          <option value="">{t("tasks.dependencies.add")}</option>
           {candidates.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
               {candidate.title}

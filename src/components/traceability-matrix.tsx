@@ -1,13 +1,15 @@
-import { requirementStatusLabel } from "@/lib/pm/labels";
+"use client";
+
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
+import { requirementStatusLabel } from "@/lib/pm/labels";
 import type { RequirementRow } from "@/components/requirements-panel";
 import { Badge, type BadgeTone, FOCUS_RING } from "@/components/ui";
 import { formatRequirementCode } from "@/lib/pm/rules";
 import {
   countDeliveryStates,
   deliveryState,
-  DELIVERY_STATE_LABEL,
   DELIVERY_STATES,
   type DeliveryState,
 } from "@/lib/pm/traceability";
@@ -47,6 +49,7 @@ export function TraceabilityMatrix({
   requirements: RequirementRow[];
   onOpen: (id: string) => void;
 }) {
+  const t = useT();
   const rows = requirements.filter((row) => row.status !== "rejected");
   const approved = rows.filter((row) => row.status === "approved");
   const counts = countDeliveryStates(approved);
@@ -58,7 +61,7 @@ export function TraceabilityMatrix({
   if (rows.length === 0) {
     return (
       <p className="px-6 py-12 text-center text-sm text-slate-500">
-        No requirements to trace in this view.
+        {t("requirements.matrix.empty")}
       </p>
     );
   }
@@ -67,22 +70,23 @@ export function TraceabilityMatrix({
     <div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
         {approved.length === 0 ? (
-          <span>
-            Nothing here is agreed yet, so no delivery state is claimed.
-          </span>
+          <span>{t("requirements.matrix.nothingAgreed")}</span>
         ) : (
           <>
             <span className="font-medium text-slate-700">
-              {approved.length} agreed:
+              {t("requirements.matrix.agreed", { count: approved.length })}
             </span>
             {DELIVERY_STATES.map((state) => (
               <span key={state} className="tabular-nums">
-                {counts[state]} {DELIVERY_STATE_LABEL[state].toLowerCase()}
+                {t("requirements.matrix.stateCount", {
+                  count: counts[state],
+                  state: t(`deliveryState.${state}`).toLocaleLowerCase(),
+                })}
               </span>
             ))}
             {mustWithoutTask > 0 ? (
               <span className="font-medium text-red-700">
-                {mustWithoutTask} Must-have with no task
+                {t("requirements.matrix.mustWithoutTask", { count: mustWithoutTask })}
               </span>
             ) : null}
           </>
@@ -94,22 +98,22 @@ export function TraceabilityMatrix({
           <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
             <tr>
               <th scope="col" className="w-[30%] px-3 py-2 font-medium">
-                Requirement
+                {t("requirements.matrix.requirement")}
               </th>
               <th scope="col" className="w-20 px-3 py-2 font-medium">
-                Priority
+                {t("requirements.matrix.priority")}
               </th>
               <th scope="col" className="w-[24%] px-3 py-2 font-medium">
-                Tasks
+                {t("requirements.matrix.tasks")}
               </th>
               <th scope="col" className="w-[16%] px-3 py-2 font-medium">
-                Milestones
+                {t("requirements.matrix.milestones")}
               </th>
               <th scope="col" className="w-[16%] px-3 py-2 font-medium">
-                Risks
+                {t("requirements.matrix.risks")}
               </th>
               <th scope="col" className="w-28 px-3 py-2 font-medium">
-                Delivery
+                {t("requirements.matrix.delivery")}
               </th>
             </tr>
           </thead>
@@ -141,20 +145,20 @@ export function TraceabilityMatrix({
                     </button>
                     {!isApproved ? (
                       <span className="mt-0.5 block pl-14 text-xs text-amber-700">
-                        {requirementStatusLabel(row.status)}
+                        {requirementStatusLabel(row.status, t)}
                       </span>
                     ) : null}
                   </Cell>
                   <Cell>
                     <span
                       className={cn(
-                        "text-xs capitalize",
+                        "text-xs",
                         row.priority === "must"
                           ? "font-semibold text-slate-900"
                           : "text-slate-500",
                       )}
                     >
-                      {row.priority}
+                      {t(`requirementPriority.${row.priority}`)}
                     </span>
                   </Cell>
                   <Cell>
@@ -167,7 +171,7 @@ export function TraceabilityMatrix({
                             {link.task!.status.category === "done" ? (
                               <Check
                                 className="mt-0.5 size-3 shrink-0 text-emerald-600"
-                                aria-label="done"
+                                aria-label={t("requirements.matrix.done")}
                               />
                             ) : (
                               <span
@@ -225,10 +229,12 @@ export function TraceabilityMatrix({
                   <Cell>
                     {isApproved ? (
                       <Badge tone={DELIVERY_TONE[state]}>
-                        {DELIVERY_STATE_LABEL[state]}
+                        {t(`deliveryState.${state}`)}
                       </Badge>
                     ) : (
-                      <span className="text-xs text-slate-400">Not agreed</span>
+                      <span className="text-xs text-slate-400">
+                        {t("requirements.matrix.notAgreed")}
+                      </span>
                     )}
                   </Cell>
                 </tr>

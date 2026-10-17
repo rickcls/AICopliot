@@ -47,14 +47,6 @@ export const TASK_QUICK_FILTERS = [
 
 export type TaskQuickFilter = (typeof TASK_QUICK_FILTERS)[number];
 
-export const TASK_QUICK_FILTER_LABEL: Record<TaskQuickFilter, string> = {
-  overdue: "Overdue",
-  due_soon: "Due in 7 days",
-  blocked: "Blocked",
-  mine: "Assigned to me",
-  unassigned: "Unassigned",
-};
-
 /** For `?filter=` — an unknown value is ignored rather than trusted. */
 export function parseTaskQuickFilter(value: unknown): TaskQuickFilter | null {
   return typeof value === "string" &&

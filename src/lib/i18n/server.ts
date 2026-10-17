@@ -34,3 +34,12 @@ export async function getT(): Promise<Translate> {
   const locale = await getLocale();
   return createTranslator(locale, DICTIONARIES[locale], DICTIONARIES.en);
 }
+
+/**
+ * The language of a file that leaves the app — an export or a client pack.
+ * `?lang=` wins, because the reader may be a client who reads the other
+ * language; otherwise it is the viewer's.
+ */
+export async function getFileLocale(requested: unknown): Promise<Locale> {
+  return isLocale(requested) ? requested : getLocale();
+}

@@ -1,10 +1,20 @@
+import { sharedEn } from "@/lib/i18n/dictionaries/areas/shared.en";
+import { requirementsEn } from "@/lib/i18n/dictionaries/areas/requirements.en";
+import { tasksEn } from "@/lib/i18n/dictionaries/areas/tasks.en";
+
 /**
  * English UI copy. This file defines the keys: every other dictionary must have
  * exactly the same shape (checked by `satisfies Dictionary` and by a test).
  *
  * Plural messages are `{ one, other }` objects and read `{count}`.
+ *
+ * Larger areas live in `areas/<area>.en.ts` and are spread in here, so this
+ * file stays readable; each has a `<area>.zh-Hant.ts` twin.
  */
 export const en = {
+  ...sharedEn,
+  ...tasksEn,
+  ...requirementsEn,
   app: {
     name: "ScopePilot",
     tagline: "AI work assistant",
@@ -52,8 +62,23 @@ export const en = {
   common: {
     couldNotReach: "Could not reach the server.",
     saved: "Saved",
+    saving: "Saving…",
     noDate: "No date",
     unassigned: "Unassigned",
+    none: "None",
+    loading: "Loading",
+    close: "Close",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    delete: "Delete",
+    remove: "Remove",
+    clear: "Clear",
+    add: "Add",
+    all: "All",
+    notifications: "Notifications",
+    dismissNotification: "Dismiss notification",
+    page: "p.{page}",
+    hours: "{hours}h",
   },
   errors: {
     notFoundTitle: "Not found",

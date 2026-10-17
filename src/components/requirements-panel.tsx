@@ -1,6 +1,6 @@
 "use client";
 
-import { REQUIREMENT_STATUS_HINT, REQUIREMENT_STATUS_LABEL, requirementStatusLabel } from "@/lib/pm/labels";
+import { requirementStatusHint, requirementStatusLabel } from "@/lib/pm/labels";
 import {
   EMPTY_REQUIREMENT_FILTER,
   type RegisterFilter,
@@ -39,6 +39,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { formatRequirementCode } from "@/lib/pm/rules";
 import { cn } from "@/lib/utils";
@@ -124,31 +125,19 @@ export interface RequirementRunSummary {
 
 const MAX_DOCUMENTS = 20;
 
-const TYPES: Array<{ value: RequirementType; label: string }> = [
-  { value: "business", label: "Business" },
-  { value: "functional", label: "Functional" },
-  { value: "non_functional", label: "Non-functional" },
-  { value: "constraint", label: "Constraint" },
+// Labels come from the dictionaries (`requirementType`, `requirementStatus`,
+// …) so the register, matrix, exports, and overview all call a value the same
+// thing.
+const TYPES: RequirementType[] = ["business", "functional", "non_functional", "constraint"];
+const PRIORITIES: RequirementPriority[] = ["must", "should", "could", "wont"];
+const STATUSES: RequirementStatus[] = [
+  "draft",
+  "needs_clarification",
+  "validated",
+  "approved",
+  "rejected",
 ];
-
-const PRIORITIES: Array<{ value: RequirementPriority; label: string }> = [
-  { value: "must", label: "Must" },
-  { value: "should", label: "Should" },
-  { value: "could", label: "Could" },
-  { value: "wont", label: "Won't" },
-];
-
-// Labels come from labels.ts so the register, matrix, exports, and overview
-// all call a status the same thing.
-const STATUSES: Array<{ value: RequirementStatus; label: string }> = (
-  ["draft", "needs_clarification", "validated", "approved", "rejected"] as const
-).map((value) => ({ value, label: REQUIREMENT_STATUS_LABEL[value] }));
-
-const CONFIDENCES: Array<{ value: RequirementConfidence; label: string }> = [
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-];
+const CONFIDENCES: RequirementConfidence[] = ["high", "medium", "low"];
 
 const STATUS_TONE = {
   draft: "neutral",
@@ -204,10 +193,6 @@ const EMPTY: Draft = {
   stakeholder: "",
 };
 
-function label(value: string) {
-  return value.replaceAll("_", " ");
-}
-
 function taskLinks(requirement: RequirementRow) {
   return requirement.links.filter((link) => link.targetType === "task");
 }
@@ -224,19 +209,21 @@ function isUncovered(requirement: RequirementRow) {
  * of them, which meant nothing stood out. These are the conditions a reviewer
  * has to act on; everything else lives in the expanded body.
  */
+type Warning = "noTask" | "noCriteria" | "lowConfidence";
+
 function warningsFor(
   requirement: RequirementRow,
   deliveryEnabled: boolean,
-): string[] {
-  const warnings: string[] = [];
+): Warning[] {
+  const warnings: Warning[] = [];
   // "No task" is only a gap when this project tracks delivery here; otherwise
   // it would badge every agreed requirement for work that lives elsewhere.
-  if (deliveryEnabled && isUncovered(requirement)) warnings.push("no task");
+  if (deliveryEnabled && isUncovered(requirement)) warnings.push("noTask");
   if (requirement.status === "approved" && !requirement.acceptanceCriteria) {
-    warnings.push("no criteria");
+    warnings.push("noCriteria");
   }
   if (requirement.confidence === "low" && requirement.status !== "rejected") {
-    warnings.push("low confidence");
+    warnings.push("lowConfidence");
   }
   return warnings;
 }
@@ -255,7 +242,7 @@ export interface LinkTargetOption {
  * by a draft proposal.
  */
 function LinkEditor({
-  noun,
+  kind,
   code,
   links,
   options,
@@ -264,7 +251,7 @@ function LinkEditor({
   onLink,
   onUnlink,
 }: {
-  noun: string;
+  kind: "task" | "milestone" | "risk";
   code: string;
   links: Array<{ id: string; targetId: string; label: string; done: boolean }>;
   options: LinkTargetOption[];
@@ -274,6 +261,7 @@ function LinkEditor({
   onUnlink: (linkId: string) => Promise<void>;
 }) {
   const [picking, setPicking] = useState(false);
+  const t = useT();
   const available = options.filter(
     (option) => !links.some((link) => link.targetId === option.id),
   );
@@ -291,7 +279,7 @@ function LinkEditor({
             {link.done ? (
               <Check
                 className="size-3 shrink-0 text-emerald-600"
-                aria-label="done"
+                aria-label={t("requirements.links.done")}
               />
             ) : null}
             <span className="min-w-0 truncate" title={link.label}>
@@ -299,7 +287,7 @@ function LinkEditor({
             </span>
             <button
               type="button"
-              aria-label={`Unlink ${link.label}`}
+              aria-label={t("requirements.links.unlink", { label: link.label })}
               className="text-slate-400 hover:text-red-700"
               disabled={busy}
               onClick={() => void onUnlink(link.id)}
@@ -312,7 +300,7 @@ function LinkEditor({
 
       {picking ? (
         <Select
-          aria-label={`Link a ${noun} to ${code}`}
+          aria-label={t(`requirements.links.pickLabel.${kind}`, { code })}
           className="h-7 max-w-xs py-0 text-xs"
           defaultValue=""
           disabled={busy}
@@ -327,7 +315,7 @@ function LinkEditor({
             setPicking(false);
           }}
         >
-          <option value="">Select a {noun}…</option>
+          <option value="">{t(`requirements.links.pickPlaceholder.${kind}`)}</option>
           {available.map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
@@ -340,13 +328,11 @@ function LinkEditor({
           className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
           disabled={busy || available.length === 0}
           title={
-            options.length === 0
-              ? `This project has no official ${noun}s yet`
-              : undefined
+            options.length === 0 ? t(`requirements.links.noneYet.${kind}`) : undefined
           }
           onClick={() => setPicking(true)}
         >
-          + Link {noun}
+          {t(`requirements.links.add.${kind}`)}
         </button>
       )}
     </div>
@@ -409,6 +395,7 @@ export function RequirementsPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
+  const t = useT();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -522,14 +509,14 @@ export function RequirementsPanel({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not save the requirement.");
+        setError(data.error ?? t("requirements.saveFailed"));
         return;
       }
       upsert(data.requirement);
       setDraft(null);
       setEditingId(null);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setSaving(false);
     }
@@ -554,14 +541,14 @@ export function RequirementsPanel({
     try {
       const { ok, data } = await patchStatus(requirement.id, status);
       if (!ok) {
-        setError(data.error ?? "Could not update the requirement.");
+        setError(data.error ?? t("requirements.updateFailed"));
         return;
       }
       upsert(data.requirement);
       // A review transition can close out the run, so its badge must refresh.
       if (requirement.source === "ai_suggested") router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -593,9 +580,11 @@ export function RequirementsPanel({
       }
       if (failed.length > 0) {
         setError(
-          `${failed.length} of ${results.length} could not be updated. ${
-            failed[0].data.error ?? "Reload and try again."
-          }`,
+          t("requirements.bulkFailed", {
+            failed: failed.length,
+            total: results.length,
+            reason: failed[0].data.error ?? t("requirements.bulkFailedReason"),
+          }),
         );
       }
       setSelected(new Set());
@@ -621,12 +610,12 @@ export function RequirementsPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? `Could not link that ${targetType}.`);
+        setError(data.error ?? t(`requirements.links.failed.${targetType}`));
         return;
       }
       upsert(data.requirement);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -642,12 +631,12 @@ export function RequirementsPanel({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not remove that link.");
+        setError(data.error ?? t("requirements.links.removeFailed"));
         return;
       }
       upsert(data.requirement);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -656,9 +645,9 @@ export function RequirementsPanel({
   async function remove(requirement: RequirementRow) {
     const code = formatRequirementCode(requirement.sequence);
     const confirmed = await confirm({
-      title: `Delete ${code}?`,
+      title: t("requirements.deleteTitle", { code }),
       body: <p className="italic">“{requirement.title}”</p>,
-      confirmLabel: "Delete requirement",
+      confirmLabel: t("requirements.deleteConfirm"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -671,15 +660,15 @@ export function RequirementsPanel({
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        setError(data.error ?? "Could not delete the requirement.");
+        setError(data.error ?? t("requirements.deleteFailed"));
         return;
       }
       setRequirements((previous) =>
         previous.filter((item) => item.id !== requirement.id),
       );
-      toast.success(`Deleted ${code}`);
+      toast.success(t("requirements.deleted", { code }));
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -700,12 +689,12 @@ export function RequirementsPanel({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not extract requirements.");
+        setError(data.error ?? t("requirements.extractFailed"));
         return;
       }
       router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setExtracting(false);
     }
@@ -731,11 +720,11 @@ export function RequirementsPanel({
     label: string;
     count: number;
   }> = [
-    { value: "all", label: "All", count: requirements.length },
+    { value: "all", label: t("common.all"), count: requirements.length },
     ...STATUSES.map((status) => ({
-      value: status.value as RegisterFilter,
-      label: status.label,
-      count: requirements.filter((item) => item.status === status.value).length,
+      value: status as RegisterFilter,
+      label: t(`requirementStatus.${status}`),
+      count: requirements.filter((item) => item.status === status).length,
     })),
   ];
 
@@ -753,13 +742,16 @@ export function RequirementsPanel({
           <Sparkles className="size-4 shrink-0 text-slate-400" />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-slate-900">
-              Extract requirements from documents
+              {t("requirements.extract.title")}
             </span>
             <span className="block text-xs text-slate-500">
               {readyDocuments.length === 0
-                ? "No indexed documents yet"
-                : `${documentIds.size} of ${readyDocuments.length} indexed document${readyDocuments.length === 1 ? "" : "s"} selected`}
-              {activeRun ? " · drafts awaiting review" : ""}
+                ? t("requirements.extract.noDocuments")
+                : t("requirements.extract.selected", {
+                    selected: documentIds.size,
+                    count: readyDocuments.length,
+                  })}
+              {activeRun ? ` · ${t("requirements.extract.awaiting")}` : ""}
             </span>
           </span>
           <ChevronRight
@@ -773,25 +765,23 @@ export function RequirementsPanel({
         {showExtract ? (
           <div className="border-t border-slate-100 px-4 py-4">
             <p className="max-w-2xl text-sm text-slate-600">
-              ScopePilot reads only the documents you select and cites every
-              requirement it proposes. Extracted requirements arrive as drafts —
-              nothing becomes agreed scope until you approve it here.
+              {t("requirements.extract.intro")}
               {requirements.length > 0
-                ? ` The ${requirements.length} already in the register are checked against, so a new meeting note adds only what is new.`
+                ? ` ${t("requirements.extract.introExisting", { count: requirements.length })}`
                 : null}
             </p>
 
             {readyDocuments.length === 0 ? (
               <div className="mt-4">
                 <EmptyState
-                  title="No ready project documents"
-                  description="Upload and finish processing at least one document before extracting requirements."
+                  title={t("requirements.extract.emptyTitle")}
+                  description={t("requirements.extract.emptyBody")}
                   action={
                     <Link
                       className="text-sm font-medium text-blue-700 hover:underline"
                       href={`/projects/${projectId}/documents`}
                     >
-                      Open Documents
+                      {t("requirements.extract.openDocuments")}
                     </Link>
                   }
                 />
@@ -825,7 +815,7 @@ export function RequirementsPanel({
                           {document.originalFilename}
                         </span>
                         <span className="text-xs text-slate-500">
-                          {document.chunkCount} indexed chunks
+                          {t("requirements.extract.chunks", { count: document.chunkCount })}
                         </span>
                       </span>
                     </label>
@@ -846,13 +836,13 @@ export function RequirementsPanel({
                     {extracting ? (
                       <Spinner className="border-white/40 border-t-white" />
                     ) : null}
-                    Extract draft requirements
+                    {t("requirements.extract.run")}
                   </Button>
                   {activeRun ? (
                     <p className="text-xs text-amber-700">
                       {activeRun.status === "processing"
-                        ? "An extraction is still running."
-                        : "Review the drafts from the last extraction before running another."}
+                        ? t("requirements.extract.running")
+                        : t("requirements.extract.reviewFirst")}
                     </p>
                   ) : null}
                 </div>
@@ -865,21 +855,24 @@ export function RequirementsPanel({
       {error ? <ErrorState message={error} /> : null}
 
       <SectionHeader
-        title="Requirement register"
+        title={t("requirements.register.title")}
         description={
           <>
-            {requirements.length} recorded ·{" "}
+            {t("requirements.register.recorded", { count: requirements.length })} ·{" "}
             {/* "Every approved requirement is covered" reads as reassurance, so
                 it must not be shown when nothing has been approved at all. */}
             {approvedCount === 0 ? (
-              "nothing agreed with the client yet"
+              t("requirements.register.nothingAgreed")
             ) : !deliveryEnabled ? (
-              `${approvedCount} agreed`
+              t("requirements.register.agreed", { count: approvedCount })
             ) : uncoveredCount === 0 ? (
-              `all ${approvedCount} agreed have a delivery task`
+              t("requirements.register.allCovered", { count: approvedCount })
             ) : (
               <span className="font-medium text-red-700">
-                {uncoveredCount} of {approvedCount} agreed have no delivery task
+                {t("requirements.register.uncovered", {
+                  uncovered: uncoveredCount,
+                  agreed: approvedCount,
+                })}
               </span>
             )}
           </>
@@ -888,13 +881,13 @@ export function RequirementsPanel({
         {deliveryEnabled ? (
         <div
           role="group"
-          aria-label="Requirements view"
+          aria-label={t("requirements.register.viewLabel")}
           className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
         >
           {(
             [
-              ["register", "Register", ListChecks],
-              ["matrix", "Matrix", Grid3x3],
+              ["register", t("requirements.register.viewRegister"), ListChecks],
+              ["matrix", t("requirements.register.viewMatrix"), Grid3x3],
             ] as const
           ).map(([value, text, Icon]) => (
             <button
@@ -927,7 +920,9 @@ export function RequirementsPanel({
             )
           }
         >
-          {expanded.size > 0 ? "Collapse all" : "Expand all"}
+          {expanded.size > 0
+            ? t("requirements.register.collapseAll")
+            : t("requirements.register.expandAll")}
         </Button>
         ) : null}
         <Button
@@ -939,7 +934,7 @@ export function RequirementsPanel({
             setDraft({ ...EMPTY });
           }}
         >
-          New requirement
+          {t("requirements.register.newRequirement")}
         </Button>
         {requirements.length > 0 ? (
           // The two packs are what goes to the client; they open as printable
@@ -949,7 +944,7 @@ export function RequirementsPanel({
           <div
             className="flex flex-wrap items-center gap-1"
             role="group"
-            aria-label="Share with the client"
+            aria-label={t("requirements.register.shareLabel")}
           >
             <Download className="size-3.5 text-slate-400" aria-hidden />
             <a
@@ -958,7 +953,7 @@ export function RequirementsPanel({
               rel="noopener"
               className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
             >
-              Client questions
+              {t("requirements.register.clientQuestions")}
             </a>
             <a
               href={`/print/requirements/${projectId}?pack=signoff`}
@@ -966,15 +961,15 @@ export function RequirementsPanel({
               rel="noopener"
               className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
             >
-              Sign-off document
+              {t("requirements.register.signoff")}
             </a>
             <a
               href={`/api/projects/${projectId}/requirements/export?format=csv`}
               download
-              aria-label="Download the whole register as CSV"
+              aria-label={t("requirements.register.csvLabel")}
               className={buttonClasses({ variant: "ghost", size: "sm", className: "px-2" })}
             >
-              CSV
+              {t("requirements.register.csv")}
             </a>
           </div>
         ) : null}
@@ -984,7 +979,7 @@ export function RequirementsPanel({
         <Card className="p-4">
           <form onSubmit={save} className="space-y-3">
             <p className="text-sm font-medium">
-              {editingId ? "Edit requirement" : "New requirement"}
+              {editingId ? t("requirements.form.editTitle") : t("requirements.form.newTitle")}
             </p>
 
             <div>
@@ -992,7 +987,7 @@ export function RequirementsPanel({
                 htmlFor="requirement-title"
                 className="mb-1.5 block text-sm font-medium"
               >
-                Title
+                {t("requirements.form.title")}
               </label>
               <Input
                 id="requirement-title"
@@ -1000,7 +995,7 @@ export function RequirementsPanel({
                 onChange={(event) =>
                   setDraft({ ...draft, title: event.target.value })
                 }
-                placeholder="e.g. Managers approve leave requests within the portal"
+                placeholder={t("requirements.form.titlePlaceholder")}
                 maxLength={200}
                 disabled={saving}
               />
@@ -1012,7 +1007,7 @@ export function RequirementsPanel({
                   htmlFor="requirement-type"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Type
+                  {t("requirements.form.type")}
                 </label>
                 <Select
                   id="requirement-type"
@@ -1027,8 +1022,8 @@ export function RequirementsPanel({
                   disabled={saving}
                 >
                   {TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
+                    <option key={type} value={type}>
+                      {t(`requirementType.${type}`)}
                     </option>
                   ))}
                 </Select>
@@ -1039,7 +1034,7 @@ export function RequirementsPanel({
                   htmlFor="requirement-priority"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Priority
+                  {t("requirements.form.priority")}
                 </label>
                 <Select
                   id="requirement-priority"
@@ -1054,8 +1049,8 @@ export function RequirementsPanel({
                   disabled={saving}
                 >
                   {PRIORITIES.map((priority) => (
-                    <option key={priority.value} value={priority.value}>
-                      {priority.label}
+                    <option key={priority} value={priority}>
+                      {t(`requirementPriority.${priority}`)}
                     </option>
                   ))}
                 </Select>
@@ -1066,7 +1061,7 @@ export function RequirementsPanel({
                   htmlFor="requirement-status"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Status
+                  {t("requirements.form.status")}
                 </label>
                 <Select
                   id="requirement-status"
@@ -1081,8 +1076,8 @@ export function RequirementsPanel({
                   disabled={saving}
                 >
                   {STATUSES.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
+                    <option key={status} value={status}>
+                      {t(`requirementStatus.${status}`)}
                     </option>
                   ))}
                 </Select>
@@ -1093,7 +1088,7 @@ export function RequirementsPanel({
                   htmlFor="requirement-confidence"
                   className="mb-1 block text-xs text-slate-500"
                 >
-                  Confidence
+                  {t("requirements.form.confidence")}
                 </label>
                 <Select
                   id="requirement-confidence"
@@ -1108,8 +1103,8 @@ export function RequirementsPanel({
                   disabled={saving}
                 >
                   {CONFIDENCES.map((confidence) => (
-                    <option key={confidence.value} value={confidence.value}>
-                      {confidence.label}
+                    <option key={confidence} value={confidence}>
+                      {t(`confidence.${confidence}`)}
                     </option>
                   ))}
                 </Select>
@@ -1121,8 +1116,10 @@ export function RequirementsPanel({
                 htmlFor="requirement-description"
                 className="mb-1.5 block text-sm font-medium"
               >
-                Description{" "}
-                <span className="font-normal text-slate-500">(optional)</span>
+                {t("requirements.form.description")}{" "}
+                <span className="font-normal text-slate-500">
+                  {t("requirements.form.optional")}
+                </span>
               </label>
               <Textarea
                 id="requirement-description"
@@ -1141,9 +1138,9 @@ export function RequirementsPanel({
                 htmlFor="requirement-acceptance"
                 className="mb-1.5 block text-sm font-medium"
               >
-                Acceptance criteria{" "}
+                {t("requirements.form.acceptance")}{" "}
                 <span className="font-normal text-slate-500">
-                  (how this is verified)
+                  {t("requirements.form.acceptanceHint")}
                 </span>
               </label>
               <Textarea
@@ -1164,8 +1161,10 @@ export function RequirementsPanel({
                   htmlFor="requirement-assumptions"
                   className="mb-1.5 block text-sm font-medium"
                 >
-                  Assumptions{" "}
-                  <span className="font-normal text-slate-500">(optional)</span>
+                  {t("requirements.form.assumptions")}{" "}
+                  <span className="font-normal text-slate-500">
+                    {t("requirements.form.optional")}
+                  </span>
                 </label>
                 <Textarea
                   id="requirement-assumptions"
@@ -1183,8 +1182,10 @@ export function RequirementsPanel({
                   htmlFor="requirement-stakeholder"
                   className="mb-1.5 block text-sm font-medium"
                 >
-                  Stakeholder{" "}
-                  <span className="font-normal text-slate-500">(optional)</span>
+                  {t("requirements.form.stakeholder")}{" "}
+                  <span className="font-normal text-slate-500">
+                    {t("requirements.form.optional")}
+                  </span>
                 </label>
                 <Input
                   id="requirement-stakeholder"
@@ -1192,7 +1193,7 @@ export function RequirementsPanel({
                   onChange={(event) =>
                     setDraft({ ...draft, stakeholder: event.target.value })
                   }
-                  placeholder="e.g. Security owner"
+                  placeholder={t("requirements.form.stakeholderPlaceholder")}
                   maxLength={200}
                   disabled={saving}
                 />
@@ -1209,18 +1210,18 @@ export function RequirementsPanel({
                 }}
                 disabled={saving}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={saving || !draft.title.trim()}>
                 {saving ? (
                   <>
                     <Spinner className="border-white/40 border-t-white" />
-                    Saving…
+                    {t("common.saving")}
                   </>
                 ) : editingId ? (
-                  "Save changes"
+                  t("requirements.form.saveChanges")
                 ) : (
-                  "Create requirement"
+                  t("requirements.form.create")
                 )}
               </Button>
             </div>
@@ -1230,8 +1231,8 @@ export function RequirementsPanel({
 
       {requirements.length === 0 && !draft ? (
         <EmptyState
-          title="No requirements yet"
-          description="Extract drafts from a project document, or record the first requirement by hand."
+          title={t("requirements.empty.title")}
+          description={t("requirements.empty.body")}
           action={
             <Button
               type="button"
@@ -1240,7 +1241,7 @@ export function RequirementsPanel({
                 setDraft({ ...EMPTY });
               }}
             >
-              Record the first requirement
+              {t("requirements.empty.action")}
             </Button>
           }
         />
@@ -1251,7 +1252,7 @@ export function RequirementsPanel({
               chip orphaned onto its own row. Grouped, they wrap together. */}
           <div
             role="group"
-            aria-label="Filter the requirement register"
+            aria-label={t("requirements.filters.label")}
             className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
           >
             <div className="flex flex-wrap items-center gap-1.5">
@@ -1308,7 +1309,7 @@ export function RequirementsPanel({
                     : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
               )}
             >
-              Gaps
+              {t("requirements.filters.gaps")}
               <span
                 className={cn(
                   "tabular-nums",
@@ -1323,12 +1324,12 @@ export function RequirementsPanel({
 
           <div
             role="search"
-            aria-label="Search the requirement register"
+            aria-label={t("requirements.filters.searchRegion")}
             className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2"
           >
             <SearchField
-              label="Search requirements"
-              placeholder="Search code, title, criteria, stakeholder"
+              label={t("requirements.filters.search")}
+              placeholder={t("requirements.filters.searchPlaceholder")}
               value={refine.query}
               onChange={(event) =>
                 setRefine((previous) => ({ ...previous, query: event.target.value }))
@@ -1337,14 +1338,32 @@ export function RequirementsPanel({
             />
             {(
               [
-                ["type", "Any type", TYPES],
-                ["priority", "Any priority", PRIORITIES],
-                ["confidence", "Any confidence", CONFIDENCES],
+                [
+                  "type",
+                  t("requirements.filters.anyType"),
+                  t("requirements.filters.byType"),
+                  TYPES.map((value) => ({ value, label: t(`requirementType.${value}`) })),
+                ],
+                [
+                  "priority",
+                  t("requirements.filters.anyPriority"),
+                  t("requirements.filters.byPriority"),
+                  PRIORITIES.map((value) => ({
+                    value,
+                    label: t(`requirementPriority.${value}`),
+                  })),
+                ],
+                [
+                  "confidence",
+                  t("requirements.filters.anyConfidence"),
+                  t("requirements.filters.byConfidence"),
+                  CONFIDENCES.map((value) => ({ value, label: t(`confidence.${value}`) })),
+                ],
               ] as const
-            ).map(([key, anyLabel, options]) => (
+            ).map(([key, anyLabel, filterLabel, options]) => (
               <Select
                 key={key}
-                aria-label={`Filter by ${key}`}
+                aria-label={filterLabel}
                 value={refine[key] ?? ""}
                 onChange={(event) =>
                   setRefine((previous) => ({
@@ -1369,7 +1388,7 @@ export function RequirementsPanel({
                 variant="ghost"
                 onClick={() => setRefine(EMPTY_REQUIREMENT_FILTER)}
               >
-                Clear
+                {t("common.clear")}
               </Button>
             ) : null}
           </div>
@@ -1395,7 +1414,7 @@ export function RequirementsPanel({
           {selectedVisible.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-900 px-3 py-2 text-white">
               <span className="text-xs font-medium">
-                {selectedVisible.length} selected
+                {t("requirements.bulk.selected", { count: selectedVisible.length })}
               </span>
               {!allVisibleSelected ? (
                 <button
@@ -1403,19 +1422,19 @@ export function RequirementsPanel({
                   className="text-xs text-white/80 underline hover:text-white"
                   onClick={toggleSelectAll}
                 >
-                  Select all {visible.length}
+                  {t("requirements.bulk.selectAll", { count: visible.length })}
                 </button>
               ) : null}
               <span aria-hidden className="mx-1 h-4 w-px bg-white/20" />
               {(
                 [
-                  ["approved", "Mark agreed"],
-                  ["validated", "Validate"],
-                  ["needs_clarification", "Ask client"],
-                  ["rejected", "Reject"],
+                  ["approved", t("requirements.bulk.approve")],
+                  ["validated", t("requirements.bulk.validate")],
+                  ["needs_clarification", t("requirements.bulk.clarify")],
+                  ["rejected", t("requirements.bulk.reject")],
                   // Without a way back, one mis-aimed batch approval could only
                   // be undone a row at a time. Undo belongs wherever bulk does.
-                  ["draft", "Back to review"],
+                  ["draft", t("requirements.bulk.backToReview")],
                 ] as Array<[RequirementStatus, string]>
               ).map(([status, text]) => (
                 <button
@@ -1434,7 +1453,7 @@ export function RequirementsPanel({
                 className="ml-auto text-xs text-white/70 hover:text-white"
                 onClick={() => setSelected(new Set())}
               >
-                Clear
+                {t("common.clear")}
               </button>
             </div>
           ) : null}
@@ -1442,10 +1461,12 @@ export function RequirementsPanel({
           {visible.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-500">
               {refineActive
-                ? "No requirements match this search."
+                ? t("requirements.list.noSearchMatch")
                 : filter === "gaps"
-                  ? "Every approved requirement has at least one delivery task."
-                  : `Nothing is “${requirementStatusLabel(filter)}”.`}
+                  ? t("requirements.list.noGaps")
+                  : t("requirements.list.noneInStatus", {
+                      status: requirementStatusLabel(filter, t),
+                    })}
             </div>
           ) : (
             <>
@@ -1455,8 +1476,8 @@ export function RequirementsPanel({
                 type="checkbox"
                 aria-label={
                   allVisibleSelected
-                    ? "Clear selection"
-                    : `Select all ${visible.length} shown requirements`
+                    ? t("requirements.list.clearSelection")
+                    : t("requirements.list.selectAllShown", { count: visible.length })
                 }
                 checked={allVisibleSelected}
                 ref={(node) => {
@@ -1469,12 +1490,16 @@ export function RequirementsPanel({
               />
               <span className="text-xs text-slate-500">
                 {selectedVisible.length > 0
-                  ? `${selectedVisible.length} of ${visible.length} selected`
-                  : `${visible.length} shown${
-                      filter === "all" && !refineActive
-                        ? ""
-                        : ` of ${requirements.length}`
-                    }`}
+                  ? t("requirements.list.selectedOf", {
+                      selected: selectedVisible.length,
+                      count: visible.length,
+                    })
+                  : filter === "all" && !refineActive
+                    ? t("requirements.list.shown", { count: visible.length })
+                    : t("requirements.list.shownOf", {
+                        count: visible.length,
+                        total: requirements.length,
+                      })}
               </span>
             </div>
             <ul className="divide-y divide-slate-100">
@@ -1502,7 +1527,7 @@ export function RequirementsPanel({
                     >
                       <input
                         type="checkbox"
-                        aria-label={`Select ${code}`}
+                        aria-label={t("requirements.list.select", { code })}
                         checked={selected.has(requirement.id)}
                         onChange={() => toggleSelected(requirement.id)}
                         className={CHECKBOX}
@@ -1534,7 +1559,7 @@ export function RequirementsPanel({
                             key={warning}
                             className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
                           >
-                            {warning}
+                            {t(`requirements.warnings.${warning}`)}
                           </span>
                         ))}
                         <span
@@ -1543,11 +1568,11 @@ export function RequirementsPanel({
                             PRIORITY_STYLE[requirement.priority],
                           )}
                         >
-                          {requirement.priority}
+                          {t(`requirementPriority.${requirement.priority}`)}
                         </span>
                         <Badge tone={STATUS_TONE[requirement.status]}>
-                          <span title={REQUIREMENT_STATUS_HINT[requirement.status]}>
-                            {REQUIREMENT_STATUS_LABEL[requirement.status]}
+                          <span title={requirementStatusHint(requirement.status, t)}>
+                            {t(`requirementStatus.${requirement.status}`)}
                           </span>
                         </Badge>
                       </div>
@@ -1556,7 +1581,7 @@ export function RequirementsPanel({
                     {open ? (
                       <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-12">
                         <DescriptionList labelWidth="8rem">
-                          <Field name="Description">
+                          <Field name={t("requirements.row.description")}>
                             {requirement.description ? (
                               <p className="max-w-3xl text-pretty">
                                 {requirement.description}
@@ -1566,15 +1591,14 @@ export function RequirementsPanel({
                             )}
                           </Field>
 
-                          <Field name="Acceptance">
+                          <Field name={t("requirements.row.acceptance")}>
                             {requirement.acceptanceCriteria ? (
                               <p className="max-w-3xl text-pretty">
                                 {requirement.acceptanceCriteria}
                               </p>
                             ) : requirement.status === "approved" ? (
                               <span className="text-amber-700">
-                                None recorded — there is nothing to verify this
-                                against.
+                                {t("requirements.row.noAcceptance")}
                               </span>
                             ) : (
                               <span className="text-slate-400">—</span>
@@ -1582,39 +1606,41 @@ export function RequirementsPanel({
                           </Field>
 
                           {requirement.assumptions ? (
-                            <Field name="Assumptions">
+                            <Field name={t("requirements.row.assumptions")}>
                               <p className="max-w-3xl text-pretty">
                                 {requirement.assumptions}
                               </p>
                             </Field>
                           ) : null}
 
-                          <Field name="Classification">
+                          <Field name={t("requirements.row.classification")}>
                             <span className="text-slate-600">
-                              {label(requirement.type)} · confidence{" "}
+                              {t(`requirementType.${requirement.type}`)} ·{" "}
                               <span
                                 className={cn(
                                   requirement.confidence === "low" &&
                                     "font-medium text-amber-700",
                                 )}
                               >
-                                {requirement.confidence}
+                                {t("requirements.row.confidence", {
+                                  level: t(`confidence.${requirement.confidence}`),
+                                })}
                               </span>{" "}
                               ·{" "}
                               {requirement.source === "manual"
-                                ? "entered by hand"
-                                : "AI suggested"}
+                                ? t("requirements.row.byHand")
+                                : t("requirements.row.aiSuggested")}
                               {requirement.stakeholder
-                                ? ` · owner ${requirement.stakeholder}`
+                                ? ` · ${t("requirements.row.owner", { name: requirement.stakeholder })}`
                                 : ""}
                             </span>
                           </Field>
 
                           {deliveryEnabled ? (
                           <>
-                          <Field name="Delivery">
+                          <Field name={t("requirements.row.delivery")}>
                             <LinkEditor
-                              noun="task"
+                              kind="task"
                               code={code}
                               busy={busy}
                               links={links.map((link) => ({
@@ -1630,11 +1656,10 @@ export function RequirementsPanel({
                               empty={
                                 isUncovered(requirement) ? (
                                   <span className="text-red-700">
-                                    No delivery task — this approved requirement
-                                    is uncovered.
+                                    {t("requirements.row.uncovered")}
                                   </span>
                                 ) : (
-                                  "No linked task yet."
+                                  t("requirements.row.noTaskYet")
                                 )
                               }
                               onLink={(targetId) =>
@@ -1644,9 +1669,9 @@ export function RequirementsPanel({
                             />
                           </Field>
 
-                          <Field name="Milestones">
+                          <Field name={t("requirements.row.milestones")}>
                             <LinkEditor
-                              noun="milestone"
+                              kind="milestone"
                               code={code}
                               busy={busy}
                               links={requirement.links
@@ -1658,7 +1683,7 @@ export function RequirementsPanel({
                                   done: item.milestone!.status === "completed",
                                 }))}
                               options={milestoneOptions}
-                              empty="None"
+                              empty={t("common.none")}
                               onLink={(targetId) =>
                                 link(requirement, "milestone", targetId)
                               }
@@ -1666,9 +1691,9 @@ export function RequirementsPanel({
                             />
                           </Field>
 
-                          <Field name="Risks">
+                          <Field name={t("requirements.row.risks")}>
                             <LinkEditor
-                              noun="risk"
+                              kind="risk"
                               code={code}
                               busy={busy}
                               links={requirement.links
@@ -1680,7 +1705,7 @@ export function RequirementsPanel({
                                   done: false,
                                 }))}
                               options={riskOptions}
-                              empty="None"
+                              empty={t("common.none")}
                               onLink={(targetId) =>
                                 link(requirement, "risk", targetId)
                               }
@@ -1692,7 +1717,7 @@ export function RequirementsPanel({
                           ) : null}
 
                           {requirement.citations.length > 0 ? (
-                            <Field name="Evidence">
+                            <Field name={t("requirements.row.evidence")}>
                               <ul className="space-y-1.5">
                                 {requirement.citations.map((citation) => (
                                   <li key={citation.id}>
@@ -1703,7 +1728,7 @@ export function RequirementsPanel({
                                       <FileText className="size-3 shrink-0 text-slate-400" />
                                       {citation.chunk.document.originalFilename}
                                       {citation.chunk.pageNumber
-                                        ? ` · p.${citation.chunk.pageNumber}`
+                                        ? ` · ${t("common.page", { page: citation.chunk.pageNumber })}`
                                         : ""}
                                       {citation.chunk.sectionTitle
                                         ? ` · ${citation.chunk.sectionTitle}`
@@ -1723,7 +1748,7 @@ export function RequirementsPanel({
 
                         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
                           <Select
-                            aria-label={`Status for ${code}`}
+                            aria-label={t("requirements.row.statusFor", { code })}
                             className="h-8 text-xs"
                             value={requirement.status}
                             disabled={busy}
@@ -1735,8 +1760,8 @@ export function RequirementsPanel({
                             }
                           >
                             {STATUSES.map((status) => (
-                              <option key={status.value} value={status.value}>
-                                {status.label}
+                              <option key={status} value={status}>
+                                {t(`requirementStatus.${status}`)}
                               </option>
                             ))}
                           </Select>
@@ -1747,7 +1772,7 @@ export function RequirementsPanel({
                             disabled={busy}
                             onClick={() => startEdit(requirement)}
                           >
-                            Edit
+                            {t("requirements.row.edit")}
                           </Button>
                           <Button
                             size="sm"
@@ -1756,7 +1781,7 @@ export function RequirementsPanel({
                             disabled={busy}
                             onClick={() => void remove(requirement)}
                           >
-                            Delete
+                            {t("common.delete")}
                           </Button>
                         </div>
                       </div>

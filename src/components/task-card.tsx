@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarClock, Flag, GitBranch, Sparkles, Timer } from "lucide-react";
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Avatar } from "@/components/ui";
 import { cn, formatDay } from "@/lib/utils";
 import type { TaskRow } from "@/components/task-types";
@@ -79,6 +80,9 @@ export function TaskCard({
   onDragEnd: () => void;
 }) {
   const overdue = isTaskOverdue(task, todayIso);
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const priorityFlag = t("priority.flag", { level: t(`priority.${task.priority}`) });
 
   return (
     <article
@@ -109,8 +113,8 @@ export function TaskCard({
         <div className="flex items-start gap-2">
           {/* The flag replaced a text badge, so the label it dropped is kept
               for screen readers — colour is the only cue that remains visually. */}
-          <span title={`${task.priority} priority`} className="mt-0.5 shrink-0">
-            <span className="sr-only">{task.priority} priority</span>
+          <span title={priorityFlag} className="mt-0.5 shrink-0">
+            <span className="sr-only">{priorityFlag}</span>
             <Flag
               aria-hidden
               fill="currentColor"
@@ -136,23 +140,23 @@ export function TaskCard({
         <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-5.5">
           {task.dueDate ? (
             <Chip
-              title={overdue ? "Past its due date" : "Due date"}
+              title={overdue ? t("tasks.card.pastDue") : t("tasks.card.dueDate")}
               tone={overdue ? "danger" : "neutral"}
             >
               <CalendarClock className="size-3" aria-hidden />
-              {formatDay(task.dueDate)}
+              {formatDay(task.dueDate, dateLocale)}
             </Chip>
           ) : null}
 
           {task.estimatedHours !== null ? (
-            <Chip title="Estimate">
+            <Chip title={t("tasks.card.estimate")}>
               <Timer className="size-3" aria-hidden />
-              {task.estimatedHours}h
+              {t("common.hours", { hours: task.estimatedHours })}
             </Chip>
           ) : null}
 
           {task.dependencies.length > 0 ? (
-            <Chip title={`Depends on ${task.dependencies.length} task(s)`}>
+            <Chip title={t("tasks.card.dependsOn", { count: task.dependencies.length })}>
               <GitBranch className="size-3" aria-hidden />
               {task.dependencies.length}
             </Chip>
@@ -163,9 +167,7 @@ export function TaskCard({
           {task.source === "ai_suggested" ? (
             <Chip
               tone="info"
-              title={`AI suggested · ${task.citations.length} source${
-                task.citations.length === 1 ? "" : "s"
-              }`}
+              title={t("tasks.card.aiSources", { count: task.citations.length })}
             >
               <Sparkles className="size-3" aria-hidden />
               {task.citations.length > 0 ? task.citations.length : "AI"}
