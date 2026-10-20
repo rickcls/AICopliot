@@ -8,7 +8,7 @@ import {
 import type { ChatProvider, EmbeddingProvider, TranscriptionProvider } from "./types";
 
 export type { ChatProvider, EmbeddingProvider, TranscriptionProvider } from "./types";
-export { ProviderError } from "./types";
+export { isProviderTimeout, ProviderError } from "./types";
 
 /**
  * Factory seam. Call sites take providers as arguments wherever practical so

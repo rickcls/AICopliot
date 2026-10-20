@@ -327,7 +327,31 @@ checks `indexdef` rather than merely checking that the index exists.
 Three abstractions exist so pieces can be swapped without touching call sites:
 
 - **`src/lib/providers/`** — `EmbeddingProvider` / `ChatProvider`. Swapping
-  models is an env change; swapping vendors is one new file.
+  models is an env change; swapping vendors is one new file. **Structured
+  calls pass `reasoning: false`** (requirements, plans, reports, captures,
+  labels, approaches, fills, day plans, email, the assistant's steps, and the
+  follow-up rewrite). With a thinking model as `OPENROUTER_CHAT_MODEL`, the
+  thinking spent the whole token budget before any JSON was written and
+  pushed calls past Vercel's 60-second limit: extraction took 85 s and failed,
+  and is 5 s without it. Chat answers pass it too — a follow-up's rewrite plus
+  a thinking answer was killed at 60 s with nothing saved. Models disagree on
+  the switch: OpenRouter refuses `reasoning: { enabled: false }` for GLM 5.3
+  Flash ("Reasoning is mandatory"), so the provider retries such a model with
+  `effort: "minimal"` (zero thinking tokens there) and remembers it; DeepSeek
+  V4 Flash still thinks at minimal, which is why the off switch goes first.
+  **Every provider call has a time limit** (`timeoutMs`, default 45 s), and a
+  timed-out call is a `ProviderError` that `isProviderTimeout()` recognises, so
+  a route can name it instead of being killed silently. Calls that share one
+  request split its budget: `answerQuestion` gives the rewrite 12 s and the
+  answer what is left of 50 s, skipping the repair when it cannot finish; the
+  assistant skips any call that would not fit in 52 s and answers with what its
+  tools found.
+  **A run killed mid-call stays `processing` forever**, and both the
+  active-run check and the one-active-run index count it, so it would block
+  every later extraction or plan. `failStaleRuns()`
+  (`src/lib/generation/stale-runs.ts`) fails runs older than `STALE_RUN_MS`
+  before each generation and each run-list read; `listCaptures` does the same
+  for captures by `updatedAt`, which brings back their Retry button.
 - **`src/lib/storage/`** — `StorageProvider`. Local disk when
   `BLOB_READ_WRITE_TOKEN` is unset; Vercel Blob (private, same
   `{workspaceId}/{documentId}.{ext}` key) when it is set. An S3 adapter is
@@ -807,6 +831,9 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
   `src/lib/capture/apply-change.ts`, which takes the claim as a hook.
 - A turn is one request (`maxDuration` 60), so the page waits for the answer
   rather than streaming steps. Threads are private, like chat threads.
+- **When the model will not answer**, the loop makes one last call that may
+  only answer; if that fails too, `foundSoFar()` lists what the lookups found
+  (with their labels, so they render as sources) instead of discarding them.
 
 ## Gmail and voice notes
 

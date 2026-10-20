@@ -82,7 +82,11 @@ export async function streamAnswer(
           handlers.onResult(payload);
         } else if (frame.event === "error") {
           outcome = "failed";
-          handlers.onError(payload.error ?? t("chat.stream.failed"));
+          handlers.onError(
+            payload.code === "timeout"
+              ? t("chat.stream.timeout")
+              : (payload.error ?? t("chat.stream.failed")),
+          );
         }
       }
     }

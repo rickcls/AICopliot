@@ -176,7 +176,7 @@ export async function suggestApproach(
       }),
     },
   ];
-  const options = { jsonMode: true, temperature: 0, maxTokens: 3000 };
+  const options = { jsonMode: true, temperature: 0, maxTokens: 3000, reasoning: false };
 
   let raw = await chat.complete(messages, options);
   let model = parseApproach(raw);

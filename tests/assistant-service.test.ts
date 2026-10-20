@@ -34,6 +34,7 @@ vi.mock("@/lib/capture/apply-change", () => ({ applyChange: mockApplyChange }));
 
 const service = await import("@/lib/assistant/service");
 const { MAX_TOOL_STEPS } = await import("@/lib/assistant/protocol");
+const { ProviderError } = await import("@/lib/providers/types");
 
 const access = {
   workspaceId: "ws-1",
@@ -115,10 +116,28 @@ describe("runAssistantTurn", () => {
     await service.runAssistantTurn(access, { question: "loop forever" }, { chat, now: NOW });
 
     expect(mockRunTool).toHaveBeenCalledTimes(MAX_TOOL_STEPS);
-    expect(chat.complete).toHaveBeenCalledTimes(MAX_TOOL_STEPS + 1);
-    expect(chat.seen.at(-1)!.at(-1)!.content).toContain("No more tools");
-    // It never answered, so the stored reply is the honest fallback.
-    expect(tx.assistantMessage.create.mock.calls[0][0].data).toMatchObject({ general: true });
+    // The capped turn, then one last call that may only answer.
+    expect(chat.complete).toHaveBeenCalledTimes(MAX_TOOL_STEPS + 2);
+    expect(chat.seen[MAX_TOOL_STEPS].at(-1)!.content).toContain("No more tools");
+    expect(chat.seen.at(-1)!.at(-1)!.content).toContain("Do not call any tool");
+    // It never answered, so the reply lists what the lookups found instead of
+    // throwing them away.
+    const saved = tx.assistantMessage.create.mock.calls[0][0].data;
+    expect(saved.content).toContain("Here is what I found");
+    expect(saved.content).toContain("Send quote [T1]");
+    expect(saved).toMatchObject({ general: false });
+    expect(saved.sources).toEqual([
+      { label: "T1", kind: "task", taskId: "task-secret", projectId: "project-secret", title: "Send quote" },
+    ]);
+  });
+
+  it("gets an answer from the last call when the capped turn asked for another tool", async () => {
+    const chat = scriptedChat(
+      ...Array.from({ length: MAX_TOOL_STEPS + 1 }, () => '{"action":"list_my_tasks","input":{"filter":"open"}}'),
+      '{"action":"answer","answer":"Send the quote [T1].","citations":["T1"]}',
+    );
+    await service.runAssistantTurn(access, { question: "prepare my meeting" }, { chat, now: NOW });
+    expect(tx.assistantMessage.create.mock.calls[0][0].data.content).toBe("Send the quote [T1].");
   });
 
   it("makes the model answer once the time limit has passed", async () => {
@@ -140,10 +159,31 @@ describe("runAssistantTurn", () => {
     expect(mockRunTool).toHaveBeenCalledTimes(1);
   });
 
+  it("answers with what it found when a model call runs out of time", async () => {
+    let now = 0;
+    const clock = () => now;
+    const chat = scriptedChat('{"action":"list_my_tasks","input":{"filter":"open"}}');
+    chat.complete
+      .mockImplementationOnce(async () => '{"action":"list_my_tasks","input":{"filter":"open"}}')
+      .mockImplementationOnce(async () => {
+        now = 50_000;
+        throw new ProviderError("Model provider did not answer within 45s", 504);
+      });
+
+    await service.runAssistantTurn(access, { question: "slow" }, { chat, now: NOW, clock });
+
+    // No time is left for a last call, and the turn is still saved.
+    expect(chat.complete).toHaveBeenCalledTimes(2);
+    const saved = tx.assistantMessage.create.mock.calls[0][0].data;
+    expect(saved.content).toContain("Send quote [T1]");
+  });
+
   it("falls back honestly after two malformed replies", async () => {
     const chat = scriptedChat("not json", "still not json");
     await service.runAssistantTurn(access, { question: "?" }, { chat, now: NOW });
-    expect(chat.complete).toHaveBeenCalledTimes(2);
+    // Two malformed replies, then the one last call — still malformed.
+    expect(chat.complete).toHaveBeenCalledTimes(3);
+    // Nothing was looked up, so there is nothing to list.
     expect(tx.assistantMessage.create.mock.calls[0][0].data.content).toContain("could not finish");
   });
 

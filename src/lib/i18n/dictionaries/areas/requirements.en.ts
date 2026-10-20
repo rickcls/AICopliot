@@ -65,6 +65,10 @@ export const requirementsEn = {
       run: "Extract draft requirements",
       running: "An extraction is still running.",
       reviewFirst: "Review the drafts from the last extraction before running another.",
+      upload: "Upload a document",
+      uploading: "Uploading and indexing {name}…",
+      uploadHint: "It joins this project's documents and is selected for extraction.",
+      uploadFailed: "{name} could not be processed: {reason}",
     },
     register: {
       title: "Requirement register",

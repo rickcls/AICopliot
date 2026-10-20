@@ -98,7 +98,7 @@ export async function labelDocument(
       }),
     },
   ];
-  const options = { jsonMode: true, temperature: 0, maxTokens: 1500 };
+  const options = { jsonMode: true, temperature: 0, maxTokens: 1500, reasoning: false };
 
   let raw = await chat.complete(messages, options);
   let model = parseLabel(raw);

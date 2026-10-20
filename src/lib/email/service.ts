@@ -76,7 +76,7 @@ async function completeJson<T>(
     { role: "system" as const, content: system },
     { role: "user" as const, content: user },
   ];
-  const options = { jsonMode: true, temperature: 0.3, maxTokens };
+  const options = { jsonMode: true, temperature: 0.3, maxTokens, reasoning: false };
   const first = await chat.complete(messages, options);
   const parsed = parse(first);
   if (parsed) return parsed;

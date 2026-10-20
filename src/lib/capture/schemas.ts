@@ -25,6 +25,8 @@ export const modelProposalSchema = z.discriminatedUnion("kind", [
     description: z.string().trim().max(2000).nullable().catch(null),
     project: z.string().trim().max(12).nullable().catch(null),
     priority,
+    // A new task is blocked or ordinary. "done" and "open" are not a starting state.
+    status: z.enum(["blocked"]).nullable().catch(null),
     due,
     estimatedHours: z.number().positive().max(1000).nullable().catch(null),
     citations: labels,

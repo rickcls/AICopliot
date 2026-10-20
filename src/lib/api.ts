@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { AuthError } from "@/lib/auth-guard";
-import { ProviderError } from "@/lib/providers";
+import { isProviderTimeout, ProviderError } from "@/lib/providers";
 
 /**
  * Uniform error handling for route handlers. Auth and provider failures get
@@ -15,7 +15,10 @@ export function handleRouteError(error: unknown, context: string) {
 
   if (error instanceof ProviderError) {
     console.error(`[${context}] provider error:`, error.message);
-    return NextResponse.json({ error: errorMessageFor(error) }, { status: 502 });
+    return NextResponse.json(
+      { error: errorMessageFor(error) },
+      { status: isProviderTimeout(error) ? 504 : 502 },
+    );
   }
 
   console.error(`[${context}]`, error);
@@ -29,6 +32,9 @@ export function handleRouteError(error: unknown, context: string) {
  */
 export function errorMessageFor(error: unknown): string {
   if (error instanceof AuthError) return error.message;
+  if (isProviderTimeout(error)) {
+    return "The model took too long to answer. Please try again.";
+  }
   if (error instanceof ProviderError) {
     return "The model provider is unavailable. Check OPENROUTER_API_KEY and try again.";
   }

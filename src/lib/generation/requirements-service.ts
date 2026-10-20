@@ -18,6 +18,7 @@ import {
 } from "./requirements-prompt";
 import { modelRequirementsSchema } from "./schemas";
 import { GenerationRequestError } from "./service";
+import { failStaleRuns } from "./stale-runs";
 import { PlanValidationError } from "./validate";
 import {
   validateRequirements,
@@ -100,6 +101,7 @@ export async function generateRequirements(
     );
   }
 
+  await failStaleRuns(workspaceId, projectId, "requirements");
   const active = await prisma.generationRun.findFirst({
     where: {
       workspaceId,
@@ -190,10 +192,13 @@ export async function generateRequirements(
     ];
 
     attempts.push(
+      // No thinking: it spent the whole budget before any JSON was written
+      // and took the call past Vercel's 60-second limit.
       await chat.complete(baseMessages, {
         jsonMode: true,
         temperature: 0,
         maxTokens: 6000,
+        reasoning: false,
       }),
     );
     let parsed = parseRequirements(attempts[0]);
@@ -212,7 +217,7 @@ export async function generateRequirements(
                 "That reply did not match the required JSON contract. Correct it and reply with only one valid JSON object. Do not add requirements unless they are cited to a supplied S label.",
             },
           ],
-          { jsonMode: true, temperature: 0, maxTokens: 6000 },
+          { jsonMode: true, temperature: 0, maxTokens: 6000, reasoning: false },
         ),
       );
       parsed = parseRequirements(attempts[1]);
@@ -389,6 +394,7 @@ export async function getRequirementRuns(
   workspaceId: string,
   projectId: string,
 ) {
+  await failStaleRuns(workspaceId, projectId, "requirements");
   return prisma.generationRun.findMany({
     where: { workspaceId, projectId, type: "requirements" },
     orderBy: { createdAt: "desc" },

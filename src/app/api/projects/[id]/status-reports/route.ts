@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
-import { requireProject, requireWorkspace } from "@/lib/auth-guard";
+import { getUserPreferences, requireProject, requireWorkspace } from "@/lib/auth-guard";
 import {
   generateStatusReport,
   listStatusReports,
@@ -31,10 +31,12 @@ export async function POST(_request: Request, { params }: Params) {
     const { workspaceId, user } = await requireWorkspace();
     const { id } = await params;
     const project = await requireProject(workspaceId, id);
+    const preferences = await getUserPreferences(user.id);
     const report = await generateStatusReport({
       workspaceId,
       projectId: project.id,
       userId: user.id,
+      language: preferences?.locale === "en" ? "en" : "zh-Hant",
     });
     return NextResponse.json({ report }, { status: 201 });
   } catch (error) {

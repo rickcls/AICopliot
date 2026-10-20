@@ -11,6 +11,7 @@ const mockPrisma = {
     update: vi.fn(),
     findMany: vi.fn(),
     findFirst: vi.fn(),
+    updateMany: vi.fn(),
   },
 };
 
@@ -26,6 +27,7 @@ const {
   generateStatusReport,
   getStatusReport,
   listStatusReports,
+  narrativeProblem,
   StatusReportRequestError,
 } = await import("@/lib/reports/service");
 
@@ -227,6 +229,72 @@ describe("status report generation audit", () => {
         data: expect.objectContaining({ status: "failed" }),
       }),
     );
+  });
+});
+
+describe("narrative corrections", () => {
+  const reply = (answer: string) =>
+    JSON.stringify({
+      answer,
+      confidence: "high",
+      insufficientContext: false,
+      citations: [{ sourceId: "P1", quote: "Derived health: green" }],
+    });
+
+  it("names what is missing", () => {
+    expect(
+      narrativeProblem({ answer: "All fine.", citations: [{ kind: "project_snapshot" }] }, "amber", false, "en"),
+    ).toContain('"amber"');
+    expect(
+      narrativeProblem({ answer: "整體需要留意。", citations: [{ kind: "project_snapshot" }] }, "amber", false, "zh-Hant"),
+    ).toBeNull();
+    expect(
+      narrativeProblem({ answer: "Health is green.", citations: [] }, "green", false, "en"),
+    ).toContain("PROJECT SNAPSHOT");
+  });
+
+  it("asks once more when the narrative leaves out the health, and saves the correction", async () => {
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce(reply("Work is moving and nothing is blocked."))
+      .mockResolvedValueOnce(reply("Health is green; nothing is blocked."));
+    const result = await generateStatusReport(INPUT, {
+      chat: { modelName: "fake-chat", complete },
+      now: new Date("2026-08-05T08:00:00.000Z"),
+    });
+
+    expect(complete).toHaveBeenCalledTimes(2);
+    expect(complete.mock.calls[1][0].at(-1).content).toContain('"green"');
+    expect(result.report?.narrative).toBe("Health is green; nothing is blocked.");
+  });
+
+  it("writes Chinese records' narrative in Chinese, with the badge's own words", async () => {
+    mockPrisma.task.findMany.mockResolvedValue([
+      {
+        id: "t-zh",
+        title: "準備報價文件",
+        description: null,
+        status: "todo",
+        priority: "medium",
+        dueDate: null,
+        completedAt: null,
+        assignee: null,
+        milestone: null,
+      },
+    ]);
+    const complete = vi.fn(async () => reply("整體进展正常，暂无受阻工作。"));
+    const result = await generateStatusReport(INPUT, {
+      chat: { modelName: "fake-chat", complete },
+      now: new Date("2026-08-05T08:00:00.000Z"),
+    });
+
+    const prompt = (complete.mock.calls[0] as unknown as [{ content: string }[]])[0]
+      .map((message) => message.content)
+      .join("\n");
+    expect(prompt).toContain("進展正常");
+    expect(prompt).toContain("Traditional Chinese");
+    // Simplified characters the model slipped in are converted.
+    expect(result.report?.narrative).toBe("整體進展正常，暫無受阻工作。");
   });
 });
 

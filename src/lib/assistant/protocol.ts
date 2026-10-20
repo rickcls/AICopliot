@@ -47,7 +47,8 @@ Rules:
 2. In the answer, mark each fact that came from a tool with its label in square brackets, e.g. "due Friday [T2]". Never invent a label.
 3. If any of the answer is your own general knowledge rather than from the tools, set "general": true. Never present general knowledge as if it came from their files.
 4. Proposals use exactly these shapes and cite labels — U1 is the person's question; S, N, and T labels are sources:
-   {"kind":"create_task","title":"...","description":null,"project":"P2","priority":null,"due":{"phrase":"the exact words that state the date","date":"YYYY-MM-DD"},"estimatedHours":null,"citations":["U1"]}
+   {"kind":"create_task","title":"...","description":null,"project":"P2","priority":null,"status":"blocked","due":{"phrase":"the exact words that state the date","date":"YYYY-MM-DD"},"estimatedHours":null,"citations":["U1"]}
+   A new task's status is "blocked" only when they are waiting on someone and no existing task covers it; otherwise null. Never mark a new task done.
    {"kind":"update_task","task":"T3","status":"done","priority":null,"due":null,"citations":["N2"]}
    {"kind":"add_note","task":"T3","note":"...","citations":["U1"]}
    Quote due-date words exactly as written; never guess a date.
@@ -186,6 +187,41 @@ const LABEL_GROUP = /\[((?:[A-Z]\d{1,3})(?:\s*[,，、]\s*[A-Z]\d{1,3})*)\]/g;
  * are the answer's citations. An answer citing nothing but the question is
  * general knowledge, whatever the model said.
  */
+const NOTHING_FOUND: Record<ReplyLanguage, string> = {
+  "zh-Hant": "我未能完成查找。請把問題問得具體一點再試。",
+  en: "I could not finish looking this up. Try asking more specifically.",
+};
+
+const FOUND_HEAD: Record<ReplyLanguage, string> = {
+  "zh-Hant": "我未能整理出完整答案。以下是我已找到的相關資料，可以先參考：",
+  en: "I could not put a full answer together. Here is what I found, to start from:",
+};
+
+/**
+ * What to say when the model never answered. The lookups it ran still found
+ * things, and "ask more specifically" after five searches threw them away, so
+ * this lists them — with their labels, which `finalizeAnswer` turns into
+ * sources. Pure, so the wording is tested without a model.
+ */
+export function foundSoFar(registry: SourceRegistry, language: ReplyLanguage): string {
+  const lines = registry.all().flatMap((source) => {
+    switch (source.kind) {
+      case "task":
+        return [`- ${source.title} [${source.label}]`];
+      case "document":
+        return [`- ${source.filename} [${source.label}]`];
+      case "note":
+        return [`- ${source.content.replace(/\s+/g, " ").slice(0, 60)} [${source.label}]`];
+      case "draft":
+        return [`- ${source.subject} [${source.label}]`];
+      default:
+        return [];
+    }
+  });
+  if (lines.length === 0) return NOTHING_FOUND[language];
+  return [FOUND_HEAD[language], ...lines.slice(0, 8)].join("\n");
+}
+
 export function finalizeAnswer(
   answer: string,
   extraCitations: string[],

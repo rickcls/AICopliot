@@ -25,6 +25,19 @@ export interface ChatCompletionOptions {
   maxTokens?: number;
   /** Ask the provider to constrain output to a JSON object. */
   jsonMode?: boolean;
+  /**
+   * `false` turns a reasoning model's thinking off. Structured extraction —
+   * requirements, plans, reports, captures — gains nothing from it: the
+   * thinking spent the whole token budget before any JSON was written, and
+   * made a call outlast Vercel's 60-second limit. Omit for the model's own
+   * default; a model without a thinking mode ignores it.
+   */
+  reasoning?: boolean;
+  /**
+   * Abort the call after this many milliseconds. The provider applies its own
+   * default; pass less when the call shares a request's budget with others.
+   */
+  timeoutMs?: number;
 }
 
 export interface ChatProvider {
@@ -50,6 +63,9 @@ export interface TranscriptionProvider {
   ): Promise<string>;
 }
 
+/** The status a timed-out provider call carries, as a gateway would report it. */
+export const PROVIDER_TIMEOUT_STATUS = 504;
+
 export class ProviderError extends Error {
   constructor(
     message: string,
@@ -58,4 +74,8 @@ export class ProviderError extends Error {
     super(message);
     this.name = "ProviderError";
   }
+}
+
+export function isProviderTimeout(error: unknown): boolean {
+  return error instanceof ProviderError && error.status === PROVIDER_TIMEOUT_STATUS;
 }

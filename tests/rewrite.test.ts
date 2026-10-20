@@ -33,6 +33,21 @@ describe("needsRewrite", () => {
 });
 
 describe("rewriteQuestion", () => {
+  it("falls back to the question as typed when the rewrite times out", async () => {
+    const chat = {
+      modelName: "fake",
+      complete: vi.fn(async (_messages: Messages, _options?: { timeoutMs?: number }) => {
+        throw new Error("Model provider did not answer within 12s");
+      }),
+    };
+
+    const result = await rewriteQuestion("what about Sev-2?", history, chat);
+
+    expect(result).toBe("what about Sev-2?");
+    // The rewrite's limit is short: it shares the request with the answer.
+    expect(chat.complete.mock.calls[0][1]?.timeoutMs).toBeLessThanOrEqual(15_000);
+  });
+
   it("does not call the model when there is no history", async () => {
     const chat = chatReturning("unused");
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { getEnv } from "@/lib/env";
+import { detectReplyLanguage, type ReplyLanguage } from "@/lib/language";
 import {
   getChatProvider,
   getEmbeddingProvider,
@@ -12,10 +13,9 @@ import {
   buildCombinedContext,
   buildContext,
   buildUserMessage,
-  PROJECT_REFUSAL_TEXT,
+  REFUSAL_TEXTS,
   PROJECT_SYSTEM_PROMPT,
   SYSTEM_PROMPT,
-  TASK_REFUSAL_TEXT,
   TASK_SYSTEM_PROMPT,
   type GroundingSourceAudit,
 } from "./prompt";
@@ -98,6 +98,8 @@ export interface AnswerDeps {
   projectContext?: typeof getProjectGroundingContext;
   focus?: AnswerFocus;
   taskContext?: typeof getTaskGroundingContext;
+  /** The language a refusal falls back to when the question shows none. */
+  fallbackLanguage?: ReplyLanguage;
   /**
    * Fire-and-forget phase notifications. The channel is a UI stream that may be
    * gone long before the answer is finished and persisted, so a throw here is
@@ -131,6 +133,15 @@ function parseModelAnswer(raw: string) {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Rewrite, answer, and any repair share the route's 60-second limit, and the
+ * answer still has to be saved after them. Past it the function is killed with
+ * nothing stored, so each call gets only what is left of this budget.
+ */
+const ANSWER_BUDGET_MS = 50_000;
+/** Below this, a call cannot finish; a repair is skipped and the answer refused. */
+const MIN_CALL_MS = 8_000;
+
 export async function answerQuestion(
   workspaceId: string,
   question: string,
@@ -152,11 +163,12 @@ export async function answerQuestion(
     focus?.kind !== "documents" &&
     deps.groundingScope === "project_combined" &&
     Boolean(deps.projectId);
+  const refusals = REFUSAL_TEXTS[detectReplyLanguage(question, deps.fallbackLanguage ?? "en")];
   const refusalText = taskFocus
-    ? TASK_REFUSAL_TEXT
+    ? refusals.task
     : combined
-      ? PROJECT_REFUSAL_TEXT
-      : undefined;
+      ? refusals.project
+      : refusals.documents;
   const focusDocumentIds =
     focus && focus.documentIds.length > 0 ? focus.documentIds : null;
 
@@ -257,19 +269,24 @@ export async function answerQuestion(
   ];
 
   // A task answer may carry a whole proposed description on top of the
-  // answer, and a reasoning model spends part of the budget thinking first.
-  // At the provider's default the JSON was cut off and the answer refused.
-  const completion = {
+  // answer; at the provider's default the JSON was cut off and refused.
+  // Thinking is off: the answer's rules are in the prompt and the citations
+  // are checked below, and thinking is what pushed a follow-up — rewrite plus
+  // answer — past the 60-second limit.
+  const deadline = startedAt + ANSWER_BUDGET_MS;
+  const completion = () => ({
     jsonMode: true,
     temperature: 0,
+    reasoning: false,
+    timeoutMs: Math.max(MIN_CALL_MS, deadline - Date.now()),
     ...(taskFocus ? { maxTokens: 4000 } : {}),
-  };
+  });
 
   report({ phase: "reasoning" });
-  let parsed = parseModelAnswer(await chat.complete(messages, completion));
+  let parsed = parseModelAnswer(await chat.complete(messages, completion()));
 
-  // One repair attempt before giving up on malformed output.
-  if (!parsed) {
+  // One repair attempt before giving up on malformed output, if it can finish.
+  if (!parsed && deadline - Date.now() >= MIN_CALL_MS) {
     report({ phase: "repairing" });
     parsed = parseModelAnswer(
       await chat.complete(
@@ -281,7 +298,7 @@ export async function answerQuestion(
               "Your previous reply was not valid JSON. Reply with ONLY the JSON object described in the system prompt.",
           },
         ],
-        completion,
+        completion(),
       ),
     );
   }

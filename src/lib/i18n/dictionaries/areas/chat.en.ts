@@ -31,6 +31,7 @@ export const chatEn = {
       failed: "Could not get an answer.",
       ended: "The answer stream ended unexpectedly.",
       unreachable: "Could not reach the server. Please try again.",
+      timeout: "The model took too long to answer, so it was stopped. Please ask again.",
     },
     rail: {
       label: "Conversations",

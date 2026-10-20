@@ -5,6 +5,7 @@ import {
   ASSISTANT_SYSTEM_PROMPT,
   buildOpeningMessage,
   finalizeAnswer,
+  foundSoFar,
   MAX_TOOL_STEPS,
   parseStep,
   SourceRegistry,
@@ -20,9 +21,14 @@ import type { CaptureProposalView } from "@/lib/capture/view";
 import { prisma } from "@/lib/db";
 import type { EmailDraftView } from "@/lib/email/service";
 import type { FactFlag } from "@/lib/email/facts";
-import { detectReplyLanguage, type ReplyLanguage } from "@/lib/language";
+import { detectReplyLanguage } from "@/lib/language";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
-import { getChatProvider, type ChatProvider, type EmbeddingProvider } from "@/lib/providers";
+import {
+  getChatProvider,
+  isProviderTimeout,
+  type ChatProvider,
+  type EmbeddingProvider,
+} from "@/lib/providers";
 import { DEFAULT_TIME_ZONE, localToday } from "@/lib/time";
 
 /**
@@ -49,6 +55,14 @@ export interface AssistantDeps {
 }
 
 const DEADLINE_MS = 40_000;
+/**
+ * No model call may run past this, whatever the deadline above has allowed:
+ * the turn must still be saved inside the request's 60 seconds. A call that
+ * would not fit is skipped, and one that runs out of time ends the loop with
+ * what the tools found rather than failing the turn.
+ */
+const BUDGET_MS = 52_000;
+const MIN_CALL_MS = 5_000;
 const HISTORY_TURNS = 6;
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -83,11 +97,6 @@ export interface AssistantMessageView {
 function scope(access: WorkspaceAccess) {
   return { workspaceId: access.workspaceId, userId: access.userId };
 }
-
-const FALLBACK: Record<ReplyLanguage, string> = {
-  "zh-Hant": "我未能完成查找。請把問題問得具體一點再試。",
-  en: "I could not finish looking this up. Try asking more specifically.",
-};
 
 function describeInput(input: Record<string, unknown>): string {
   return Object.values(input)
@@ -165,7 +174,19 @@ export async function runAssistantTurn(
       }),
     },
   ];
-  const options = { jsonMode: true, temperature: 0, maxTokens: 2500 };
+  // No thinking: each step is a small JSON choice, and six thinking steps
+  // pushed a turn past its deadline and into the fallback answer.
+  const options = { jsonMode: true, temperature: 0, maxTokens: 2500, reasoning: false };
+  const ask = async (): Promise<string | null> => {
+    const left = BUDGET_MS - (clock() - started);
+    if (left < MIN_CALL_MS) return null;
+    try {
+      return await chat.complete(messages, { ...options, timeoutMs: left });
+    } catch (error) {
+      if (isProviderTimeout(error)) return null;
+      throw error;
+    }
+  };
   const toolContext = {
     access,
     registry,
@@ -187,7 +208,8 @@ export async function runAssistantTurn(
         content: 'No more tools. Answer now with {"action":"answer",...} using what you have found.',
       });
     }
-    const raw = await chat.complete(messages, options);
+    const raw = await ask();
+    if (raw === null) break;
     const step = parseStep(raw);
     messages.push({ role: "assistant", content: raw });
 
@@ -211,9 +233,21 @@ export async function runAssistantTurn(
     messages.push({ role: "user", content: `RESULT (${step.tool}):\n${outcome.text}` });
   }
 
+  // Told to answer, the model sometimes asks for one more tool or breaks the
+  // format. One last call that may only answer, before giving up on it.
+  if (!answer) {
+    messages.push({
+      role: "user",
+      content: 'Answer now. Reply with exactly one {"action":"answer","answer":"…","citations":[…]} object built from the results above. Do not call any tool.',
+    });
+    const raw = await ask();
+    const step = raw === null ? null : parseStep(raw);
+    if (step?.kind === "answer") answer = step;
+  }
+
   const final = answer
     ? finalizeAnswer(answer.answer, answer.citations, answer.general, registry, language)
-    : { content: FALLBACK[language], used: [], general: true };
+    : finalizeAnswer(foundSoFar(registry, language), [], false, registry, language);
   const proposals = answer ? validateAssistantProposals(answer.proposals, registry, anchor, language) : [];
 
   const saved = await prisma.$transaction(async (tx) => {

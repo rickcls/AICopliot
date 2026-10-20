@@ -284,6 +284,38 @@ describe("applyProposal", () => {
     expect(input).toMatchObject({ title: "Send the ABC quote", priority: "urgent", dueDate: null });
   });
 
+  it("creates a waiting task in the project's blocked column", async () => {
+    mockPrisma.captureProposal.findFirst.mockResolvedValue({
+      ...createProposal,
+      payload: { ...createProposal.payload, status: "blocked", projectId: "project-1" },
+    });
+    mockPrisma.project.findFirst.mockResolvedValue({ id: "project-1" });
+    mockPrisma.projectTaskStatus.findMany.mockResolvedValue([
+      { id: "s-open", key: "backlog", category: "open", position: 0 },
+      { id: "s-blocked", key: "blocked", category: "blocked", position: 3 },
+    ]);
+    tx.captureProposal.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.applyProposal(access, "prop-1", {}, NOW);
+
+    expect(result).toMatchObject({ ok: true, taskId: "task-new" });
+    expect(writes.prepareTaskCreate.mock.calls[0][2]).toMatchObject({ statusId: "s-blocked" });
+  });
+
+  it("refuses a new blocked task when the project has no blocked column", async () => {
+    mockPrisma.captureProposal.findFirst.mockResolvedValue({
+      ...createProposal,
+      payload: { ...createProposal.payload, status: "blocked", projectId: "project-1" },
+    });
+    mockPrisma.project.findFirst.mockResolvedValue({ id: "project-1" });
+    mockPrisma.projectTaskStatus.findMany.mockResolvedValue([
+      { id: "s-open", key: "backlog", category: "open", position: 0 },
+    ]);
+
+    expect(await service.applyProposal(access, "prop-1", {}, NOW)).toMatchObject({ ok: false, status: 409 });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("moves a task to its project's done column", async () => {
     mockPrisma.captureProposal.findFirst.mockResolvedValue({
       id: "prop-2",

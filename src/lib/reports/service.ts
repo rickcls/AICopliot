@@ -2,6 +2,9 @@ import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
+import { toTraditional } from "@/lib/language-convert";
+import { detectReplyLanguage, languageDirective, type ReplyLanguage } from "@/lib/language";
+import { failStaleRuns } from "@/lib/generation/stale-runs";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { getChatProvider, type ChatProvider } from "@/lib/providers";
 import type { ChatMessageInput } from "@/lib/providers/types";
@@ -13,11 +16,21 @@ import {
   buildDeterministicStatusReport,
   buildReportGroundingSources,
   hasReportableData,
+  type ProjectHealth,
   type SavedStatusReport,
   type StatusReportSourceData,
 } from "./status-report";
 
-const STATUS_REPORT_PROMPT_VERSION = "status-report-v1";
+const STATUS_REPORT_PROMPT_VERSION = "status-report-v2";
+
+/**
+ * The words the narrative must use for the derived health — in Chinese, the
+ * same words the report's health badge shows, so the two cannot disagree.
+ */
+const HEALTH_WORDS: Record<ReplyLanguage, Record<ProjectHealth, string>> = {
+  en: { green: "green", amber: "amber", red: "red" },
+  "zh-Hant": { green: "進展正常", amber: "需要留意", red: "有風險" },
+};
 
 const STATUS_REPORT_SYSTEM_PROMPT = `You are ScopePilot, an AI project delivery copilot.
 
@@ -26,7 +39,7 @@ Write only a concise executive narrative for a weekly project status report. The
 Rules:
 1. Use only the supplied CURRENT PROJECT DATA sources. Never use outside knowledge.
 2. Every factual sentence must be supported by a cited opaque source label.
-3. State the supplied derived health exactly; do not recalculate or change it.
+3. Open with one sentence that states the supplied derived health in the exact words given, citing the PROJECT SNAPSHOT. Do not recalculate or change it.
 4. Prioritize completed work, blockers/overdue work, active risks, and the next seven days.
 5. Exact aggregate counts come from the PROJECT SNAPSHOT. A detailed source list may be marked partial; never describe it as complete when it is partial.
 6. If the sources are insufficient, set insufficientContext to true. Never invent work, dates, owners, or risks.
@@ -53,6 +66,40 @@ export interface GenerateStatusReportInput {
   workspaceId: string;
   projectId: string;
   userId: string;
+  /** The requester's language, used when the records themselves show none. */
+  language?: ReplyLanguage;
+}
+
+interface NarrativeCheck {
+  answer: string;
+  citations: Array<{ kind: string }>;
+}
+
+/**
+ * Why a cited narrative cannot be saved, in words the model can act on, or
+ * null when it can. Pure, so the rules are tested without a model.
+ */
+export function narrativeProblem(
+  narrative: NarrativeCheck,
+  health: ProjectHealth,
+  hasDetailedReportItems: boolean,
+  language: ReplyLanguage,
+): string | null {
+  const problems: string[] = [];
+  if (!narrative.citations.some((citation) => citation.kind === "project_snapshot")) {
+    problems.push("Cite the PROJECT SNAPSHOT label for the health and the counts.");
+  }
+  if (
+    hasDetailedReportItems &&
+    !narrative.citations.some((citation) => citation.kind !== "project_snapshot")
+  ) {
+    problems.push("Cite at least one task, milestone, risk, or dependency label for the work you describe.");
+  }
+  const word = HEALTH_WORDS[language][health];
+  if (!narrative.answer.toLocaleLowerCase().includes(word.toLocaleLowerCase())) {
+    problems.push(`State the health in the narrative with the exact words "${word}".`);
+  }
+  return problems.length > 0 ? problems.join(" ") : null;
 }
 
 export interface GenerateStatusReportDeps {
@@ -196,6 +243,8 @@ async function completeNarrative(
       jsonMode: true,
       temperature: 0,
       maxTokens: 1400,
+      // A thinking model spent all 1,400 tokens thinking and returned nothing.
+      reasoning: false,
     });
   } catch {
     throw new StatusReportRequestError(
@@ -219,8 +268,19 @@ export async function generateStatusReport(
   }
 
   const deterministic = buildDeterministicStatusReport(data, now);
+  // The narrative follows the records' own language, like every other reply.
+  const language = detectReplyLanguage(
+    [
+      ...data.tasks.map((task) => task.title),
+      ...data.milestones.map((milestone) => milestone.title),
+      ...data.risks.map((risk) => risk.description),
+    ].join("\n"),
+    input.language ?? "en",
+  );
+  const healthWord = HEALTH_WORDS[language][deterministic.health];
   const sources = buildReportGroundingSources(deterministic);
   const { contextBlock, sourceMap, groundingSources } = buildCombinedContext([], sources);
+  await failStaleRuns(input.workspaceId, input.projectId, "status_report", now);
   const startedAt = Date.now();
   const run = await prisma.generationRun.create({
     data: {
@@ -261,7 +321,7 @@ export async function generateStatusReport(
       {
         role: "user" as const,
         content: buildUserMessage(
-          `Write the executive narrative for the ${deterministic.period.start} through ${deterministic.period.end} weekly report. The derived health is ${deterministic.health}.`,
+          `Write the executive narrative for the ${deterministic.period.start} through ${deterministic.period.end} weekly report. The derived health is ${deterministic.health}; state it in the narrative as "${healthWord}".\nOUTPUT LANGUAGE: ${languageDirective(language)}`,
           contextBlock,
         ),
       },
@@ -293,18 +353,6 @@ export async function generateStatusReport(
       );
     }
 
-    const validated = validateAnswer(parsed, sourceMap, {
-      refusalText: "The current project records do not support a weekly narrative.",
-    });
-    if (validated.refused) {
-      throw new StatusReportRequestError(
-        "The model did not provide a cited status report narrative.",
-        502,
-      );
-    }
-    const citations = validated.citations.filter(
-      (citation): citation is ProjectCitation => citation.kind !== "document",
-    );
     const hasDetailedReportItems =
       deterministic.counts.completedTasksInPeriod +
         deterministic.counts.completedMilestonesInPeriod +
@@ -314,22 +362,57 @@ export async function generateStatusReport(
         deterministic.counts.activeRisks +
         deterministic.counts.dependencyBlockers >
       0;
-    if (
-      citations.length === 0 ||
-      !citations.some((citation) => citation.kind === "project_snapshot") ||
-      (hasDetailedReportItems &&
-        !citations.some((citation) => citation.kind !== "project_snapshot")) ||
-      !validated.answer.toLocaleLowerCase().includes(deterministic.health)
-    ) {
+    const check = (candidate: NonNullable<typeof parsed>) => {
+      const validated = validateAnswer(candidate, sourceMap, {
+        refusalText: "The current project records do not support a weekly narrative.",
+      });
+      const citations = validated.citations.filter(
+        (citation): citation is ProjectCitation => citation.kind !== "document",
+      );
+      const problem = validated.refused
+        ? "Cite the supplied labels for every factual sentence."
+        : narrativeProblem(
+            // Compared after conversion: a model that wrote 进展 for 進展 has
+            // still stated the health.
+            { answer: language === "zh-Hant" ? toTraditional(validated.answer) : validated.answer, citations },
+            deterministic.health,
+            hasDetailedReportItems,
+            language,
+          );
+      return { validated, citations, problem };
+    };
+
+    let narrative = check(parsed);
+    // A narrative that left out the health word or a citation used to fail
+    // the whole report. One correction that names what is missing first.
+    if (narrative.problem) {
+      const retry = await completeNarrative(chat, [
+        ...messages,
+        { role: "assistant" as const, content: attempts.at(-1) ?? "" },
+        { role: "user" as const, content: `${narrative.problem} Reply with ONLY the corrected JSON object.` },
+      ]);
+      attempts.push(retry);
+      const reparsed = parseModelNarrative(retry);
+      if (reparsed) narrative = check(reparsed);
+    }
+    if (narrative.validated.refused) {
+      throw new StatusReportRequestError(
+        "The model did not provide a cited status report narrative.",
+        502,
+      );
+    }
+    if (narrative.problem) {
       throw new StatusReportRequestError(
         "The model did not provide a snapshot-cited narrative with the derived health.",
         502,
       );
     }
+    const { validated, citations } = narrative;
 
     const report: SavedStatusReport = {
       ...deterministic,
-      narrative: validated.answer,
+      // Generated prose only; the cited quotes keep the records' characters.
+      narrative: language === "zh-Hant" ? toTraditional(validated.answer) : validated.answer,
       confidence: validated.confidence,
       citations,
     };
@@ -392,6 +475,7 @@ function serializeStatusReportRun(row: {
 }
 
 export async function listStatusReports(workspaceId: string, projectId: string) {
+  await failStaleRuns(workspaceId, projectId, "status_report");
   const rows = await prisma.generationRun.findMany({
     where: { workspaceId, projectId, type: "status_report" },
     orderBy: { createdAt: "desc" },

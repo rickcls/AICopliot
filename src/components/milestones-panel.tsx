@@ -1,6 +1,7 @@
 "use client";
 
 import { type TracedRequirementRow } from "@/components/task-types";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import {
@@ -100,6 +101,10 @@ export function MilestonesPanel({
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
+  // The Gantt, calendar, and progress counts above are server-rendered from
+  // the same milestones; without a refresh a new one showed in this list and
+  // nowhere on the chart until the page was reloaded.
+  const router = useRouter();
   const t = useT();
   const dateLocale = useDateLocale();
   const timeZone = useTimeZone();
@@ -151,6 +156,7 @@ export function MilestonesPanel({
       upsert(data.milestone);
       setDraft(null);
       setEditingId(null);
+      router.refresh();
     } catch {
       setError(t("common.couldNotReach"));
     } finally {
@@ -173,6 +179,7 @@ export function MilestonesPanel({
         return;
       }
       upsert(data.milestone);
+      router.refresh();
     } catch {
       setError(t("common.couldNotReach"));
     } finally {
@@ -203,6 +210,7 @@ export function MilestonesPanel({
         previous.filter((item) => item.id !== milestone.id),
       );
       toast.success(t("milestones.deleted", { title: milestone.title }));
+      router.refresh();
     } catch {
       setError(t("common.couldNotReach"));
     } finally {

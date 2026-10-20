@@ -8,7 +8,7 @@ const fakes = vi.hoisted(() => {
   const prisma = {
     document: { findMany: vi.fn() },
     requirement: { findMany: vi.fn() },
-    generationRun: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+    generationRun: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   };
   return {
@@ -35,6 +35,7 @@ vi.mock("@/lib/generation/context", () => ({
 import { generateRequirements } from "@/lib/generation/requirements-service";
 import { GenerationRequestError } from "@/lib/generation/service";
 import { REQUIREMENTS_QUERIES } from "@/lib/generation/requirements-prompt";
+import { STALE_RUN_MS } from "@/lib/generation/stale-runs";
 
 const chunk = {
   id: "chunk-real-id",
@@ -115,6 +116,25 @@ beforeEach(() => {
   fakes.prisma.$transaction.mockImplementation(
     async (operation: (tx: typeof fakes.tx) => unknown) => operation(fakes.tx),
   );
+});
+
+describe("a run left processing by a killed request", () => {
+  it("is failed before the active-run check, so it no longer blocks extraction", async () => {
+    await generateRequirements(input, { chat: chatWith(validOutput), embeddings });
+
+    const sweep = fakes.prisma.generationRun.updateMany.mock.calls[0][0];
+    expect(sweep.where).toMatchObject({
+      workspaceId: "workspace-1",
+      projectId: "project-1",
+      type: "requirements",
+      status: "processing",
+    });
+    expect(Date.now() - sweep.where.createdAt.lt.getTime()).toBeGreaterThanOrEqual(STALE_RUN_MS);
+    expect(sweep.data).toMatchObject({ status: "failed" });
+    expect(fakes.prisma.generationRun.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      fakes.prisma.generationRun.findFirst.mock.invocationCallOrder[0],
+    );
+  });
 });
 
 describe("generateRequirements against an existing register", () => {
