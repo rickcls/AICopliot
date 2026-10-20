@@ -114,7 +114,7 @@ export async function planMyDay(
       }),
     },
   ];
-  const options = { jsonMode: true, temperature: 0, maxTokens: 3000 };
+  const options = { jsonMode: true, temperature: 0, maxTokens: 3000, reasoning: false };
 
   let raw = await chat.complete(messages, options);
   let model = parsePlan(raw);

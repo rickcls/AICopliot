@@ -67,6 +67,27 @@ export const TASK_REFUSAL_TEXT =
   "I couldn't find enough supporting evidence in this task, its documents, or its linked records.";
 
 /**
+ * The refusal in the question's language. A Chinese question that got the
+ * English sentence back read as a broken app rather than as "not in your
+ * files", so the scope's refusal is chosen the way every reply language is.
+ */
+export const REFUSAL_TEXTS: Record<
+  "en" | "zh-Hant",
+  { documents: string; project: string; task: string }
+> = {
+  en: {
+    documents: REFUSAL_TEXT,
+    project: PROJECT_REFUSAL_TEXT,
+    task: TASK_REFUSAL_TEXT,
+  },
+  "zh-Hant": {
+    documents: "你的文件中找不到這方面的資料。",
+    project: "此專案的文件和目前記錄中，找不到足夠資料回答這個問題。",
+    task: "這項工作、它的文件和相關記錄中，找不到足夠資料回答這個問題。",
+  },
+};
+
+/**
  * A thread focused on one task. The rules are project chat's, narrowed to one
  * record, plus the one thing only this scope may do: propose edits. A proposal
  * is data for an Apply button, never a claim that anything changed — the

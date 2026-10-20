@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { errorMessageFor, handleRouteError } from "@/lib/api";
-import { requireWorkspace } from "@/lib/auth-guard";
+import { getUserPreferences, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { isProviderTimeout } from "@/lib/providers";
 import { answerFocusFor, resolveNewThreadScope, type ResolvedScope } from "@/lib/chat/focus";
 import { answerQuestion } from "@/lib/rag/answer";
 import { askQuestionSchema } from "@/lib/schemas";
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
       conversationTitle = created.title;
     }
     const { projectId, groundingScope } = scope;
+    const fallbackLanguage =
+      (await getUserPreferences(user.id))?.locale === "en" ? ("en" as const) : ("zh-Hant" as const);
     const focus = await answerFocusFor(workspaceId, scope);
 
     // Load prior turns before writing the new one, so the history passed to the
@@ -172,6 +175,7 @@ export async function POST(request: Request) {
               projectId,
               groundingScope,
               focus,
+              fallbackLanguage,
               history: priorTurns.toReversed().map((turn) => ({
                 role: turn.role,
                 content: turn.content,
@@ -230,7 +234,11 @@ export async function POST(request: Request) {
             });
           } catch (error) {
             console.error("[POST /api/chat] stream", error);
-            send("error", { error: errorMessageFor(error) });
+            // The code lets the browser say it in the viewer's language.
+            send("error", {
+              error: errorMessageFor(error),
+              ...(isProviderTimeout(error) ? { code: "timeout" } : {}),
+            });
           } finally {
             clearInterval(heartbeat);
             if (!closed) {

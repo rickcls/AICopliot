@@ -39,6 +39,8 @@ export interface CreateTaskPayload {
   description: string | null;
   projectId: string | null;
   priority: TaskPriority | null;
+  /** Set only when the cited lines say the work is waiting. */
+  status: "blocked" | null;
   dueDate: string | null;
   duePhrase: string | null;
   estimatedHours: number | null;
@@ -107,6 +109,16 @@ function duplicateKey(title: string): string {
 
 function prose(text: string, language: ReplyLanguage): string {
   return language === "zh-Hant" ? toTraditional(text) : text;
+}
+
+/**
+ * The waiting phrases rule 8 of the prompt treats as blocked. The model's
+ * status is kept only when one of them is actually in the cited lines.
+ */
+const WAITING = /等緊|卡住|未有回覆|\bwaiting for\b|\bblocked\b|\bon hold\b/i;
+
+function citedStatesWaiting(text: string): boolean {
+  return WAITING.test(text);
 }
 
 /**
@@ -191,6 +203,7 @@ export function validateCaptureProposals(
           description: proposal.description ? prose(proposal.description, ctx.language) : null,
           projectId: proposal.project ? (ctx.projects.get(proposal.project) ?? null) : null,
           priority: proposal.priority,
+          status: proposal.status === "blocked" && citedStatesWaiting(citedText) ? "blocked" : null,
           dueDate,
           duePhrase,
           estimatedHours: estimate,

@@ -79,13 +79,25 @@ const STOP_WORDS = new Set([
   "with",
 ]);
 
+const HAN_RUN = /\p{Script=Han}+/gu;
+
+/**
+ * Words, plus Chinese character pairs. Written Chinese has no spaces, so
+ * without the pairs a whole Chinese question was one token that matched no
+ * record at all.
+ */
 function tokens(value: string): Set<string> {
-  return new Set(
-    value
-      .toLocaleLowerCase()
+  const lower = value.toLocaleLowerCase();
+  const out = new Set(
+    lower
+      .replace(HAN_RUN, " ")
       .match(/[\p{L}\p{N}_-]+/gu)
       ?.filter((token) => token.length > 1 && !STOP_WORDS.has(token)) ?? [],
   );
+  for (const run of lower.match(HAN_RUN) ?? []) {
+    for (let i = 0; i + 1 < run.length; i++) out.add(run.slice(i, i + 2));
+  }
+  return out;
 }
 
 function overlapScore(queryTokens: Set<string>, text: string): number {
@@ -445,25 +457,25 @@ function sourceScore(
 
   if (
     source.kind === "task" &&
-    includesAny(question, ["task", "work", "action", "assignee", "owner", "who"])
+    includesAny(question, ["task", "work", "action", "assignee", "owner", "who", "工作", "任務", "待辦", "負責", "邊個", "誰"])
   ) {
     score += 2;
   }
   if (
     source.kind === "milestone" &&
-    includesAny(question, ["milestone", "target", "delivery", "phase"])
+    includesAny(question, ["milestone", "target", "delivery", "phase", "里程碑", "交付", "階段"])
   ) {
     score += 2;
   }
   if (
     source.kind === "risk" &&
-    includesAny(question, ["risk", "mitigation", "impact", "likelihood"])
+    includesAny(question, ["risk", "mitigation", "impact", "likelihood", "風險", "緩解", "影響"])
   ) {
     score += 3;
   }
   if (
     source.kind === "dependency" &&
-    includesAny(question, ["block", "depend", "prerequisite", "before", "uat"])
+    includesAny(question, ["block", "depend", "prerequisite", "before", "uat", "受阻", "卡住", "依賴", "前置"])
   ) {
     score += 4;
   }
@@ -478,6 +490,11 @@ function sourceScore(
       "agreed",
       "stakeholder",
       "criteria",
+      "需求",
+      "範圍",
+      "驗收",
+      "必須",
+      "議定",
     ])
   ) {
     score += 4;
@@ -487,17 +504,17 @@ function sourceScore(
   if (
     source.kind === "requirement" &&
     source.snapshot.covered === false &&
-    includesAny(question, ["uncovered", "no task", "not covered", "coverage", "gap"])
+    includesAny(question, ["uncovered", "no task", "not covered", "coverage", "gap", "未覆蓋", "覆蓋", "缺口", "沒有工作", "未有工作"])
   ) {
     score += 6;
   }
 
   const status = String(source.snapshot.status ?? "");
-  if (includesAny(question, ["block", "stuck"]) && status === "blocked") score += 6;
-  if (includesAny(question, ["complete", "done", "finished"])) {
+  if (includesAny(question, ["block", "stuck", "受阻", "卡住"]) && status === "blocked") score += 6;
+  if (includesAny(question, ["complete", "done", "finished", "完成", "做完", "搞掂"])) {
     if (status === "done" || status === "completed") score += 4;
   }
-  if (includesAny(question, ["open", "active", "current", "status", "progress"])) {
+  if (includesAny(question, ["open", "active", "current", "status", "progress", "進度", "狀態", "目前"])) {
     score += 1;
   }
 
@@ -515,10 +532,10 @@ function sourceScore(
         : false;
   if (dateValue) {
     const dated = { date: new Date(`${dateValue}T00:00:00.000Z`), open };
-    if (includesAny(question, ["overdue", "late", "past due"]) && isOverdue(dated, now)) {
+    if (includesAny(question, ["overdue", "late", "past due", "逾期", "過期", "遲咗"]) && isOverdue(dated, now)) {
       score += 6;
     }
-    if (includesAny(question, ["week", "upcoming", "due", "next"]) && isDueWithinDays(dated, now)) {
+    if (includesAny(question, ["week", "upcoming", "due", "next", "星期", "到期", "下週", "快到"]) && isDueWithinDays(dated, now)) {
       score += 4;
     }
   }

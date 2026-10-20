@@ -15,6 +15,7 @@ import {
   PROJECT_PLAN_SYSTEM_PROMPT,
 } from "./prompt";
 import { isoDayToDate, modelProjectPlanSchema } from "./schemas";
+import { failStaleRuns } from "./stale-runs";
 import {
   PlanValidationError,
   validateProjectPlan,
@@ -93,6 +94,7 @@ export async function generateProjectPlan(
     );
   }
 
+  await failStaleRuns(workspaceId, projectId, "project_plan");
   const active = await prisma.generationRun.findFirst({
     where: {
       workspaceId,
@@ -173,10 +175,13 @@ export async function generateProjectPlan(
     ];
 
     attempts.push(
+      // No thinking: it spent the whole budget before any JSON was written
+      // and took the call past Vercel's 60-second limit.
       await chat.complete(baseMessages, {
         jsonMode: true,
         temperature: 0,
         maxTokens: 6000,
+        reasoning: false,
       }),
     );
     let parsed = parsePlan(attempts[0]);
@@ -195,7 +200,7 @@ export async function generateProjectPlan(
                 "That reply did not match the required JSON contract. Correct it and reply with only one valid JSON object. Do not add proposals unless they are cited to a supplied S label.",
             },
           ],
-          { jsonMode: true, temperature: 0, maxTokens: 6000 },
+          { jsonMode: true, temperature: 0, maxTokens: 6000, reasoning: false },
         ),
       );
       parsed = parsePlan(attempts[1]);
@@ -629,6 +634,7 @@ export function sanitizeReviewSummary(value: unknown) {
 }
 
 export async function getProjectPlanRuns(workspaceId: string, projectId: string) {
+  await failStaleRuns(workspaceId, projectId, "project_plan");
   const runs = await prisma.generationRun.findMany({
     where: { workspaceId, projectId, type: "project_plan" },
     orderBy: { createdAt: "desc" },

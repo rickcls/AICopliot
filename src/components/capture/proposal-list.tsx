@@ -64,7 +64,7 @@ function effective(proposal: CaptureProposalView, draft: ProposalOverrides) {
         projectId: draft.projectId ?? proposal.payload.projectId,
         dueDate: draft.dueDate !== undefined ? draft.dueDate : proposal.payload.dueDate,
         priority: draft.priority !== undefined ? draft.priority : proposal.payload.priority,
-        status: null,
+        status: draft.status !== undefined ? draft.status : proposal.payload.status,
         note: null,
       };
     case "update_task":

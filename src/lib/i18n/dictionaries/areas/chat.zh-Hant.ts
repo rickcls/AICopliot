@@ -33,6 +33,7 @@ export const chatZhHant = {
       failed: "無法取得答案。",
       ended: "答案傳送意外中斷。",
       unreachable: "無法連接伺服器，請再試一次。",
+      timeout: "模型回覆太慢，已經停止。請再問一次。",
     },
     rail: {
       label: "對話",

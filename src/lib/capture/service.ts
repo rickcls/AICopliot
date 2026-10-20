@@ -15,6 +15,7 @@ import { modelCaptureSchema, type ProposalOverrides } from "@/lib/capture/schema
 import { validateCaptureProposals } from "@/lib/capture/validate";
 import { prisma } from "@/lib/db";
 import { extractJsonObject } from "@/lib/generation/prompt";
+import { STALE_RUN_MESSAGE, STALE_RUN_MS } from "@/lib/generation/stale-runs";
 import { detectReplyLanguage } from "@/lib/language";
 import { getOrCreatePersonalProject } from "@/lib/pm/personal-project";
 import { storeDocument } from "@/lib/documents/store";
@@ -101,6 +102,17 @@ export async function listCaptures(
     pendingOnly = false,
   }: { before?: Date; limit?: number; pendingOnly?: boolean } = {},
 ) {
+  // A note still processing this long after its last write lost its request
+  // (see STALE_RUN_MS). Failing it brings back its Retry button; `updatedAt`,
+  // not `createdAt`, because a retry reuses the row.
+  await prisma.capture.updateMany({
+    where: {
+      ...scope(access),
+      status: "processing",
+      updatedAt: { lt: new Date(Date.now() - STALE_RUN_MS) },
+    },
+    data: { status: "failed", errorMessage: STALE_RUN_MESSAGE },
+  });
   return prisma.capture.findMany({
     where: {
       ...scope(access),
@@ -230,7 +242,7 @@ export async function proposeForCapture(
         }),
       },
     ];
-    const options = { jsonMode: true, temperature: 0, maxTokens: 3000 };
+    const options = { jsonMode: true, temperature: 0, maxTokens: 3000, reasoning: false };
 
     let raw = await chat.complete(messages, options);
     let proposals = parseProposals(raw);

@@ -146,4 +146,29 @@ describe("live project grounding context", () => {
       partial: true,
     });
   });
+
+  it("selects records for a question asked in Chinese", async () => {
+    mockPrisma.projectRisk.findMany.mockResolvedValue([
+      {
+        id: "risk-1",
+        description: "Vendor may miss the cut-over window",
+        impact: "high",
+        likelihood: "medium",
+        mitigation: null,
+        status: "open",
+        milestone: null,
+      },
+    ]);
+    mockPrisma.task.findMany.mockResolvedValue([
+      { ...task("quote"), title: "準備 ABC 報價" },
+      task("other"),
+    ]);
+
+    const risks = await getProjectGroundingContext("ws-1", "project-1", "這個專案的主要風險是甚麼？");
+    expect(risks.sources.map((source) => source.kind)).toContain("risk");
+
+    // Character pairs match a Chinese title without any spaces to split on.
+    const quote = await getProjectGroundingContext("ws-1", "project-1", "報價幾時要交？");
+    expect(quote.sources.slice(1).map((source) => source.title)).toEqual(["準備 ABC 報價"]);
+  });
 });

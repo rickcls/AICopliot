@@ -28,7 +28,7 @@ vi.mock("@/lib/env", () => ({
 }));
 
 const { answerQuestion } = await import("@/lib/rag/answer");
-const { REFUSAL_TEXT } = await import("@/lib/rag/prompt");
+const { REFUSAL_TEXT, REFUSAL_TEXTS } = await import("@/lib/rag/prompt");
 
 function chunk(id: string, score: number): RetrievedChunk {
   return {
@@ -120,6 +120,19 @@ describe("retrieval gate — refusing before the model is called", () => {
     expect(result.citations).toEqual([]);
   });
 
+  it("refuses in the question's language", async () => {
+    retrieveChunks.mockResolvedValue([]);
+    const chat = chatReturning({ answer: "nope" });
+
+    const chinese = await answerQuestion("ws-1", "ABC 公司的年營業額是多少？", { embeddings, chat });
+    expect(chinese.answer).toBe(REFUSAL_TEXTS["zh-Hant"].documents);
+
+    // A question with no language of its own follows the viewer's.
+    const bare = await answerQuestion("ws-1", "2026 ？", { embeddings, chat, fallbackLanguage: "zh-Hant" });
+    expect(bare.answer).toBe(REFUSAL_TEXTS["zh-Hant"].documents);
+    expect(chat.complete).not.toHaveBeenCalled();
+  });
+
   it("refuses when retrieval returns nothing at all", async () => {
     retrieveChunks.mockResolvedValue([]);
     const chat = chatReturning({ answer: "nope" });
@@ -166,6 +179,13 @@ describe("retrieval gate — refusing before the model is called", () => {
     expect(result.answer).toBe("Restart the service.");
     // Only the chunk that cleared the threshold is sent to the model.
     expect(result.retrievedChunkIds).toEqual(["c1"]);
+    // No thinking, and a limit that leaves time to save inside 60 seconds.
+    const options = (chat.complete.mock.calls[0] as unknown[])[1] as {
+      reasoning?: boolean;
+      timeoutMs?: number;
+    };
+    expect(options.reasoning).toBe(false);
+    expect(options.timeoutMs).toBeLessThanOrEqual(50_000);
   });
 
   it("calls the model for an exact lexical match below the semantic threshold", async () => {
@@ -294,6 +314,33 @@ describe("malformed model output", () => {
     expect(chat.complete).toHaveBeenCalledTimes(2);
     expect(result.refused).toBe(true);
     expect(result.answer).toBe(REFUSAL_TEXT);
+  });
+
+  it("skips the repair when the first call used up the time budget", async () => {
+    retrieveChunks.mockResolvedValue([chunk("c1", 0.9)]);
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    const chat = {
+      modelName: "fake-chat",
+      complete: vi.fn(async () => {
+        clock.mockReturnValue(start + 45_000);
+        return "not json at all";
+      }),
+    };
+
+    try {
+      const result = await answerQuestion("ws-1", "question", {
+        embeddings,
+        chat,
+        minScore: 0.25,
+      });
+      // A repair could not finish before the request is killed, so the
+      // answer is refused and saved instead of lost.
+      expect(chat.complete).toHaveBeenCalledTimes(1);
+      expect(result.refused).toBe(true);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("recovers JSON wrapped in a markdown fence", async () => {

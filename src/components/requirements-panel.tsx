@@ -17,8 +17,10 @@ import {
   FileText,
   Grid3x3,
   ListChecks,
+  Paperclip,
   Sparkles,
 } from "lucide-react";
+import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
 import { TraceabilityMatrix } from "@/components/traceability-matrix";
 import {
   Badge,
@@ -400,6 +402,10 @@ export function RequirementsPanel({
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExtract, setShowExtract] = useState(initialRequirements.length === 0);
+  // Starts from the server's list and grows with uploads made here, so a
+  // client brief can be added and extracted from without leaving the page.
+  const [documents, setDocuments] = useState(readyDocuments);
+  const [uploading, setUploading] = useState<string | null>(null);
   const [documentIds, setDocumentIds] = useState<Set<string>>(
     () =>
       new Set(
@@ -674,6 +680,88 @@ export function RequirementsPanel({
     }
   }
 
+  /**
+   * The ordinary upload route and indexing, then the document is selected.
+   * Labelling runs afterwards and is not waited on: extraction reads the
+   * indexed text, not the label.
+   */
+  async function uploadForExtraction(file: File) {
+    setUploading(file.name);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("projectId", projectId);
+      const response = await fetch("/api/documents", { method: "POST", body: formData });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(
+          data.error ??
+            (response.status === 413 ? t("tasks.documents.tooLarge") : t("tasks.documents.uploadFailed")),
+        );
+        return;
+      }
+      const processed = await fetch(`/api/documents/${data.id}/process`, { method: "POST" })
+        .then((result) => result.json())
+        .catch(() => ({ status: "failed" }));
+      if (processed.status !== "ready") {
+        setError(
+          t("requirements.extract.uploadFailed", {
+            name: file.name,
+            reason: processed.error ?? t("tasks.documents.uploadFailed"),
+          }),
+        );
+        return;
+      }
+      void fetch(`/api/documents/${data.id}/label`, { method: "POST" }).catch(() => {});
+      setDocuments((current) => [
+        ...current,
+        { id: data.id, originalFilename: file.name, chunkCount: processed.chunkCount ?? 0 },
+      ]);
+      setDocumentIds((current) =>
+        current.size < MAX_DOCUMENTS ? new Set([...current, data.id]) : current,
+      );
+    } catch {
+      setError(t("tasks.documents.uploadRetry"));
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  const uploadControl = (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      <label
+        className={buttonClasses({
+          variant: "secondary",
+          size: "sm",
+          className: cn(
+            "cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-slate-900",
+            (uploading !== null || extracting) && "pointer-events-none opacity-50",
+          ),
+        })}
+      >
+        {uploading ? <Spinner className="size-3.5" /> : <Paperclip className="size-3.5" aria-hidden />}
+        {t("requirements.extract.upload")}
+        <input
+          type="file"
+          accept={SUPPORTED_EXTENSIONS.join(",")}
+          className="sr-only"
+          disabled={uploading !== null || extracting}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void uploadForExtraction(file);
+          }}
+        />
+      </label>
+      <span className="text-xs text-slate-500">
+        {uploading
+          ? t("requirements.extract.uploading", { name: uploading })
+          : t("requirements.extract.uploadHint")}
+      </span>
+    </span>
+  );
+
   async function extract() {
     if (extracting || documentIds.size === 0) return;
     setExtracting(true);
@@ -745,11 +833,11 @@ export function RequirementsPanel({
               {t("requirements.extract.title")}
             </span>
             <span className="block text-xs text-slate-500">
-              {readyDocuments.length === 0
+              {documents.length === 0
                 ? t("requirements.extract.noDocuments")
                 : t("requirements.extract.selected", {
                     selected: documentIds.size,
-                    count: readyDocuments.length,
+                    count: documents.length,
                   })}
               {activeRun ? ` · ${t("requirements.extract.awaiting")}` : ""}
             </span>
@@ -771,25 +859,28 @@ export function RequirementsPanel({
                 : null}
             </p>
 
-            {readyDocuments.length === 0 ? (
+            {documents.length === 0 ? (
               <div className="mt-4">
                 <EmptyState
                   title={t("requirements.extract.emptyTitle")}
                   description={t("requirements.extract.emptyBody")}
                   action={
-                    <Link
-                      className="text-sm font-medium text-blue-700 hover:underline"
-                      href={`/projects/${projectId}/documents`}
-                    >
-                      {t("requirements.extract.openDocuments")}
-                    </Link>
+                    <span className="flex flex-col items-center gap-2">
+                      {uploadControl}
+                      <Link
+                        className="text-sm font-medium text-blue-700 hover:underline"
+                        href={`/projects/${projectId}/documents`}
+                      >
+                        {t("requirements.extract.openDocuments")}
+                      </Link>
+                    </span>
                   }
                 />
               </div>
             ) : (
               <>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {readyDocuments.map((document) => (
+                  {documents.map((document) => (
                     <label
                       key={document.id}
                       className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-2.5 text-sm hover:border-slate-300"
@@ -822,12 +913,15 @@ export function RequirementsPanel({
                   ))}
                 </div>
 
+                <div className="mt-3">{uploadControl}</div>
+
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <Button
                     type="button"
                     onClick={() => void extract()}
                     disabled={
                       extracting ||
+                      uploading !== null ||
                       Boolean(activeRun) ||
                       documentIds.size === 0 ||
                       documentIds.size > MAX_DOCUMENTS

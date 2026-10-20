@@ -2,7 +2,12 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { AuthError, getUserPreferences, type SessionUser, type WorkspaceAccess } from "@/lib/auth-guard";
 import type { ProposalOverrides } from "@/lib/capture/schemas";
-import type { AddNotePayload, CreateTaskPayload, UpdateTaskPayload } from "@/lib/capture/validate";
+import type {
+  AddNotePayload,
+  CreateTaskPayload,
+  ProposalStatus,
+  UpdateTaskPayload,
+} from "@/lib/capture/validate";
 import { prisma } from "@/lib/db";
 import { getOrCreatePersonalProject } from "@/lib/pm/personal-project";
 import { officialRecordWhere } from "@/lib/pm/rules";
@@ -53,6 +58,22 @@ function refuse(status: number, error: string): ChangeResult {
   return { ok: false, status, error };
 }
 
+/** The project's column for a proposed status, or a refusal when it has none. */
+async function columnForStatus(
+  workspaceId: string,
+  projectId: string,
+  status: ProposalStatus | null | undefined,
+): Promise<{ ok: true; statusId?: string } | { ok: false; error: string }> {
+  if (!status) return { ok: true };
+  const statuses = await prisma.projectTaskStatus.findMany({
+    where: { workspaceId, projectId },
+    select: { id: true, key: true, category: true, position: true },
+  });
+  const picked = pickStatusForCategory(statuses, status);
+  if (!picked) return { ok: false, error: `This project has no column for ${status} work` };
+  return { ok: true, statusId: picked.id };
+}
+
 async function inTransaction<T>(
   hooks: ClaimHooks,
   write: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -86,6 +107,10 @@ export async function applyChange(
           );
       if (!project) return refuse(404, "Project not found");
 
+      const status = overrides.status !== undefined ? overrides.status : payload.status;
+      const column = await columnForStatus(access.workspaceId, project.id, status);
+      if (!column.ok) return refuse(409, column.error);
+
       const parsed = createTaskSchema.safeParse({
         title: overrides.title ?? payload.title,
         description: overrides.description !== undefined ? overrides.description : payload.description,
@@ -93,6 +118,7 @@ export async function applyChange(
         assigneeId: access.userId,
         estimatedHours: payload.estimatedHours,
         dueDate: overrides.dueDate !== undefined ? overrides.dueDate : payload.dueDate,
+        ...(column.statusId ? { statusId: column.statusId } : {}),
         // A task can only link a document in its own project.
         ...(change.document && change.document.projectId === project.id
           ? { documentIds: [change.document.id] }
@@ -144,19 +170,11 @@ export async function applyChange(
     });
     if (!target) return refuse(404, "The task no longer exists");
 
-    let statusId: string | undefined;
-    if (status) {
-      const statuses = await prisma.projectTaskStatus.findMany({
-        where: { workspaceId: access.workspaceId, projectId: target.projectId },
-        select: { id: true, key: true, category: true, position: true },
-      });
-      const picked = pickStatusForCategory(statuses, status);
-      if (!picked) return refuse(409, `This project has no column for ${status} work`);
-      statusId = picked.id;
-    }
+    const column = await columnForStatus(access.workspaceId, target.projectId, status);
+    if (!column.ok) return refuse(409, column.error);
 
     const parsed = updateTaskSchema.safeParse({
-      ...(statusId ? { statusId } : {}),
+      ...(column.statusId ? { statusId: column.statusId } : {}),
       ...(priority ? { priority } : {}),
       ...(dueDate ? { dueDate } : {}),
     });

@@ -133,6 +133,40 @@ describe("validateCaptureProposals", () => {
     expect(dropped.map((entry) => entry.reason)).toEqual(["noop", "noop"]);
   });
 
+  it("starts a new task blocked only when the cited line says they are waiting", () => {
+    const waiting = splitCaptureLines("等緊Peter覆個contract\n下星期要處理續約");
+    const { proposals } = validateCaptureProposals(
+      [
+        create({
+          title: "跟進 Peter 覆 contract",
+          citations: ["C1"],
+          due: null,
+          project: null,
+          status: "blocked",
+        }),
+        create({
+          title: "處理續約",
+          citations: ["C2"],
+          due: { phrase: "下星期", date: "2026-10-23" },
+          project: null,
+          status: "blocked",
+        }),
+        create({ title: "Send quote to ABC", status: "done" }),
+      ],
+      { ...ctx, lines: waiting.lines },
+    );
+    expect(proposals).toHaveLength(3);
+    expect(proposals[0].kind === "create_task" && proposals[0].payload).toMatchObject({
+      status: "blocked",
+      dueDate: null,
+    });
+    expect(proposals[1].kind === "create_task" && proposals[1].payload).toMatchObject({
+      status: null,
+      dueDate: null,
+    });
+    expect(proposals[2].kind === "create_task" && proposals[2].payload.status).toBeNull();
+  });
+
   it("keeps a real status change on the right task", () => {
     const { proposals } = validateCaptureProposals(
       [{ kind: "update_task", task: "T1", status: "done", priority: null, due: null, citations: ["C2"] }],

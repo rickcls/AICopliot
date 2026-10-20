@@ -6,7 +6,7 @@ import type {
   EmbeddingProvider,
   TranscriptionProvider,
 } from "./types";
-import { ProviderError } from "./types";
+import { PROVIDER_TIMEOUT_STATUS, ProviderError } from "./types";
 
 interface OpenRouterConfig {
   apiKey: string;
@@ -19,11 +19,32 @@ interface OpenRouterConfig {
 const EMBED_BATCH_SIZE = 64;
 const EMBED_CONCURRENCY = 3;
 
+/**
+ * Every call ends by this time unless the caller asks for less. Vercel stops a
+ * function at 60 seconds without a response, which the browser can only report
+ * as "failed before it was saved"; an aborted call is an error a route can name.
+ */
+const DEFAULT_TIMEOUT_MS = 45_000;
+
+function isTimeout(error: unknown) {
+  return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+function timeoutError(timeoutMs: number) {
+  return new ProviderError(
+    `Model provider did not answer within ${Math.round(timeoutMs / 1000)}s`,
+    PROVIDER_TIMEOUT_STATUS,
+  );
+}
+
 async function postJson<T>(
   url: string,
   apiKey: string,
   body: unknown,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
+  // The signal also covers reading the body, so a stalled stream aborts too.
+  const signal = AbortSignal.timeout(timeoutMs);
   let response: Response;
   try {
     response = await fetch(url, {
@@ -35,8 +56,10 @@ async function postJson<T>(
         "X-Title": "ScopePilot",
       },
       body: JSON.stringify(body),
+      signal,
     });
   } catch (cause) {
+    if (isTimeout(cause)) throw timeoutError(timeoutMs);
     const err = cause as Error & { cause?: { code?: string } };
     const detail = err.cause?.code ? `${err.message} (${err.cause.code})` : err.message;
     throw new ProviderError(`Could not reach the model provider: ${detail}`);
@@ -50,7 +73,12 @@ async function postJson<T>(
     );
   }
 
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch (cause) {
+    if (isTimeout(cause)) throw timeoutError(timeoutMs);
+    throw cause;
+  }
 }
 
 interface EmbeddingsResponse {
@@ -123,6 +151,23 @@ interface ChatResponse {
   choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
 }
 
+/**
+ * Models whose thinking cannot be switched off. OpenRouter refuses
+ * `reasoning: { enabled: false }` for them with a 400 but accepts the lowest
+ * effort, which spent no thinking tokens on GLM 5.3 Flash. The off switch is
+ * still tried first because the lowest effort is not off everywhere: DeepSeek
+ * V4 Flash kept thinking at it, and was slower.
+ */
+const mandatoryReasoning = new Set<string>();
+
+function isReasoningMandatory(error: unknown) {
+  return (
+    error instanceof ProviderError &&
+    error.status === 400 &&
+    /reasoning is mandatory/i.test(error.message)
+  );
+}
+
 export class OpenRouterChatProvider implements ChatProvider {
   readonly modelName: string;
 
@@ -134,17 +179,38 @@ export class OpenRouterChatProvider implements ChatProvider {
     messages: ChatMessageInput[],
     options: ChatCompletionOptions = {},
   ): Promise<string> {
-    const json = await postJson<ChatResponse>(
-      `${this.config.baseUrl}/chat/completions`,
-      this.config.apiKey,
-      {
-        model: this.config.model,
-        messages,
-        temperature: options.temperature ?? 0,
-        max_tokens: options.maxTokens ?? 1200,
-        ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
-      },
-    );
+    const { model } = this.config;
+    const send = () =>
+      postJson<ChatResponse>(
+        `${this.config.baseUrl}/chat/completions`,
+        this.config.apiKey,
+        {
+          model,
+          messages,
+          temperature: options.temperature ?? 0,
+          max_tokens: options.maxTokens ?? 1200,
+          ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
+          ...(options.reasoning === false
+            ? {
+                reasoning: mandatoryReasoning.has(model)
+                  ? { effort: "minimal" }
+                  : { enabled: false },
+              }
+            : {}),
+        },
+        options.timeoutMs,
+      );
+
+    let json: ChatResponse;
+    try {
+      json = await send();
+    } catch (error) {
+      if (options.reasoning !== false || mandatoryReasoning.has(model) || !isReasoningMandatory(error)) {
+        throw error;
+      }
+      mandatoryReasoning.add(model);
+      json = await send();
+    }
 
     const choice = json.choices?.[0];
     const content = choice?.message?.content;

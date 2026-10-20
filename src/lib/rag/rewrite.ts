@@ -20,6 +20,11 @@ const MAX_HISTORY_TURNS = 6;
 const MAX_TURN_CHARS = 500;
 /** Longest a rewritten question may be before we assume the model answered. */
 const MIN_REWRITE_BUDGET = 240;
+/**
+ * A slow rewrite is abandoned for the question as typed, which still searches.
+ * Its time comes out of the same 60-second request as the answer.
+ */
+const REWRITE_TIMEOUT_MS = 12_000;
 
 const REWRITE_SYSTEM_PROMPT = `You rewrite follow-up questions so they can be understood on their own.
 
@@ -60,7 +65,9 @@ export async function rewriteQuestion(
           content: `Conversation:\n${recent.join("\n")}\n\nLatest message: ${question}\n\nRewritten standalone question:`,
         },
       ],
-      { temperature: 0, maxTokens: 200 },
+      // A one-line rewrite needs no thinking, and it is the extra call every
+      // follow-up pays for.
+      { temperature: 0, maxTokens: 200, reasoning: false, timeoutMs: REWRITE_TIMEOUT_MS },
     );
 
     const rewritten = raw.trim().replace(/^["']|["']$/g, "");

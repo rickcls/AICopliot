@@ -63,6 +63,10 @@ export const requirementsZhHant = {
       run: "擷取需求草稿",
       running: "仍在擷取中。",
       reviewFirst: "請先審閱上次擷取的草稿，才再擷取。",
+      upload: "上載文件",
+      uploading: "正在上載及索引 {name}…",
+      uploadHint: "文件會加入此專案，並自動選取以供擷取。",
+      uploadFailed: "{name} 無法處理：{reason}",
     },
     register: {
       title: "需求清單",
