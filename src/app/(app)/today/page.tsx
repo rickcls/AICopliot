@@ -16,7 +16,7 @@ import {
   type MyOpenTask,
 } from "@/lib/pm/my-work";
 import { daysSinceActivity, isStale } from "@/lib/pm/rules";
-import { bucketMyTasks } from "@/lib/pm/today";
+import { bucketMyTasks, undatedToShow } from "@/lib/pm/today";
 import { getDayPlan } from "@/lib/today/plan-service";
 import { formatDay } from "@/lib/utils";
 import { getViewerToday } from "@/lib/viewer";
@@ -70,7 +70,11 @@ export default async function TodayPage() {
   const quietLater = buckets.later
     .map((task) => toRow(task, false))
     .filter((row) => row.staleDays !== null);
-  const laterCount = buckets.later.length - quietLater.length;
+  const quietIds = new Set(quietLater.map((row) => row.id));
+  const undatedLater = buckets.later.filter((task) => !quietIds.has(task.id));
+  const undatedCount = undatedLater.filter((task) => task.dueDate === null).length;
+  const undatedRows = undatedToShow(undatedLater).map((task) => toRow(task, false));
+  const laterCount = buckets.later.length - quietLater.length - undatedRows.length;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -103,7 +107,7 @@ export default async function TodayPage() {
         <div className="space-y-6">
           <DayPlanCard initialPlan={plan} />
 
-          {sections.length === 0 && quietLater.length === 0 ? (
+          {sections.length === 0 && quietLater.length === 0 && undatedRows.length === 0 ? (
             <Card className="p-5">
               <h2 className="text-sm font-semibold text-slate-900">
                 {t("today.allClearTitle")}
@@ -127,6 +131,15 @@ export default async function TodayPage() {
               title={`${t("today.needsUpdate")} · ${quietLater.length}`}
               description={t("today.needsUpdateLead")}
               rows={quietLater}
+            />
+          ) : null}
+
+          {undatedRows.length > 0 ? (
+            <TaskSection
+              id="today-undated"
+              title={`${t("today.undatedTitle")} · ${undatedCount}`}
+              description={t("today.undatedLead")}
+              rows={undatedRows}
             />
           ) : null}
 

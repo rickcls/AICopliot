@@ -74,6 +74,7 @@ export default async function ProjectTasksPage({
       initialOpenTaskId={requestedTaskId ?? null}
       initialQuickFilter={parseTaskQuickFilter(filterParam)}
       nowIso={(await getViewerToday()).toISOString()}
+      timeline={project.deliveryEnabled}
     />
   );
 }

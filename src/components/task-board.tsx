@@ -92,6 +92,7 @@ export function TaskBoard({
   initialOpenTaskId = null,
   initialQuickFilter = null,
   nowIso,
+  timeline,
 }: {
   projectId: string;
   initialTasks: TaskRow[];
@@ -111,6 +112,8 @@ export function TaskBoard({
    * render across midnight — and the browser's UTC day is not the viewer's.
    */
   nowIso: string;
+  /** Whether the project draws a timeline (delivery tools on), which is what a start date is for. */
+  timeline: boolean;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [statuses, setStatuses] = useState(initialStatuses);
@@ -1185,6 +1188,7 @@ export function TaskBoard({
           initialFill={draftFill}
           saving={saving}
           editing={editingId !== null}
+          timeline={timeline}
           onChange={setDraft}
           onDocumentChange={upsertDocument}
           onCancel={() => {
@@ -1220,6 +1224,7 @@ export function TaskBoard({
           onTaskChange={upsert}
           onError={setError}
           onOpenTask={setOpenTaskId}
+          timeline={timeline}
         />
       ) : null}
     </div>
