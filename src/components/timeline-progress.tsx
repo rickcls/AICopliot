@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui";
+import { getT } from "@/lib/i18n/server";
 import { DUE_SOON_DAYS } from "@/lib/pm/rules";
 import type { ProgressCounts } from "@/lib/pm/progress";
 import { cn } from "@/lib/utils";
@@ -47,7 +48,7 @@ function Stat({
   );
 }
 
-export function TimelineProgress({
+export async function TimelineProgress({
   tasks,
   milestones,
 }: {
@@ -55,20 +56,21 @@ export function TimelineProgress({
   milestones: ProgressCounts;
 }) {
   const undated = tasks.undated + milestones.undated;
+  const t = await getT();
 
   return (
     <Card className="p-5">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
         <div className="sm:w-56 sm:shrink-0">
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-xs font-medium text-slate-500">Task progress</h2>
+            <h2 className="text-xs font-medium text-slate-500">{t("timeline.progress")}</h2>
             <span className="text-2xl leading-none font-semibold text-slate-900 tabular-nums">
               {tasks.percentComplete}%
             </span>
           </div>
           <div
             role="progressbar"
-            aria-label="Task completion"
+            aria-label={t("timeline.completion")}
             aria-valuenow={tasks.percentComplete}
             aria-valuemin={0}
             aria-valuemax={100}
@@ -80,41 +82,39 @@ export function TimelineProgress({
             />
           </div>
           <p className="mt-2 text-xs text-slate-500 tabular-nums">
-            {tasks.done} of {tasks.total} task{tasks.total === 1 ? "" : "s"} done
+            {t("timeline.tasksDone", { done: tasks.done, count: tasks.total })}
           </p>
         </div>
 
         <dl className="grid flex-1 grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
           <Stat
-            label="Overdue"
+            label={t("timeline.overdue")}
             value={tasks.overdue + milestones.overdue}
             tone="danger"
-            hint="past its date, still open"
+            hint={t("timeline.overdueHint")}
           />
           <Stat
-            label={`Due in ${DUE_SOON_DAYS} days`}
+            label={t("timeline.dueSoon", { days: DUE_SOON_DAYS })}
             value={tasks.dueSoon + milestones.dueSoon}
             tone="warning"
           />
           <Stat
-            label="At risk"
+            label={t("timeline.atRisk")}
             value={tasks.atRisk + milestones.atRisk}
             tone="warning"
-            hint="blocked or flagged"
+            hint={t("timeline.atRiskHint")}
           />
           <Stat
-            label="Milestones"
+            label={t("timeline.milestones")}
             value={milestones.done}
-            hint={`of ${milestones.total} reached`}
+            hint={t("timeline.milestonesHint", { count: milestones.total })}
           />
         </dl>
       </div>
 
       {undated > 0 ? (
         <p className="mt-5 border-t border-slate-100 pt-3 text-xs text-slate-500">
-          {undated === 1
-            ? "1 open item has no date, so it is not counted in any deadline above."
-            : `${undated} open items have no date, so they are not counted in any deadline above.`}
+          {t("timeline.undated", { count: undated })}
         </p>
       ) : null}
     </Card>

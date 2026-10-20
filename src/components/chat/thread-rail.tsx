@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { ThreadSummary } from "@/lib/chat/history";
 import { formatThreadTime } from "@/lib/chat/relative-time";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { Badge, FOCUS_RING, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,9 @@ export function ThreadRail({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
 
   async function commit(thread: ThreadSummary) {
     const title = draftTitle.trim();
@@ -58,7 +62,7 @@ export function ThreadRail({
   }
 
   return (
-    <nav aria-label="Conversations" className={className}>
+    <nav aria-label={t("chat.rail.label")} className={className}>
       <Link
         href="/chat"
         onClick={onNavigate}
@@ -69,12 +73,12 @@ export function ThreadRail({
         )}
       >
         <Plus className="size-4 text-slate-400" aria-hidden />
-        New thread
+        {t("chat.rail.newThread")}
       </Link>
 
       {threads.length === 0 ? (
         <p className="mt-4 px-1 text-xs text-slate-500">
-          Your conversations will be listed here.
+          {t("chat.rail.empty")}
         </p>
       ) : (
         <ul className="mt-3 space-y-0.5">
@@ -87,7 +91,7 @@ export function ThreadRail({
                 <li key={thread.id} className="px-1 py-1">
                   <Input
                     value={draftTitle}
-                    aria-label="Thread name"
+                    aria-label={t("chat.rail.threadName")}
                     maxLength={120}
                     autoFocus
                     onChange={(event) => setDraftTitle(event.target.value)}
@@ -140,12 +144,13 @@ export function ThreadRail({
                       // The task outranks the project: it is the narrower,
                       // more useful thing to recognise a thread by.
                       <Badge tone="info" className="max-w-[9rem] truncate">
-                        Task: {thread.taskTitle ?? "deleted"}
+                        {t("chat.rail.taskBadge", {
+                          title: thread.taskTitle ?? t("chat.rail.deletedTask"),
+                        })}
                       </Badge>
                     ) : thread.focus === "documents" ? (
                       <Badge tone="neutral" className="max-w-[9rem] truncate">
-                        {thread.focusDocumentIds.length} doc
-                        {thread.focusDocumentIds.length === 1 ? "" : "s"}
+                        {t("chat.rail.documents", { count: thread.focusDocumentIds.length })}
                       </Badge>
                     ) : thread.projectName ? (
                       <Badge tone="info" className="max-w-[9rem] truncate">
@@ -153,7 +158,7 @@ export function ThreadRail({
                       </Badge>
                     ) : null}
                     <span className="text-xs text-slate-400">
-                      {formatThreadTime(thread.lastMessageAt, nowIso)}
+                      {formatThreadTime(thread.lastMessageAt, nowIso, t, dateLocale, timeZone)}
                     </span>
                   </span>
                 </Link>
@@ -161,7 +166,7 @@ export function ThreadRail({
                   <button
                     type="button"
                     disabled={busy}
-                    aria-label={`Rename “${thread.title}”`}
+                    aria-label={t("chat.rail.rename", { title: thread.title })}
                     onClick={() => {
                       setDraftTitle(thread.title);
                       setEditingId(thread.id);
@@ -173,7 +178,7 @@ export function ThreadRail({
                   <button
                     type="button"
                     disabled={busy}
-                    aria-label={`Delete “${thread.title}”`}
+                    aria-label={t("chat.rail.delete", { title: thread.title })}
                     onClick={async () => {
                       setBusyId(thread.id);
                       try {

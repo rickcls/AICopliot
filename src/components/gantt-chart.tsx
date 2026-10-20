@@ -1,3 +1,6 @@
+"use client";
+
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import type { GanttModel } from "@/lib/pm/gantt";
 import { cn, formatDay } from "@/lib/utils";
 
@@ -29,13 +32,16 @@ function barColor(status: string, overdue: boolean): string {
 }
 
 export function GanttChart({ model }: { model: GanttModel | null }) {
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const day = (value: Date | null) => (value ? formatDay(value, dateLocale) : "");
+
   if (!model) {
     return (
       <div className="px-5 py-10 text-center">
-        <p className="text-sm font-medium text-slate-900">Nothing scheduled yet</p>
+        <p className="text-sm font-medium text-slate-900">{t("timeline.ganttEmptyTitle")}</p>
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-          Give a task a start and due date, or a milestone a target date, and it
-          will appear on the chart.
+          {t("timeline.ganttEmptyBody")}
         </p>
       </div>
     );
@@ -76,7 +82,7 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
                 }}
               >
                 <span className="absolute -top-0.5 -left-3.5 rounded-sm bg-red-500 px-1 text-[10px] font-medium text-white">
-                  today
+                  {t("timeline.todayMarker")}
                 </span>
               </div>
             ) : null}
@@ -131,7 +137,7 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
                             : "bg-purple-500",
                       )}
                       style={{ left: `${bar.offsetPct}%` }}
-                      title={`${bar.title} — ${bar.end ? formatDay(bar.end) : ""}`}
+                      title={t("timeline.barMilestone", { title: bar.title, date: day(bar.end) })}
                     />
                   ) : (
                     <span
@@ -146,8 +152,12 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
                       }}
                       title={
                         bar.isPoint
-                          ? `${bar.title} — due ${bar.end ? formatDay(bar.end) : ""}`
-                          : `${bar.title} — ${bar.start ? formatDay(bar.start) : ""} to ${bar.end ? formatDay(bar.end) : ""}`
+                          ? t("timeline.barPoint", { title: bar.title, date: day(bar.end) })
+                          : t("timeline.barSpan", {
+                              title: bar.title,
+                              start: day(bar.start),
+                              end: day(bar.end),
+                            })
                       }
                     />
                   )}
@@ -160,26 +170,27 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-500">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-4 rounded-full bg-blue-500" aria-hidden /> in
-          progress
+          <span className="h-2 w-4 rounded-full bg-blue-500" aria-hidden />{" "}
+          {t("timeline.legendInProgress")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-4 rounded-full bg-emerald-500" aria-hidden /> done
+          <span className="h-2 w-4 rounded-full bg-emerald-500" aria-hidden />{" "}
+          {t("timeline.legendDone")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-4 rounded-full bg-red-500" aria-hidden /> overdue
-          or blocked
+          <span className="h-2 w-4 rounded-full bg-red-500" aria-hidden />{" "}
+          {t("timeline.legendOverdue")}
         </span>
         <span className="flex items-center gap-1.5">
           <span
             className="size-2.5 rotate-45 rounded-[2px] bg-purple-500"
             aria-hidden
           />{" "}
-          milestone
+          {t("timeline.legendMilestone")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-1 rounded-sm bg-slate-400" aria-hidden /> due
-          date only
+          <span className="h-2.5 w-1 rounded-sm bg-slate-400" aria-hidden />{" "}
+          {t("timeline.legendDueOnly")}
         </span>
       </div>
     </>

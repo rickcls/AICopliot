@@ -150,7 +150,8 @@ const defaultWorkspaceFor = cache(async function defaultWorkspaceFor(
 ): Promise<WorkspaceAccess> {
   const user = { id: userId, name: userName };
 
-  const activeWorkspaceId = (await getUserRow(userId))?.activeWorkspaceId;
+  const row = await getUserRow(userId);
+  const activeWorkspaceId = row?.activeWorkspaceId;
   if (activeWorkspaceId) {
     const active = await prisma.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId: activeWorkspaceId, userId } },
@@ -181,7 +182,7 @@ const defaultWorkspaceFor = cache(async function defaultWorkspaceFor(
     };
   }
 
-  const name = user.name ? `${user.name}'s Workspace` : "My Workspace";
+  const name = defaultWorkspaceName(user.name, row?.locale);
   const workspace = await prisma.workspace.create({
     data: {
       name,
@@ -197,6 +198,16 @@ const defaultWorkspaceFor = cache(async function defaultWorkspaceFor(
     role: "admin",
   };
 });
+
+/**
+ * A first workspace is named in the person's language, as their personal
+ * project is; anything but English reads Chinese, since that is the default.
+ */
+export function defaultWorkspaceName(name: string | null, locale: string | undefined): string {
+  const who = name?.trim();
+  if (locale === "en") return who ? `${who}'s Workspace` : "My Workspace";
+  return who ? `${who}的工作區` : "我的工作區";
+}
 
 /**
  * Resolves a client-supplied project ID *within* an already-authorised

@@ -75,8 +75,13 @@ export function chooseTickDays(totalDays: number): number {
   return 90;
 }
 
-function labelFor(date: Date, tickDays: number): string {
-  return date.toLocaleDateString(undefined, {
+/**
+ * An explicit locale, never `undefined`: the chart is built in a client
+ * component, and the server's default locale and the browser's would label
+ * the same axis differently at hydration.
+ */
+function labelFor(date: Date, tickDays: number, locale: string): string {
+  return date.toLocaleDateString(locale, {
     timeZone: "UTC",
     month: "short",
     day: tickDays >= 30 ? undefined : "numeric",
@@ -91,6 +96,7 @@ function labelFor(date: Date, tickDays: number): string {
 export function buildGantt(
   items: readonly GanttInput[],
   now: Date = new Date(),
+  locale = "en-GB",
 ): GanttModel | null {
   const dated = items.filter((item) => item.start !== null || item.end !== null);
   const undated = items.filter((item) => item.start === null && item.end === null);
@@ -136,7 +142,7 @@ export function buildGantt(
   const ticks: GanttTick[] = [];
   for (let day = 0; day <= totalDays; day += tickDays) {
     const date = addDays(start, day);
-    ticks.push({ label: labelFor(date, tickDays), offsetPct: (day / totalDays) * 100 });
+    ticks.push({ label: labelFor(date, tickDays, locale), offsetPct: (day / totalDays) * 100 });
   }
 
   const todayOffset = daysBetween(start, now);

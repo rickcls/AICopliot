@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui";
+import { labelOr } from "@/lib/i18n/translate";
 import type { Citation } from "@/lib/schemas";
 import { formatDate } from "@/lib/utils";
 import { sourceAnchorId } from "./answer-body";
@@ -32,6 +34,9 @@ export function SourceCard({
   citation: Citation;
   messageId: string;
 }) {
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
   // Cards for citations written before labels existed still render; they just
   // have nothing to jump to, which matches the answer text leaving them literal.
   const anchorId = citation.label
@@ -39,20 +44,30 @@ export function SourceCard({
     : undefined;
 
   if (citation.kind !== "document") {
-    const status =
-      typeof citation.snapshot.status === "string"
-        ? citation.snapshot.status.replaceAll("_", " ")
-        : null;
+    // A frozen snapshot's status is an enum value for milestones, risks, and
+    // requirements, and a column label (data) for tasks.
+    const rawStatus =
+      typeof citation.snapshot.status === "string" ? citation.snapshot.status : null;
+    const statusFamily =
+      citation.kind === "milestone"
+        ? "milestoneStatus"
+        : citation.kind === "risk"
+          ? "riskStatus"
+          : citation.kind === "requirement"
+            ? "requirementStatus"
+            : null;
+    const status = rawStatus
+      ? statusFamily
+        ? labelOr(t, `${statusFamily}.${rawStatus}`, rawStatus.replaceAll("_", " "))
+        : rawStatus.replaceAll("_", " ")
+      : null;
     const sourceDate =
       typeof citation.snapshot.dueDate === "string"
         ? citation.snapshot.dueDate
         : typeof citation.snapshot.targetDate === "string"
           ? citation.snapshot.targetDate
           : null;
-    const label =
-      citation.kind === "project_snapshot"
-        ? "Project snapshot"
-        : citation.kind.charAt(0).toUpperCase() + citation.kind.slice(1);
+    const label = t(`chat.source.kinds.${citation.kind}`);
 
     return (
       <div
@@ -73,7 +88,7 @@ export function SourceCard({
             <span className="text-xs text-slate-500">{sourceDate}</span>
           ) : null}
           <span className="ml-auto text-xs text-slate-400">
-            observed {formatDate(citation.observedAt)}
+            {t("chat.source.observed", { date: formatDate(citation.observedAt, dateLocale, timeZone) })}
           </span>
         </div>
         <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-pretty text-slate-600 italic">
@@ -84,7 +99,7 @@ export function SourceCard({
   }
 
   const location = [
-    citation.pageNumber !== null ? `page ${citation.pageNumber}` : null,
+    citation.pageNumber !== null ? t("chat.source.page", { page: citation.pageNumber }) : null,
     citation.sectionTitle,
   ]
     .filter(Boolean)
@@ -109,10 +124,10 @@ export function SourceCard({
         ) : null}
         <span className="ml-auto text-xs text-slate-400">
           {citation.matchType === "lexical"
-            ? "exact text match"
+            ? t("chat.source.lexical")
             : citation.matchType === "hybrid"
-              ? `hybrid · ${(citation.score * 100).toFixed(0)}% semantic`
-              : `${(citation.score * 100).toFixed(0)}% semantic match`}
+              ? t("chat.source.hybrid", { percent: (citation.score * 100).toFixed(0) })
+              : t("chat.source.semantic", { percent: (citation.score * 100).toFixed(0) })}
         </span>
       </div>
       <blockquote className="mt-2 border-l-2 border-slate-300 pl-3 text-xs text-pretty text-slate-600 italic">

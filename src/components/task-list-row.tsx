@@ -9,6 +9,7 @@ import {
   PanelRight,
   Timer,
 } from "lucide-react";
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Avatar, FOCUS_RING, Input, Select } from "@/components/ui";
 import { toPartialPayload, type TaskDraft } from "@/components/task-form";
 import {
@@ -86,6 +87,8 @@ export function TaskListRow({
   const dueRef = useRef<HTMLInputElement>(null);
 
   const overdue = isTaskOverdue(task, todayIso);
+  const t = useT();
+  const dateLocale = useDateLocale();
   const rowTone = statusColorToken(task.status);
   const disabled = busy || saving;
 
@@ -121,13 +124,13 @@ export function TaskListRow({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        onError(data.error ?? "Could not save that change.");
+        onError(data.error ?? t("tasks.row.saveFailed"));
         return false;
       }
       onTaskChange(data.task);
       return true;
     } catch {
-      onError("Could not reach the server.");
+      onError(t("common.couldNotReach"));
       return false;
     } finally {
       setSaving(false);
@@ -203,7 +206,7 @@ export function TaskListRow({
         <input
           type="checkbox"
           checked={selected}
-          aria-label={`Select ${task.title}`}
+          aria-label={t("tasks.row.select", { title: task.title })}
           onChange={(event) =>
             onToggleSelect((event.nativeEvent as MouseEvent).shiftKey)
           }
@@ -216,13 +219,13 @@ export function TaskListRow({
           draggable={!disabled}
           aria-label={
             selected && selectedCount > 1
-              ? `Drag ${selectedCount} selected tasks to another status`
-              : `Drag ${task.title} to another status`
+              ? t("tasks.row.dragMany", { count: selectedCount })
+              : t("tasks.row.dragOne", { title: task.title })
           }
           title={
             selected && selectedCount > 1
-              ? `Drag ${selectedCount} selected`
-              : "Drag to another status"
+              ? t("tasks.row.dragManyShort", { count: selectedCount })
+              : t("tasks.row.dragShort")
           }
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
@@ -237,7 +240,7 @@ export function TaskListRow({
       <th
         scope="row"
         className="px-2 py-2.5 text-left font-normal"
-        title="Double-click to edit"
+        title={t("tasks.row.doubleClick")}
         onDoubleClick={() => beginEdit("title")}
       >
         <span className="flex items-center gap-2.5">
@@ -251,7 +254,7 @@ export function TaskListRow({
                 ref={titleRef}
                 value={titleDraft}
                 maxLength={200}
-                aria-label="Task name"
+                aria-label={t("tasks.fields.name")}
                 onChange={(event) => setTitleDraft(event.target.value)}
                 onBlur={() => void commitTitle()}
                 onKeyDown={(event) =>
@@ -276,8 +279,8 @@ export function TaskListRow({
             <button
               type="button"
               onClick={onOpen}
-              aria-label={`Open ${task.title} details`}
-              title="Open details"
+              aria-label={t("tasks.row.openDetails", { title: task.title })}
+              title={t("tasks.row.openDetailsShort")}
               className={cn(
                 "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-200/80 hover:text-slate-700",
                 FOCUS_RING,
@@ -288,7 +291,7 @@ export function TaskListRow({
           ) : null}
           {task.dependencies.length > 0 && editing !== "title" ? (
             <span
-              title={`Depends on ${task.dependencies.length} task(s)`}
+              title={t("tasks.card.dependsOn", { count: task.dependencies.length })}
               className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 tabular-nums"
             >
               <GitBranch className="size-3" aria-hidden />
@@ -299,13 +302,13 @@ export function TaskListRow({
       </th>
       <td
         className="cursor-default px-3 py-2.5"
-        title="Double-click to edit"
+        title={t("tasks.row.doubleClick")}
         onDoubleClick={() => beginEdit("assigneeId")}
       >
         {editing === "assigneeId" ? (
           <Select
             ref={assigneeRef}
-            aria-label="Assignee"
+            aria-label={t("tasks.fields.assignee")}
             className="h-8 w-full max-w-full text-xs"
             defaultValue={task.assigneeId ?? ""}
             onChange={(event) => void commitAssignee(event.target.value)}
@@ -314,7 +317,7 @@ export function TaskListRow({
               if (event.key === "Escape") setEditing(null);
             }}
           >
-            <option value="">Unassigned</option>
+            <option value="">{t("common.unassigned")}</option>
             {members.map((member) => (
               <option key={member.id} value={member.id}>
                 {member.name}
@@ -333,19 +336,19 @@ export function TaskListRow({
             </span>
           </span>
         ) : (
-          <span className="text-xs text-slate-400">Unassigned</span>
+          <span className="text-xs text-slate-400">{t("common.unassigned")}</span>
         )}
       </td>
       <td
         className="cursor-default px-3 py-2.5"
-        title="Double-click to edit"
+        title={t("tasks.row.doubleClick")}
         onDoubleClick={() => beginEdit("priority")}
       >
         {editing === "priority" ? (
           <Select
             ref={priorityRef}
-            aria-label="Priority"
-            className="h-8 w-full max-w-full capitalize text-xs"
+            aria-label={t("tasks.fields.priority")}
+            className="h-8 w-full max-w-full text-xs"
             defaultValue={task.priority}
             onChange={(event) =>
               void commitPriority(event.target.value as TaskPriority)
@@ -356,15 +359,15 @@ export function TaskListRow({
             }}
           >
             {TASK_PRIORITIES.map((priority) => (
-              <option key={priority} value={priority} className="capitalize">
-                {priority}
+              <option key={priority} value={priority}>
+                {t(`priority.${priority}`)}
               </option>
             ))}
           </Select>
         ) : (
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 text-xs capitalize",
+              "inline-flex items-center gap-1.5 text-xs",
               PRIORITY_TEXT[task.priority],
             )}
           >
@@ -373,7 +376,7 @@ export function TaskListRow({
               fill="currentColor"
               className={cn("size-3.5 shrink-0", PRIORITY_FLAG[task.priority])}
             />
-            {task.priority}
+            {t(`priority.${task.priority}`)}
           </span>
         )}
       </td>
@@ -382,14 +385,14 @@ export function TaskListRow({
           "cursor-default px-3 py-2.5 text-xs whitespace-nowrap",
           overdue ? "font-medium text-red-700" : "text-slate-600",
         )}
-        title="Double-click to edit"
+        title={t("tasks.row.doubleClick")}
         onDoubleClick={() => beginEdit("dueDate")}
       >
         {editing === "dueDate" ? (
           <Input
             ref={dueRef}
             type="date"
-            aria-label="Due date"
+            aria-label={t("tasks.fields.dueDate")}
             defaultValue={toDateInput(task.dueDate)}
             onChange={(event) => void commitDue(event.target.value)}
             onBlur={(event) => {
@@ -405,8 +408,8 @@ export function TaskListRow({
         ) : task.dueDate ? (
           <span className="inline-flex items-center gap-1.5">
             <CalendarClock className="size-3.5 shrink-0" aria-hidden />
-            {formatDay(task.dueDate)}
-            {overdue ? " · overdue" : ""}
+            {formatDay(task.dueDate, dateLocale)}
+            {overdue ? ` · ${t("tasks.fields.overdue")}` : ""}
           </span>
         ) : (
           <span className="text-slate-300">—</span>
@@ -414,7 +417,7 @@ export function TaskListRow({
       </td>
       <td
         className="cursor-default px-4 py-2.5 text-right text-xs whitespace-nowrap text-slate-600 tabular-nums"
-        title="Double-click to edit"
+        title={t("tasks.row.doubleClick")}
         onDoubleClick={() => beginEdit("estimatedHours")}
       >
         {editing === "estimatedHours" ? (
@@ -423,7 +426,7 @@ export function TaskListRow({
             type="number"
             min={0}
             step="0.5"
-            aria-label="Estimate hours"
+            aria-label={t("tasks.row.estimateHours")}
             value={estimateDraft}
             onChange={(event) => setEstimateDraft(event.target.value)}
             onBlur={() => void commitEstimate()}
@@ -437,7 +440,7 @@ export function TaskListRow({
         ) : (
           <span className="inline-flex items-center justify-end gap-1.5">
             <Timer className="size-3.5" aria-hidden />
-            {task.estimatedHours}h
+            {t("common.hours", { hours: task.estimatedHours })}
           </span>
         )}
       </td>

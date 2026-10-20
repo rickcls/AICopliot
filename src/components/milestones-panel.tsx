@@ -18,8 +18,9 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
-import { cn, formatDay } from "@/lib/utils";
+import { cn, formatDay, formatInstantDay } from "@/lib/utils";
 import { TracedRequirements } from "@/components/traced-requirements";
 
 export type MilestoneStatus =
@@ -53,12 +54,12 @@ export interface MilestoneRow {
   requirementLinks: TracedRequirementRow[];
 }
 
-const STATUSES: Array<{ value: MilestoneStatus; label: string }> = [
-  { value: "not_started", label: "Not started" },
-  { value: "on_track", label: "On track" },
-  { value: "at_risk", label: "At risk" },
-  { value: "blocked", label: "Blocked" },
-  { value: "completed", label: "Completed" },
+const STATUSES: MilestoneStatus[] = [
+  "not_started",
+  "on_track",
+  "at_risk",
+  "blocked",
+  "completed",
 ];
 
 const STATUS_TONE = {
@@ -99,6 +100,9 @@ export function MilestonesPanel({
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
 
   function toggleExpanded(id: string) {
     setExpanded((previous) => {
@@ -141,14 +145,14 @@ export function MilestonesPanel({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not save the milestone.");
+        setError(data.error ?? t("milestones.saveFailed"));
         return;
       }
       upsert(data.milestone);
       setDraft(null);
       setEditingId(null);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setSaving(false);
     }
@@ -165,12 +169,12 @@ export function MilestonesPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not update the milestone.");
+        setError(data.error ?? t("milestones.updateFailed"));
         return;
       }
       upsert(data.milestone);
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -178,8 +182,8 @@ export function MilestonesPanel({
 
   async function remove(milestone: MilestoneRow) {
     const confirmed = await confirm({
-      title: `Delete milestone “${milestone.title}”?`,
-      confirmLabel: "Delete milestone",
+      title: t("milestones.deleteTitle", { title: milestone.title }),
+      confirmLabel: t("milestones.deleteConfirm"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -192,15 +196,15 @@ export function MilestonesPanel({
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        setError(data.error ?? "Could not delete the milestone.");
+        setError(data.error ?? t("milestones.deleteFailed"));
         return;
       }
       setMilestones((previous) =>
         previous.filter((item) => item.id !== milestone.id),
       );
-      toast.success(`Deleted milestone “${milestone.title}”`);
+      toast.success(t("milestones.deleted", { title: milestone.title }));
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -209,8 +213,8 @@ export function MilestonesPanel({
   return (
     <Card className="p-5">
       <SectionHeader
-        title="Milestones"
-        description="Dated checkpoints. These appear in the timeline above."
+        title={t("milestones.title")}
+        description={t("milestones.lead")}
       >
         <Button
           type="button"
@@ -220,7 +224,7 @@ export function MilestonesPanel({
             setDraft({ ...EMPTY });
           }}
         >
-          New milestone
+          {t("milestones.new")}
         </Button>
       </SectionHeader>
 
@@ -237,7 +241,7 @@ export function MilestonesPanel({
               htmlFor="milestone-title"
               className="mb-1.5 block text-sm font-medium"
             >
-              Title
+              {t("milestones.fieldTitle")}
             </label>
             <Input
               id="milestone-title"
@@ -245,7 +249,7 @@ export function MilestonesPanel({
               onChange={(event) =>
                 setDraft({ ...draft, title: event.target.value })
               }
-              placeholder="e.g. UAT sign-off"
+              placeholder={t("milestones.titlePlaceholder")}
               maxLength={200}
               disabled={saving}
             />
@@ -256,8 +260,8 @@ export function MilestonesPanel({
               htmlFor="milestone-description"
               className="mb-1.5 block text-sm font-medium"
             >
-              Description{" "}
-              <span className="font-normal text-slate-500">(optional)</span>
+              {t("milestones.description")}{" "}
+              <span className="font-normal text-slate-500">{t("milestones.optional")}</span>
             </label>
             <Textarea
               id="milestone-description"
@@ -277,7 +281,7 @@ export function MilestonesPanel({
                 htmlFor="milestone-date"
                 className="mb-1 block text-xs text-slate-500"
               >
-                Target date
+                {t("milestones.targetDate")}
               </label>
               <Input
                 id="milestone-date"
@@ -294,7 +298,7 @@ export function MilestonesPanel({
                 htmlFor="milestone-status"
                 className="mb-1 block text-xs text-slate-500"
               >
-                Status
+                {t("milestones.status")}
               </label>
               <Select
                 id="milestone-status"
@@ -309,8 +313,8 @@ export function MilestonesPanel({
                 disabled={saving}
               >
                 {STATUSES.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
+                  <option key={status} value={status}>
+                    {t(`milestoneStatus.${status}`)}
                   </option>
                 ))}
               </Select>
@@ -328,18 +332,18 @@ export function MilestonesPanel({
               }}
               disabled={saving}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" size="sm" disabled={saving || !draft.title.trim()}>
               {saving ? (
                 <>
                   <Spinner className="border-white/40 border-t-white" />
-                  Saving…
+                  {t("common.saving")}
                 </>
               ) : editingId ? (
-                "Save changes"
+                t("milestones.saveChanges")
               ) : (
-                "Create milestone"
+                t("milestones.create")
               )}
             </Button>
           </div>
@@ -349,8 +353,8 @@ export function MilestonesPanel({
       {milestones.length === 0 ? (
         <div className="mt-4">
           <EmptyState
-            title="No milestones yet"
-            description="Add one to mark a dated checkpoint. Milestones appear on the timeline and in weekly reports."
+            title={t("milestones.emptyTitle")}
+            description={t("milestones.emptyBody")}
           />
         </div>
       ) : (
@@ -394,14 +398,14 @@ export function MilestonesPanel({
                       )}
                     >
                       {milestone.targetDate
-                        ? formatDay(milestone.targetDate)
-                        : "no date"}
+                        ? formatDay(milestone.targetDate, dateLocale)
+                        : t("milestones.noDate")}
                     </span>
                     {milestone.source === "ai_suggested" ? (
-                      <Badge tone="info">AI</Badge>
+                      <Badge tone="info">{t("milestones.ai")}</Badge>
                     ) : null}
                     <Badge tone={STATUS_TONE[milestone.status]}>
-                      {milestone.status.replace("_", " ")}
+                      {t(`milestoneStatus.${milestone.status}`)}
                     </Badge>
                   </div>
                 </div>
@@ -409,7 +413,7 @@ export function MilestonesPanel({
                 {open ? (
                   <div className="border-t border-slate-100 bg-slate-50/50 px-1 py-3 pl-6">
                     <DescriptionList>
-                      <Field name="Description">
+                      <Field name={t("milestones.description")}>
                         {milestone.description ? (
                           <p className="max-w-3xl text-pretty">
                             {milestone.description}
@@ -420,15 +424,15 @@ export function MilestonesPanel({
                       </Field>
 
                       {milestone.completedAt ? (
-                        <Field name="Completed">
+                        <Field name={t("milestones.completed")}>
                           <span className="text-slate-600">
-                            {formatDay(milestone.completedAt)}
+                            {formatInstantDay(milestone.completedAt, dateLocale, timeZone)}
                           </span>
                         </Field>
                       ) : null}
 
                       {milestone.requirementLinks.length > 0 ? (
-                        <Field name="Requirements">
+                        <Field name={t("milestones.requirements")}>
                           <TracedRequirements
                             projectId={projectId}
                             links={milestone.requirementLinks}
@@ -437,7 +441,7 @@ export function MilestonesPanel({
                       ) : null}
 
                       {milestone.citations.length > 0 ? (
-                        <Field name="Sources">
+                        <Field name={t("milestones.sources")}>
                           <ul className="space-y-1.5">
                             {milestone.citations.map((citation) => (
                               <li key={citation.id}>
@@ -447,7 +451,7 @@ export function MilestonesPanel({
                                 >
                                   {citation.chunk.document.originalFilename}
                                   {citation.chunk.pageNumber
-                                    ? ` p.${citation.chunk.pageNumber}`
+                                    ? ` ${t("common.page", { page: citation.chunk.pageNumber })}`
                                     : ""}
                                   {citation.chunk.sectionTitle
                                     ? ` · ${citation.chunk.sectionTitle}`
@@ -467,7 +471,7 @@ export function MilestonesPanel({
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <Select
-                        aria-label={`Status for ${milestone.title}`}
+                        aria-label={t("milestones.statusFor", { title: milestone.title })}
                         className="h-8 text-xs"
                         value={milestone.status}
                         disabled={busy}
@@ -479,8 +483,8 @@ export function MilestonesPanel({
                         }
                       >
                         {STATUSES.map((status) => (
-                          <option key={status.value} value={status.value}>
-                            {status.label}
+                          <option key={status} value={status}>
+                            {t(`milestoneStatus.${status}`)}
                           </option>
                         ))}
                       </Select>
@@ -500,7 +504,7 @@ export function MilestonesPanel({
                           });
                         }}
                       >
-                        Edit
+                        {t("milestones.edit")}
                       </Button>
                       <Button
                         size="sm"
@@ -509,7 +513,7 @@ export function MilestonesPanel({
                         disabled={busy}
                         onClick={() => void remove(milestone)}
                       >
-                        Delete
+                        {t("common.delete")}
                       </Button>
                     </div>
                   </div>

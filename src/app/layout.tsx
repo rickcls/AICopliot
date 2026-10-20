@@ -3,6 +3,7 @@ import { Geist_Mono, Source_Sans_3 } from "next/font/google";
 import { I18nProvider } from "@/components/i18n-provider";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { htmlLang } from "@/lib/i18n/locales";
+import { getViewerTimeZone } from "@/lib/viewer";
 import "./globals.css";
 
 // Source Sans 3 reads more clearly in dense PM UI than Geist (the Next.js
@@ -33,7 +34,7 @@ export default async function RootLayout({
 }) {
   // Resolved once here and handed to client components through context, so
   // the server render and hydration read the same language.
-  const locale = await getLocale();
+  const [locale, timeZone] = await Promise.all([getLocale(), getViewerTimeZone()]);
 
   return (
     // suppressHydrationWarning: the head script may set data-theme before
@@ -53,7 +54,9 @@ export default async function RootLayout({
         />
       </head>
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        <I18nProvider locale={locale} timeZone={timeZone}>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

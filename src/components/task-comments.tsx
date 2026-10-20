@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Avatar, Button, Spinner } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import type { TaskCommentRow } from "@/components/task-types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -35,22 +36,25 @@ export function TaskComments({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
 
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/tasks/${taskId}/comments`, { signal: controller.signal })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error ?? "Could not load comments.");
+        if (!response.ok) throw new Error(data.error ?? t("tasks.comments.loadFailed"));
         setComments(data.comments);
       })
       .catch((cause: Error) => {
         if (controller.signal.aborted) return;
-        setError(cause.message || "Could not load comments.");
+        setError(cause.message || t("tasks.comments.loadFailed"));
         setComments([]);
       });
     return () => controller.abort();
-  }, [taskId]);
+  }, [taskId, t]);
 
   async function post(event: React.FormEvent) {
     event.preventDefault();
@@ -67,13 +71,13 @@ export function TaskComments({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not post that comment.");
+        setError(data.error ?? t("tasks.comments.postFailed"));
         return;
       }
       setComments((current) => [...(current ?? []), data.comment]);
       setBody("");
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setPosting(false);
     }
@@ -81,9 +85,9 @@ export function TaskComments({
 
   async function remove(comment: TaskCommentRow) {
     const confirmed = await confirm({
-      title: "Delete this comment?",
+      title: t("tasks.comments.deleteTitle"),
       body: <p className="line-clamp-3">“{comment.body}”</p>,
-      confirmLabel: "Delete",
+      confirmLabel: t("common.delete"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -97,14 +101,14 @@ export function TaskComments({
       );
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        setError(data.error ?? "Could not delete that comment.");
+        setError(data.error ?? t("tasks.comments.deleteFailed"));
         return;
       }
       setComments((current) =>
         (current ?? []).filter((item) => item.id !== comment.id),
       );
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setBusyId(null);
     }
@@ -113,7 +117,7 @@ export function TaskComments({
   return (
     <div>
       <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-        Comments
+        {t("tasks.comments.title")}
         {comments && comments.length > 0 ? (
           <span className="ml-1.5 font-normal text-slate-400 tabular-nums">
             {comments.length}
@@ -129,13 +133,10 @@ export function TaskComments({
 
       {comments === null ? (
         <p className="mb-3 flex items-center gap-2 text-xs text-slate-400">
-          <Spinner /> Loading comments…
+          <Spinner /> {t("tasks.comments.loading")}
         </p>
       ) : comments.length === 0 ? (
-        <p className="mb-3 text-xs text-slate-400">
-          No comments yet. Notes here are for people — they are never used to
-          answer questions in chat.
-        </p>
+        <p className="mb-3 text-xs text-slate-400">{t("tasks.comments.empty")}</p>
       ) : (
         <ul className="mb-3 space-y-3">
           {comments.map((comment) => {
@@ -161,13 +162,13 @@ export function TaskComments({
                     <span className="text-xs font-semibold text-slate-900">
                       {comment.author?.name ??
                         comment.author?.email ??
-                        "Former member"}
+                        t("tasks.comments.formerMember")}
                     </span>
                     <time
                       dateTime={comment.createdAt}
                       className="text-[11px] text-slate-400"
                     >
-                      {formatDate(comment.createdAt)}
+                      {formatDate(comment.createdAt, dateLocale, timeZone)}
                     </time>
                     {mine ? (
                       <button
@@ -175,7 +176,7 @@ export function TaskComments({
                         onClick={() => void remove(comment)}
                         className="text-[11px] text-slate-400 transition-colors hover:text-red-700"
                       >
-                        Delete
+                        {t("common.delete")}
                       </button>
                     ) : null}
                   </div>
@@ -203,11 +204,11 @@ export function TaskComments({
               void post(event);
             }
           }}
-          placeholder="Add a comment…"
+          placeholder={t("tasks.comments.placeholder")}
           rows={2}
           maxLength={4000}
           disabled={posting}
-          aria-label="Add a comment"
+          aria-label={t("tasks.comments.label")}
           className={cn(
             "w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700",
             "placeholder:text-slate-400 focus-visible:border-slate-900 focus-visible:outline-hidden",
@@ -222,16 +223,16 @@ export function TaskComments({
               onClick={() => setBody("")}
               disabled={posting}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" size="sm" disabled={posting}>
               {posting ? (
                 <>
                   <Spinner className="size-3 border-white/40 border-t-white" />
-                  Posting…
+                  {t("tasks.comments.posting")}
                 </>
               ) : (
-                "Comment"
+                t("tasks.comments.post")
               )}
             </Button>
           </div>

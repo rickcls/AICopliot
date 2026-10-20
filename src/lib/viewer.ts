@@ -9,7 +9,12 @@ import { DEFAULT_TIME_ZONE, localToday } from "@/lib/time";
  * marker). Not an instant: never use it for completedAt or report windows.
  */
 export const getViewerToday = cache(async (): Promise<Date> => {
+  return localToday(await getViewerTimeZone(), new Date());
+});
+
+/** The zone the viewer's instants are shown in; the default when signed out. */
+export const getViewerTimeZone = cache(async (): Promise<string> => {
   const user = await getSessionUser();
   const preferences = user ? await getUserPreferences(user.id) : null;
-  return localToday(preferences?.timeZone ?? DEFAULT_TIME_ZONE, new Date());
+  return preferences?.timeZone ?? DEFAULT_TIME_ZONE;
 });

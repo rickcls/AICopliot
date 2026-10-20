@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileUp, Sparkles } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useLocale, useT } from "@/components/i18n-provider";
+import { useLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import {
   Badge,
@@ -22,7 +22,7 @@ import { intlLocale } from "@/lib/i18n/locales";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
 import { matchesQuery } from "@/lib/pm/filters";
-import { cn, formatBytes, formatDay } from "@/lib/utils";
+import { cn, formatBytes, formatInstantDay } from "@/lib/utils";
 
 interface ProjectOption {
   id: string;
@@ -64,6 +64,7 @@ export function DocumentsPanel({
   const t = useT();
   const locale = useLocale();
   const dateLocale = intlLocale(locale);
+  const timeZone = useTimeZone();
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
@@ -455,7 +456,7 @@ export function DocumentsPanel({
               doc.docType ? t(`documents.docType.${doc.docType}` as MessageKey) : null,
               doc.title ? doc.originalFilename : null,
               formatBytes(doc.sizeBytes),
-              formatDay(doc.createdAt, dateLocale),
+              formatInstantDay(doc.createdAt, dateLocale, timeZone),
               doc.status === "ready" ? t("documents.passages", { count: doc.chunkCount }) : null,
             ].filter(Boolean);
 

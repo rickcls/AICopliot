@@ -16,7 +16,9 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { sortRisks, worstRiskLevel } from "@/lib/pm/filters";
 import { percentOf } from "@/lib/pm/progress";
-import { getT } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { intlLocale } from "@/lib/i18n/locales";
+import type { Translate } from "@/lib/i18n/translate";
 import { getScopedProject } from "@/lib/pm/project";
 import { getProjectSummary } from "@/lib/pm/summary";
 import {
@@ -27,7 +29,7 @@ import {
 } from "@/lib/pm/rules";
 import { getLatestStatusReport } from "@/lib/reports/service";
 import { cn, formatDate, formatDay } from "@/lib/utils";
-import { getViewerToday } from "@/lib/viewer";
+import { getViewerTimeZone, getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -43,16 +45,18 @@ const HEALTH_TONE = { green: "success", amber: "warning", red: "danger" } as con
 function OverviewCard({
   title,
   href,
-  linkLabel = "View all",
+  linkLabel,
   children,
 }: {
   title: string;
   href?: string;
-  linkLabel?: string;
+  linkLabel: string;
   children: React.ReactNode;
 }) {
   return (
-    <Card className="flex flex-col p-5">
+    // min-w-0 for the same reason as the dashboard's lists: a grid item is
+    // otherwise as wide as its longest truncated title.
+    <Card className="flex min-w-0 flex-col p-5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
         {href ? (
@@ -78,6 +82,7 @@ function DiscoveryStage({
   hint,
   done,
   href,
+  doneLabel,
 }: {
   index: number;
   label: string;
@@ -85,6 +90,7 @@ function DiscoveryStage({
   hint?: string;
   done: boolean;
   href: string;
+  doneLabel: string;
 }) {
   return (
     <li>
@@ -108,7 +114,7 @@ function DiscoveryStage({
         <span className="min-w-0">
           <span className="block text-xs font-medium text-slate-500">
             {label}
-            {done ? <span className="sr-only"> (done)</span> : null}
+            {done ? <span className="sr-only"> {doneLabel}</span> : null}
           </span>
           <span className="block text-sm font-semibold text-slate-900 tabular-nums">
             {value}
@@ -130,64 +136,38 @@ function nextStepCopy(
   step: DiscoveryStep,
   counts: DiscoveryCounts,
   projectId: string,
+  t: Translate,
 ): { title: string; description: string; cta: string; href: string } {
   const base = `/projects/${projectId}`;
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const copy = (count?: number) => ({
+    title:
+      count === undefined
+        ? t(`overview.steps.${step as "upload" | "wait_indexing" | "extract"}.title`)
+        : t(`overview.steps.${step as "review" | "clarify" | "agree" | "sign_off"}.title`, {
+            count,
+          }),
+    description: t(`overview.steps.${step}.description`),
+    cta: t(`overview.steps.${step}.cta`),
+  });
   switch (step) {
     case "upload":
-      return {
-        title: "Upload the client’s documents",
-        description:
-          "Briefs, statements of work, meeting notes, or emails saved as PDF, Word, Markdown, or text. Every requirement ScopePilot drafts will cite them.",
-        cta: "Upload documents",
-        href: `${base}/documents`,
-      };
+      return { ...copy(), href: `${base}/documents` };
     case "wait_indexing":
-      return {
-        title: "Your documents are being indexed",
-        description:
-          "This usually takes under a minute. Extraction opens as soon as one document is ready.",
-        cta: "View documents",
-        href: `${base}/documents`,
-      };
+      return { ...copy(), href: `${base}/documents` };
     case "extract":
-      return {
-        title: "Extract the requirements",
-        description:
-          "ScopePilot reads the indexed documents and drafts cited requirements for you to check. Nothing counts as agreed until you say so.",
-        cta: "Extract requirements",
-        href: `${base}/requirements`,
-      };
+      return { ...copy(), href: `${base}/requirements` };
     case "review":
-      return {
-        title: `Review ${plural(counts.toReview, "draft requirement")}`,
-        description:
-          "Check each one against its source, then mark it Validated, Agreed, or Ask client — or reject it.",
-        cta: "Start reviewing",
-        href: `${base}/requirements?filter=draft`,
-      };
+      return { ...copy(counts.toReview), href: `${base}/requirements?filter=draft` };
     case "clarify":
       return {
-        title: `${plural(counts.askClient, "question")} for the client`,
-        description:
-          "Send the client the question list, then update each requirement once it is answered.",
-        cta: "Open the question list",
+        ...copy(counts.askClient),
         href: `/print/requirements/${projectId}?pack=questions`,
       };
     case "agree":
-      return {
-        title: `${plural(counts.validated, "requirement")} waiting for client agreement`,
-        description:
-          "You have checked these. Mark them Agreed once the client confirms.",
-        cta: "Open validated",
-        href: `${base}/requirements?filter=validated`,
-      };
+      return { ...copy(counts.validated), href: `${base}/requirements?filter=validated` };
     case "sign_off":
       return {
-        title: `${plural(counts.agreed, "requirement")} agreed`,
-        description:
-          "The scope is agreed. Share it with the client for sign-off, or add new documents as the project evolves — new extractions are checked against this register.",
-        cta: "Open the sign-off document",
+        ...copy(counts.agreed),
         href: `/print/requirements/${projectId}?pack=signoff`,
       };
   }
@@ -209,7 +189,13 @@ export default async function ProjectOverviewPage({
   if (!project) notFound();
 
   // The viewer's day: every use below is a day comparison.
-  const [now, t] = await Promise.all([getViewerToday(), getT()]);
+  const [now, t, locale, timeZone] = await Promise.all([
+    getViewerToday(),
+    getT(),
+    getLocale(),
+    getViewerTimeZone(),
+  ]);
+  const dateLocale = intlLocale(locale);
   const [
     summary,
     overdueTasks,
@@ -278,7 +264,7 @@ export default async function ProjectOverviewPage({
     rejected: byStatus.rejected,
   };
   const step = nextDiscoveryStep(discovery);
-  const next = nextStepCopy(step, discovery, project.id);
+  const next = nextStepCopy(step, discovery, project.id, t);
   const live =
     byStatus.draft +
     byStatus.needs_clarification +
@@ -287,16 +273,16 @@ export default async function ProjectOverviewPage({
 
   const overdueList = (
     <OverviewCard
-      title="Overdue tasks"
+      title={t("overview.overdueTitle")}
       href={
         summary.overdueTasks > overdueTasks.length
           ? `${base}/tasks?filter=overdue`
           : undefined
       }
-      linkLabel={`All ${summary.overdueTasks}`}
+      linkLabel={t("overview.allCount", { count: summary.overdueTasks })}
     >
       {overdueTasks.length === 0 ? (
-        <Quiet>Nothing is past its due date.</Quiet>
+        <Quiet>{t("overview.overdueEmpty")}</Quiet>
       ) : (
         <ul className="space-y-2">
           {overdueTasks.map((task) => (
@@ -308,7 +294,7 @@ export default async function ProjectOverviewPage({
                 {task.title}
               </Link>
               <span className="shrink-0 text-xs text-red-700">
-                {task.dueDate ? formatDay(task.dueDate) : ""}
+                {task.dueDate ? formatDay(task.dueDate, dateLocale) : ""}
               </span>
             </li>
           ))}
@@ -319,16 +305,16 @@ export default async function ProjectOverviewPage({
 
   const blockedList = (
     <OverviewCard
-      title="Blocked tasks"
+      title={t("overview.blockedTitle")}
       href={
         summary.blockedTasks > blockedTasks.length
           ? `${base}/tasks?filter=blocked`
           : undefined
       }
-      linkLabel={`All ${summary.blockedTasks}`}
+      linkLabel={t("overview.allCount", { count: summary.blockedTasks })}
     >
       {blockedTasks.length === 0 ? (
-        <Quiet>Nothing is blocked.</Quiet>
+        <Quiet>{t("overview.blockedEmpty")}</Quiet>
       ) : (
         <ul className="space-y-2">
           {blockedTasks.map((task) => (
@@ -360,7 +346,7 @@ export default async function ProjectOverviewPage({
           <Card className="flex flex-wrap items-center justify-between gap-4 border-slate-300 p-5">
             <div className="min-w-0">
               <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-                Next step
+                {t("overview.nextStep")}
               </p>
               <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">
                 {next.title}
@@ -376,44 +362,50 @@ export default async function ProjectOverviewPage({
           </Card>
 
           <ol
-            aria-label="Discovery progress"
+            aria-label={t("overview.discoveryProgress")}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
           >
             <DiscoveryStage
               index={1}
-              label="Documents"
-              value={`${summary.readyDocuments} indexed`}
+              label={t("overview.stages.documents")}
+              value={t("overview.stages.documentsValue", { count: summary.readyDocuments })}
               hint={
                 summary.totalDocuments > summary.readyDocuments
-                  ? `${summary.totalDocuments - summary.readyDocuments} still processing`
+                  ? t("overview.stages.processing", {
+                      count: summary.totalDocuments - summary.readyDocuments,
+                    })
                   : undefined
               }
+              doneLabel={t("overview.done")}
               done={summary.readyDocuments > 0}
               href={`${base}/documents`}
             />
             <DiscoveryStage
               index={2}
-              label="Extracted"
-              value={`${live} requirement${live === 1 ? "" : "s"}`}
+              label={t("overview.stages.extracted")}
+              value={t("overview.stages.extractedValue", { count: live })}
+              doneLabel={t("overview.done")}
               done={live > 0}
               href={`${base}/requirements`}
             />
             <DiscoveryStage
               index={3}
-              label="Reviewed"
-              value={`${live - byStatus.draft} of ${live}`}
+              label={t("overview.stages.reviewed")}
+              value={t("overview.stages.ofTotal", { done: live - byStatus.draft, total: live })}
               hint={
                 byStatus.needs_clarification > 0
-                  ? `${byStatus.needs_clarification} waiting on the client`
+                  ? t("overview.stages.waitingClient", { count: byStatus.needs_clarification })
                   : undefined
               }
+              doneLabel={t("overview.done")}
               done={live > 0 && byStatus.draft === 0}
               href={`${base}/requirements?filter=draft`}
             />
             <DiscoveryStage
               index={4}
-              label="Agreed"
-              value={`${byStatus.approved} of ${live}`}
+              label={t("overview.stages.agreed")}
+              value={t("overview.stages.ofTotal", { done: byStatus.approved, total: live })}
+              doneLabel={t("overview.done")}
               done={live > 0 && byStatus.approved === live}
               href={`${base}/requirements?filter=approved`}
             />
@@ -425,37 +417,37 @@ export default async function ProjectOverviewPage({
         <SectionHeader title={t("project.tabs.tasks")} />
         <div className="grid gap-3 sm:grid-cols-3">
           <StatCard
-            label="Task completion"
+            label={t("overview.completion")}
             value={totalTasks === 0 ? "—" : `${completion}%`}
             href={`${base}/tasks`}
             hint={
               totalTasks === 0 ? (
-                "No tasks yet"
+                t("overview.noTasks")
               ) : (
                 <>
                   <ProgressBar
                     percent={completion}
-                    label="Tasks done"
+                    label={t("overview.tasksDone")}
                     className="mb-1.5"
                   />
-                  {summary.doneTasks} of {totalTasks} done
+                  {t("overview.doneOf", { done: summary.doneTasks, total: totalTasks })}
                 </>
               )
             }
           />
           <StatCard
-            label="Overdue tasks"
+            label={t("overview.overdueTitle")}
             value={summary.overdueTasks}
             tone="danger"
             href={`${base}/tasks?filter=overdue`}
             hint={
               summary.dueSoonTasks > 0
-                ? `${summary.dueSoonTasks} more due in 7 days`
-                : "Nothing else due this week"
+                ? t("overview.dueSoonMore", { count: summary.dueSoonTasks })
+                : t("overview.nothingThisWeek")
             }
           />
           <StatCard
-            label="Blocked tasks"
+            label={t("overview.blockedTitle")}
             value={summary.blockedTasks}
             tone="warning"
             href={`${base}/tasks?filter=blocked`}
@@ -468,10 +460,10 @@ export default async function ProjectOverviewPage({
       </section>
 
       {project.deliveryEnabled ? (
-        <section aria-label="Delivery" className="space-y-4">
+        <section aria-label={t("overview.delivery")} className="space-y-4">
           <SectionHeader
-            title="Delivery"
-            description="Milestones, risks, and reports for this project."
+            title={t("overview.delivery")}
+            description={t("overview.deliveryLead")}
           >
             <SectionToggle
               projectId={project.id}
@@ -484,46 +476,52 @@ export default async function ProjectOverviewPage({
             {project.discoveryEnabled ? (
               <>
                 <StatCard
-                  label="Scope coverage"
+                  label={t("overview.coverage")}
                   value={summary.approvedRequirements === 0 ? "—" : `${coverage}%`}
                   href={`${base}/requirements?filter=approved`}
                   hint={
                     summary.approvedRequirements === 0 ? (
-                      "Nothing agreed yet"
+                      t("overview.nothingAgreed")
                     ) : (
                       <>
                         <ProgressBar
                           percent={coverage}
-                          label="Agreed requirements with a delivery task"
+                          label={t("overview.coverageBar")}
                           className="mb-1.5"
                         />
-                        {coveredRequirements} of {summary.approvedRequirements} agreed
-                        have a task
+                        {t("overview.coverageHint", {
+                          covered: coveredRequirements,
+                          agreed: summary.approvedRequirements,
+                        })}
                       </>
                     )
                   }
                 />
                 <StatCard
-                  label="Uncovered requirements"
+                  label={t("overview.uncovered")}
                   value={summary.uncoveredRequirements}
                   tone="danger"
                   href={`${base}/requirements?filter=gaps`}
-                  hint="Agreed scope with no delivery task"
+                  hint={t("overview.uncoveredHint")}
                 />
               </>
             ) : null}
             <StatCard
-              label="Open risks"
+              label={t("overview.openRisks")}
               value={summary.openRisks}
               tone={highRisks > 0 ? "danger" : undefined}
               href={`${base}/risks`}
-              hint={highRisks > 0 ? `${highRisks} rated high` : undefined}
+              hint={highRisks > 0 ? t("overview.highRisks", { count: highRisks }) : undefined}
             />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <OverviewCard title="Upcoming milestones" href={`${base}/timeline`} linkLabel="Timeline">
+            <OverviewCard
+              title={t("overview.milestonesTitle")}
+              href={`${base}/timeline`}
+              linkLabel={t("overview.timeline")}
+            >
               {nextMilestones.length === 0 ? (
-                <Quiet>No milestones recorded yet.</Quiet>
+                <Quiet>{t("overview.milestonesEmpty")}</Quiet>
               ) : (
                 <ul className="space-y-2">
                   {nextMilestones.map((milestone) => {
@@ -544,9 +542,11 @@ export default async function ProjectOverviewPage({
                           )}
                         >
                           {milestone.targetDate
-                            ? formatDay(milestone.targetDate)
-                            : "No date"}
-                          {late ? <span className="sr-only"> (overdue)</span> : null}
+                            ? formatDay(milestone.targetDate, dateLocale)
+                            : t("common.noDate")}
+                          {late ? (
+                            <span className="sr-only"> {t("overview.overdue")}</span>
+                          ) : null}
                         </span>
                       </li>
                     );
@@ -555,16 +555,23 @@ export default async function ProjectOverviewPage({
               )}
             </OverviewCard>
 
-            <OverviewCard title="Top risks" href={`${base}/risks`} linkLabel="All risks">
+            <OverviewCard
+              title={t("overview.risksTitle")}
+              href={`${base}/risks`}
+              linkLabel={t("overview.allRisks")}
+            >
               {topRisks.length === 0 ? (
-                <Quiet>No open risks.</Quiet>
+                <Quiet>{t("overview.risksEmpty")}</Quiet>
               ) : (
                 <ul className="space-y-2">
                   {topRisks.map((risk) => (
                     <li key={risk.id} className="flex items-start justify-between gap-3 text-sm">
                       <span className="min-w-0 line-clamp-2">{risk.description}</span>
                       <Badge tone={LEVEL_TONE[worstRiskLevel(risk)]} className="shrink-0">
-                        {risk.impact} · {risk.likelihood}
+                        {t("overview.riskLevels", {
+                          impact: t(`riskLevel.${risk.impact}`),
+                          likelihood: t(`riskLevel.${risk.likelihood}`),
+                        })}
                       </Badge>
                     </li>
                   ))}
@@ -573,25 +580,28 @@ export default async function ProjectOverviewPage({
             </OverviewCard>
 
             <OverviewCard
-              title="Latest status report"
+              title={t("overview.reportTitle")}
               href={`${base}/reports`}
-              linkLabel={report ? "Open" : "Reports"}
+              linkLabel={report ? t("overview.open") : t("overview.reports")}
             >
               {report && latestReport ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <Badge tone={HEALTH_TONE[report.health]}>
-                      {report.health}
+                      {t(`reportHealth.${report.health}`)}
                     </Badge>
-                    {report.period.start} – {report.period.end} · generated{" "}
-                    {formatDate(latestReport.createdAt)}
+                    {t("overview.reportMeta", {
+                      start: report.period.start,
+                      end: report.period.end,
+                      date: formatDate(latestReport.createdAt, dateLocale, timeZone),
+                    })}
                   </div>
                   <p className="line-clamp-3 text-sm text-slate-700">
                     {report.narrative}
                   </p>
                 </div>
               ) : (
-                <Quiet>No weekly report yet. Generate one from the Reports tab.</Quiet>
+                <Quiet>{t("overview.reportEmpty")}</Quiet>
               )}
             </OverviewCard>
           </div>

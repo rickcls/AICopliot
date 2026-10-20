@@ -1,4 +1,11 @@
 import type { Dictionary } from "@/lib/i18n/translate";
+import { chatZhHant } from "@/lib/i18n/dictionaries/areas/chat.zh-Hant";
+import { deliveryZhHant } from "@/lib/i18n/dictionaries/areas/delivery.zh-Hant";
+import { evaluationsZhHant } from "@/lib/i18n/dictionaries/areas/evaluations.zh-Hant";
+import { overviewZhHant } from "@/lib/i18n/dictionaries/areas/overview.zh-Hant";
+import { requirementsZhHant } from "@/lib/i18n/dictionaries/areas/requirements.zh-Hant";
+import { sharedZhHant } from "@/lib/i18n/dictionaries/areas/shared.zh-Hant";
+import { tasksZhHant } from "@/lib/i18n/dictionaries/areas/tasks.zh-Hant";
 
 /**
  * 繁體中文（香港用字）介面文字。Written Chinese rather than Cantonese, which is
@@ -6,6 +13,13 @@ import type { Dictionary } from "@/lib/i18n/translate";
  * rejected by tests/i18n-dictionaries.test.ts.
  */
 export const zhHant = {
+  ...sharedZhHant,
+  ...tasksZhHant,
+  ...requirementsZhHant,
+  ...overviewZhHant,
+  ...deliveryZhHant,
+  ...chatZhHant,
+  ...evaluationsZhHant,
   app: {
     name: "ScopePilot",
     tagline: "AI 工作助理",
@@ -53,8 +67,23 @@ export const zhHant = {
   common: {
     couldNotReach: "無法連接伺服器。",
     saved: "已儲存",
+    saving: "儲存中…",
     noDate: "未定日期",
     unassigned: "未指派",
+    none: "無",
+    loading: "載入中",
+    close: "關閉",
+    cancel: "取消",
+    confirm: "確定",
+    delete: "刪除",
+    remove: "移除",
+    clear: "清除",
+    add: "新增",
+    all: "全部",
+    notifications: "通知",
+    dismissNotification: "關閉通知",
+    page: "第 {page} 頁",
+    hours: "{hours} 小時",
   },
   errors: {
     notFoundTitle: "找不到頁面",
@@ -68,6 +97,9 @@ export const zhHant = {
     goToToday: "前往今日",
     browseProjects: "瀏覽專案",
     backHome: "返回首頁",
+    sectionFailedTitle: "無法載入此部分",
+    sectionFailedBody: "載入此專案時出現問題，你的資料沒有任何改動。",
+    backToProjects: "返回專案",
   },
   nav: {
     main: "主選單",
@@ -617,6 +649,7 @@ export const zhHant = {
   },
   project: {
     breadcrumb: "專案",
+    breadcrumbLabel: "頁面路徑",
     ask: "就此專案提問",
     sections: "專案分頁",
     tabs: {

@@ -1,3 +1,4 @@
+import type { Translate } from "@/lib/i18n/translate";
 import type { Citation } from "@/lib/schemas";
 
 /**
@@ -16,31 +17,22 @@ export interface NextAction {
 /** More than four stops being a next step and becomes a toolbar. */
 const MAX_ACTIONS = 4;
 
-const PROJECT_ACTION_LABELS = {
-  task: "Open in Tasks",
-  // A dependency lives on the board, so it collapses into the task link.
-  dependency: "Open in Tasks",
-  milestone: "Open the timeline",
-  risk: "Open the risk register",
-  // Deliberately the register, not the record: /projects/[id]/requirements has
-  // no per-record anchor yet, so "View REQ-007" would land you at the top of the
-  // list having promised otherwise.
-  requirement: "Open the requirements register",
-  project_snapshot: "Open the project overview",
-} as const;
+// Labels live under `chat.next`. A dependency lives on the board, so it reads
+// as the task link; a requirement opens the register rather than the record,
+// because "View REQ-007" would promise an anchor the link does not reach.
 
 function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-export function nextActionsFor(citations: Citation[]): NextAction[] {
+export function nextActionsFor(citations: Citation[], t: Translate): NextAction[] {
   const byHref = new Map<string, NextAction>();
 
   for (const citation of citations) {
     const action: NextAction =
       citation.kind === "document"
         ? {
-            label: `Open ${citation.filename}`,
+            label: t("chat.next.openDocument", { filename: citation.filename }),
             href: `/documents/${citation.documentId}`,
           }
         : {
@@ -48,8 +40,8 @@ export function nextActionsFor(citations: Citation[]): NextAction[] {
             // tasks would otherwise be several identical "Open in Tasks".
             label:
               citation.kind === "task"
-                ? `Open “${truncate(citation.title, 40)}”`
-                : PROJECT_ACTION_LABELS[citation.kind],
+                ? t("chat.next.openTask", { title: truncate(citation.title, 40) })
+                : t(`chat.next.${citation.kind}`),
             // Already constrained to an in-app path by projectCitationSchema, so
             // a model-influenced value can never become an off-site URL.
             href: citation.href,

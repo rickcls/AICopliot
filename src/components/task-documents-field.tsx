@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { FileText, Paperclip, X } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
 import { Badge, QUIET_CONTROL, Select, Spinner, buttonClasses } from "@/components/ui";
 import type { ProjectDocumentOption } from "@/components/task-types";
 import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
@@ -41,6 +42,7 @@ export function TaskDocumentsField({
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   const linkedIds = new Set(linked.map((document) => document.id));
   const unlinked = available.filter((document) => !linkedIds.has(document.id));
@@ -61,7 +63,9 @@ export function TaskDocumentsField({
         // Vercel refuses bodies over 4.5 MB before the route runs, with no JSON.
         setError(
           data.error ??
-            (response.status === 413 ? "That file is too large to upload." : "Upload failed."),
+            (response.status === 413
+              ? t("tasks.documents.tooLarge")
+              : t("tasks.documents.uploadFailed")),
         );
         return;
       }
@@ -87,11 +91,16 @@ export function TaskDocumentsField({
       });
       if (processed.status !== "ready") {
         setError(
-          `${file.name} could not be processed${processed.error ? `: ${processed.error}` : "."} Retry it from the Documents tab.`,
+          processed.error
+            ? t("tasks.documents.processFailedReason", {
+                filename: file.name,
+                reason: processed.error,
+              })
+            : t("tasks.documents.processFailed", { filename: file.name }),
         );
       }
     } catch {
-      setError("Upload failed. Please try again.");
+      setError(t("tasks.documents.uploadRetry"));
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -117,19 +126,19 @@ export function TaskDocumentsField({
                 {document.originalFilename}
               </a>
               {document.status === "failed" ? (
-                <Badge tone="danger">Failed</Badge>
+                <Badge tone="danger">{t("documents.status.failed")}</Badge>
               ) : document.status !== "ready" ? (
                 <span className="inline-flex items-center gap-1 text-xs text-slate-500">
                   <Spinner className="size-3" />
-                  Indexing
+                  {t("documents.status.processing")}
                 </span>
               ) : null}
               <button
                 type="button"
                 onClick={() => onRemove(document.id)}
                 disabled={disabled}
-                aria-label={`Unlink ${document.originalFilename}`}
-                title="Unlink (the document stays in the project)"
+                aria-label={t("tasks.documents.unlink", { filename: document.originalFilename })}
+                title={t("tasks.documents.unlinkHint")}
                 className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-50"
               >
                 <X className="size-3.5" aria-hidden />
@@ -142,7 +151,7 @@ export function TaskDocumentsField({
       <div className="flex flex-wrap items-center gap-2">
         {unlinked.length > 0 ? (
           <Select
-            aria-label="Link a project document"
+            aria-label={t("tasks.documents.linkLabel")}
             className={cn(QUIET_CONTROL, "max-w-xs text-slate-500")}
             value=""
             disabled={disabled}
@@ -151,11 +160,13 @@ export function TaskDocumentsField({
               if (document) onAdd(document);
             }}
           >
-            <option value="">Link a project document…</option>
+            <option value="">{t("tasks.documents.linkPlaceholder")}</option>
             {unlinked.map((document) => (
               <option key={document.id} value={document.id}>
                 {document.originalFilename}
-                {document.status === "ready" ? "" : ` (${document.status})`}
+                {document.status === "ready"
+                  ? ""
+                  : ` (${t(`documents.status.${document.status}`)})`}
               </option>
             ))}
           </Select>
@@ -172,7 +183,7 @@ export function TaskDocumentsField({
           })}
         >
           {uploading ? <Spinner className="size-3.5" /> : <Paperclip className="size-3.5" aria-hidden />}
-          {uploading ? "Uploading…" : "Upload"}
+          {uploading ? t("tasks.documents.uploading") : t("tasks.documents.upload")}
           <input
             ref={fileInput}
             type="file"

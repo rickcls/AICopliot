@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "./ui";
 
 /**
@@ -55,6 +56,7 @@ export function useConfirm() {
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [options, setOptions] = React.useState<ConfirmOptions | null>(null);
   const dialogRef = React.useRef<HTMLDialogElement>(null);
+  const t = useT();
 
   // The pending promise lives in a ref, not state: a state updater must be pure,
   // and resolving from inside one would fire twice under StrictMode.
@@ -124,14 +126,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 autoFocus
                 onClick={() => settle(false)}
               >
-                {options.cancelLabel ?? "Cancel"}
+                {options.cancelLabel ?? t("common.cancel")}
               </Button>
               <Button
                 type="button"
                 variant={options.tone === "danger" ? "danger" : "primary"}
                 onClick={() => settle(true)}
               >
-                {options.confirmLabel ?? "Confirm"}
+                {options.confirmLabel ?? t("common.confirm")}
               </Button>
             </div>
           </div>

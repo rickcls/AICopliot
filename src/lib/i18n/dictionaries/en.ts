@@ -1,10 +1,28 @@
+import { chatEn } from "@/lib/i18n/dictionaries/areas/chat.en";
+import { deliveryEn } from "@/lib/i18n/dictionaries/areas/delivery.en";
+import { evaluationsEn } from "@/lib/i18n/dictionaries/areas/evaluations.en";
+import { overviewEn } from "@/lib/i18n/dictionaries/areas/overview.en";
+import { requirementsEn } from "@/lib/i18n/dictionaries/areas/requirements.en";
+import { sharedEn } from "@/lib/i18n/dictionaries/areas/shared.en";
+import { tasksEn } from "@/lib/i18n/dictionaries/areas/tasks.en";
+
 /**
  * English UI copy. This file defines the keys: every other dictionary must have
  * exactly the same shape (checked by `satisfies Dictionary` and by a test).
  *
  * Plural messages are `{ one, other }` objects and read `{count}`.
+ *
+ * Larger areas live in `areas/<area>.en.ts` and are spread in here, so this
+ * file stays readable; each has a `<area>.zh-Hant.ts` twin.
  */
 export const en = {
+  ...sharedEn,
+  ...tasksEn,
+  ...requirementsEn,
+  ...overviewEn,
+  ...deliveryEn,
+  ...chatEn,
+  ...evaluationsEn,
   app: {
     name: "ScopePilot",
     tagline: "AI work assistant",
@@ -52,8 +70,23 @@ export const en = {
   common: {
     couldNotReach: "Could not reach the server.",
     saved: "Saved",
+    saving: "Saving…",
     noDate: "No date",
     unassigned: "Unassigned",
+    none: "None",
+    loading: "Loading",
+    close: "Close",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    delete: "Delete",
+    remove: "Remove",
+    clear: "Clear",
+    add: "Add",
+    all: "All",
+    notifications: "Notifications",
+    dismissNotification: "Dismiss notification",
+    page: "p.{page}",
+    hours: "{hours}h",
   },
   errors: {
     notFoundTitle: "Not found",
@@ -67,6 +100,9 @@ export const en = {
     goToToday: "Go to Today",
     browseProjects: "Browse projects",
     backHome: "Back to home",
+    sectionFailedTitle: "This section could not be loaded",
+    sectionFailedBody: "Something went wrong while loading this project. Your data has not been changed.",
+    backToProjects: "Back to projects",
   },
   nav: {
     main: "Main",
@@ -616,6 +652,7 @@ export const en = {
   },
   project: {
     breadcrumb: "Projects",
+    breadcrumbLabel: "Breadcrumb",
     ask: "Ask this project",
     sections: "Project sections",
     tabs: {

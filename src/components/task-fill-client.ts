@@ -5,6 +5,7 @@ import {
   type TaskFillResult,
   type TaskFillSource,
 } from "@/lib/pm/task-fill-apply";
+import type { Translate } from "@/lib/i18n/translate";
 
 /** What the form shows after a fill: what changed, what was left, and why. */
 export interface FillSummary {
@@ -24,7 +25,11 @@ export interface FillSummary {
 export async function fillDraft<T extends FillableDraft & { title: string }>(
   projectId: string,
   draft: T,
-  options: { priorityIsBlank: boolean; linkedRequirementIds?: readonly string[] },
+  options: {
+    priorityIsBlank: boolean;
+    linkedRequirementIds?: readonly string[];
+    t: Translate;
+  },
 ): Promise<{ draft: T; summary: FillSummary }> {
   let response: Response;
   try {
@@ -38,11 +43,11 @@ export async function fillDraft<T extends FillableDraft & { title: string }>(
       }),
     });
   } catch {
-    throw new Error("Could not reach the server.");
+    throw new Error(options.t("common.couldNotReach"));
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error ?? "Could not fill in the task.");
+    throw new Error(data.error ?? options.t("tasks.fill.requestFailed"));
   }
 
   const result = data as TaskFillResult;

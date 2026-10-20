@@ -6,6 +6,7 @@ import { MessagesSquare } from "lucide-react";
 import type { LoadedConversation, ThreadSummary } from "@/lib/chat/history";
 import type { AnswerProgress } from "@/lib/rag/answer";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { Modal, ModalBody } from "@/components/modal";
 import { Button, EmptyState, ErrorState, LinkButton } from "@/components/ui";
@@ -57,6 +58,7 @@ export function ChatWorkspace({
   const router = useRouter();
   const confirm = useConfirm();
   const toast = useToast();
+  const t = useT();
 
   // The page keys this component on the conversation id, so state starts from
   // the right thread on every navigation without an effect copying props.
@@ -103,9 +105,9 @@ export function ChatWorkspace({
   }) {
     if (turns.length > 0) {
       const confirmed = await confirm({
-        title: "Start a new thread?",
-        body: "Answers from different evidence sets are never mixed, so changing what you are asking about begins a fresh conversation.",
-        confirmLabel: "Start new thread",
+        title: t("chat.newThreadTitle"),
+        body: t("chat.newThreadBody"),
+        confirmLabel: t("chat.newThreadConfirm"),
       });
       if (!confirmed) return;
     }
@@ -147,13 +149,13 @@ export function ChatWorkspace({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        toast.error(data.error ?? "Could not apply that change.");
+        toast.error(data.error ?? t("chat.applyFailed"));
         return false;
       }
-      toast.success("Applied to the task");
+      toast.success(t("chat.applied"));
       return true;
     } catch {
-      toast.error("Could not reach the server.");
+      toast.error(t("common.couldNotReach"));
       return false;
     }
   }
@@ -224,6 +226,7 @@ export function ChatWorkspace({
           setTurns((previous) => [...previous, assistantTurnFrom(payload)]),
         onError: fail,
       },
+      t,
     );
 
     if (outcome === "superseded") return;
@@ -243,20 +246,20 @@ export function ChatWorkspace({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        toast.error(data.error ?? "Could not rename that thread.");
+        toast.error(data.error ?? t("chat.renameFailed"));
         return;
       }
       router.refresh();
     } catch {
-      toast.error("Could not reach the server.");
+      toast.error(t("common.couldNotReach"));
     }
   }
 
   async function deleteThread(thread: ThreadSummary) {
     const confirmed = await confirm({
-      title: `Delete “${thread.title}”?`,
-      body: "Its questions, answers, and any feedback you gave on them are removed. This cannot be undone.",
-      confirmLabel: "Delete thread",
+      title: t("chat.deleteTitle", { title: thread.title }),
+      body: t("chat.deleteBody"),
+      confirmLabel: t("chat.deleteConfirm"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -267,16 +270,16 @@ export function ChatWorkspace({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        toast.error(data.error ?? "Could not delete that thread.");
+        toast.error(data.error ?? t("chat.deleteFailed"));
         return;
       }
-      toast.success("Thread deleted");
+      toast.success(t("chat.deleted"));
       setThreadsOpen(false);
       // Leaving a deleted thread's URL, rather than refreshing it into a 404.
       if (thread.id === conversationId) router.push("/chat");
       else router.refresh();
     } catch {
-      toast.error("Could not reach the server.");
+      toast.error(t("common.couldNotReach"));
     }
   }
 
@@ -301,11 +304,11 @@ export function ChatWorkspace({
           <div className="mb-5 flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-semibold tracking-tight">
-                {conversation?.conversation.title ?? "Ask"}
+                {conversation?.conversation.title ?? t("chat.title")}
               </h1>
               {focus.kind === "task" ? (
                 <p className="mt-1 text-sm text-slate-600">
-                  About the task{" "}
+                  {t("chat.aboutTaskBefore")}{" "}
                   {focus.taskId && projectId ? (
                     <a
                       href={`/projects/${projectId}/tasks?task=${focus.taskId}`}
@@ -314,26 +317,21 @@ export function ChatWorkspace({
                       {focus.taskTitle}
                     </a>
                   ) : (
-                    <span className="font-medium">(deleted)</span>
+                    <span className="font-medium">{t("chat.deletedTask")}</span>
                   )}
-                  : its record, connected records, and linked documents. Answers
-                  can propose edits for you to apply.
+                  {t("chat.aboutTaskAfter")}
                 </p>
               ) : focus.kind === "documents" ? (
                 <p className="mt-1 text-sm text-slate-600">
-                  Only from{" "}
+                  {t("chat.onlyFrom")}{" "}
                   <span className="font-medium text-slate-900">
                     {focus.documents.length === 1
                       ? focus.documents[0].filename
-                      : `${focus.documents.length} chosen documents`}
+                      : t("chat.chosenDocuments", { count: focus.documents.length })}
                   </span>
-                  .
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-slate-600">
-                  Grounded answers from your documents, and from a project&rsquo;s
-                  approved records when you pick one.
-                </p>
+                <p className="mt-1 text-sm text-slate-600">{t("chat.lead")}</p>
               )}
             </div>
             {/* Below lg the rail has no room beside the 56px icon sidebar, so
@@ -345,25 +343,25 @@ export function ChatWorkspace({
               onClick={() => setThreadsOpen(true)}
             >
               <MessagesSquare className="size-4 text-slate-400" aria-hidden />
-              Threads ({threads.length})
+              {t("chat.threads", { count: threads.length })}
             </Button>
           </div>
 
           {noEvidence ? (
             <EmptyState
-              title="No supporting project evidence yet"
-              description="Index a document or add approved project records before asking questions."
+              title={t("chat.noEvidenceTitle")}
+              description={t("chat.noEvidenceBody")}
               action={
                 <LinkButton href={projectId ? `/projects/${projectId}` : "/projects"}>
-                  {projectId ? "Go to project" : "Go to projects"}
+                  {projectId ? t("chat.goToProject") : t("chat.goToProjects")}
                 </LinkButton>
               }
             />
           ) : turns.length === 0 ? (
             <div className="mb-4">
               <EmptyState
-                title="Ask a question to start"
-                description="Every claim in an answer is cited back to the document passage or live project record it came from. If nothing supports an answer, you get a refusal rather than a guess."
+                title={t("chat.startTitle")}
+                description={t("chat.startBody")}
               />
             </div>
           ) : (
@@ -433,7 +431,7 @@ export function ChatWorkspace({
 
       {threadsOpen ? (
         <Modal
-          title="Conversations"
+          title={t("chat.conversations")}
           onClose={() => setThreadsOpen(false)}
           className="max-w-sm"
         >

@@ -8,6 +8,7 @@ import {
   GanttChartSquare,
 } from "lucide-react";
 import { GanttChart } from "@/components/gantt-chart";
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import { TimelineCalendar } from "@/components/timeline-calendar";
 import { Button, Card } from "@/components/ui";
 import {
@@ -51,8 +52,8 @@ export interface TimelineRow {
 }
 
 const VIEWS = [
-  { id: "gantt", label: "Gantt", icon: GanttChartSquare },
-  { id: "calendar", label: "Calendar", icon: CalendarDays },
+  { id: "gantt", icon: GanttChartSquare },
+  { id: "calendar", icon: CalendarDays },
 ] as const;
 
 export function ProjectTimeline({
@@ -63,6 +64,8 @@ export function ProjectTimeline({
   nowIso: string;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
+  const t = useT();
+  const dateLocale = useDateLocale();
 
   const items = useMemo<GanttInput[]>(
     () =>
@@ -102,10 +105,10 @@ export function ProjectTimeline({
     initialCalendarMonth(calendarItems, now),
   );
 
-  const gantt = useMemo(() => buildGantt(items, now), [items, now]);
+  const gantt = useMemo(() => buildGantt(items, now, dateLocale), [items, now, dateLocale]);
   const calendar = useMemo(
-    () => buildCalendarMonth(calendarItems, month, now),
-    [calendarItems, month, now],
+    () => buildCalendarMonth(calendarItems, month, now, dateLocale),
+    [calendarItems, month, now, dateLocale],
   );
 
   const undated = items.filter(
@@ -118,14 +121,18 @@ export function ProjectTimeline({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-slate-200 px-5 py-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold tracking-tight text-slate-900">
-            Schedule
+            {t("timeline.schedule")}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
             {view === "calendar"
-              ? `${calendar.inMonthCount} due in ${calendar.label}`
+              ? t("timeline.dueInMonth", { count: calendar.inMonthCount, month: calendar.label })
               : gantt
-                ? `${formatDay(gantt.start)} – ${formatDay(gantt.end)} · ${gantt.bars.length} item${gantt.bars.length === 1 ? "" : "s"}`
-                : "Nothing scheduled"}
+                ? t("timeline.range", {
+                    start: formatDay(gantt.start, dateLocale),
+                    end: formatDay(gantt.end, dateLocale),
+                    count: gantt.bars.length,
+                  })
+                : t("timeline.nothingScheduled")}
           </p>
         </div>
 
@@ -136,7 +143,7 @@ export function ProjectTimeline({
                 type="button"
                 variant="secondary"
                 size="icon"
-                aria-label="Previous month"
+                aria-label={t("timeline.previousMonth")}
                 onClick={() => setMonth((current) => addUtcMonths(current, -1))}
               >
                 <ChevronLeft className="size-4" aria-hidden />
@@ -145,7 +152,7 @@ export function ProjectTimeline({
                 type="button"
                 variant="secondary"
                 size="icon"
-                aria-label="Next month"
+                aria-label={t("timeline.nextMonth")}
                 onClick={() => setMonth((current) => addUtcMonths(current, 1))}
               >
                 <ChevronRight className="size-4" aria-hidden />
@@ -157,17 +164,17 @@ export function ProjectTimeline({
                 disabled={onThisMonth}
                 onClick={() => setMonth(startOfUtcMonth(now))}
               >
-                Today
+                {t("timeline.today")}
               </Button>
             </div>
           ) : null}
 
           <div
             role="group"
-            aria-label="Timeline view"
+            aria-label={t("timeline.viewLabel")}
             className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
           >
-            {VIEWS.map(({ id, label, icon: Icon }) => (
+            {VIEWS.map(({ id, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -181,7 +188,7 @@ export function ProjectTimeline({
                 )}
               >
                 <Icon className="size-3.5" aria-hidden />
-                {label}
+                {t(`timeline.${id}`)}
               </button>
             ))}
           </div>
@@ -197,7 +204,7 @@ export function ProjectTimeline({
       {undated.length > 0 ? (
         <div className="border-t border-slate-200 px-5 py-3">
           <p className="text-xs font-medium text-slate-600">
-            Not scheduled ({undated.length})
+            {t("timeline.notScheduled", { count: undated.length })}
           </p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {undated.map((item) => (

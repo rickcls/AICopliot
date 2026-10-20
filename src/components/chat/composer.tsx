@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { ArrowUp } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
 import { Button, QUIET_CONTROL, Select, Spinner, Textarea } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { ChatFocusState, FocusOptions, ProjectOption } from "./types";
@@ -50,6 +51,7 @@ export function Composer({
   className?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const t = useT();
 
   const selectedProject = projects.find((project) => project.id === projectId);
   const documentCount = projectId
@@ -95,7 +97,7 @@ export function Composer({
         className="rounded-2xl border border-slate-300 bg-white p-2 shadow-sm focus-within:border-slate-900"
       >
         <label htmlFor="question" className="sr-only">
-          Your question
+          {t("chat.composer.question")}
         </label>
         <Textarea
           id="question"
@@ -111,23 +113,26 @@ export function Composer({
             event.preventDefault();
             submit();
           }}
-          placeholder="Ask about your documents and project records…"
+          placeholder={t("chat.composer.placeholder")}
           disabled={pending}
           className="resize-none border-transparent bg-transparent px-2 py-1.5 focus-visible:border-transparent focus-visible:ring-0"
         />
 
-        <div className="mt-1 flex items-center gap-2 px-1">
+        {/* Wraps and lets the pickers shrink: at phone width two pickers and
+            the send button are wider than the composer, and the row pushed the
+            whole page sideways. */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
           <label htmlFor="chat-project" className="sr-only">
-            Ask about
+            {t("chat.composer.askAbout")}
           </label>
           <Select
             id="chat-project"
             value={projectId}
             onChange={(event) => onProjectChange(event.target.value)}
             disabled={pending}
-            className={cn(QUIET_CONTROL, "h-8 w-auto max-w-[14rem] text-xs")}
+            className={cn(QUIET_CONTROL, "h-8 w-auto max-w-[14rem] min-w-0 shrink text-xs")}
           >
-            <option value="">All documents</option>
+            <option value="">{t("chat.composer.allDocuments")}</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
@@ -136,23 +141,25 @@ export function Composer({
           </Select>
 
           <label htmlFor="chat-focus" className="sr-only">
-            Focus on
+            {t("chat.composer.focusOn")}
           </label>
           <Select
             id="chat-focus"
             value={focusValue}
             onChange={(event) => onFocusChange(event.target.value)}
             disabled={pending}
-            className={cn(QUIET_CONTROL, "h-8 w-auto max-w-[14rem] text-xs")}
+            className={cn(QUIET_CONTROL, "h-8 w-auto max-w-[14rem] min-w-0 shrink text-xs")}
           >
-            <option value="">{projectId ? "Whole project" : "Every document"}</option>
+            <option value="">
+              {projectId ? t("chat.composer.wholeProject") : t("chat.composer.everyDocument")}
+            </option>
             {focus.kind === "task" && !focus.taskId ? (
               <option value="task:deleted" disabled>
-                Deleted task
+                {t("chat.composer.deletedTask")}
               </option>
             ) : null}
             {focusOptions.tasks.length > 0 ? (
-              <optgroup label="A task">
+              <optgroup label={t("chat.composer.aTask")}>
                 {focusOptions.tasks.map((task) => (
                   <option key={task.id} value={`task:${task.id}`}>
                     {task.title}
@@ -161,7 +168,7 @@ export function Composer({
               </optgroup>
             ) : null}
             {focusOptions.documents.length > 0 ? (
-              <optgroup label="A document">
+              <optgroup label={t("chat.composer.aDocument")}>
                 {focusOptions.documents.map((document) => (
                   <option key={document.id} value={`doc:${document.id}`}>
                     {document.filename}
@@ -171,25 +178,32 @@ export function Composer({
             ) : null}
             {focusValue === "several-documents" ? (
               <option value="several-documents" disabled>
-                {focus.kind === "documents" ? `${focus.documents.length} documents` : ""}
+                {focus.kind === "documents"
+                  ? t("chat.composer.documentsCount", { count: focus.documents.length })
+                  : ""}
               </option>
             ) : null}
             {focusOptions.documents.length > 1 ? (
-              <option value="choose-documents">Several documents…</option>
+              <option value="choose-documents">{t("chat.composer.severalDocuments")}</option>
             ) : null}
           </Select>
 
           <span className="hidden min-w-0 truncate text-xs text-slate-500 sm:inline">
-            {focus.kind !== "none" ? "" : projectId
-              ? `${documentCount} document${documentCount === 1 ? "" : "s"} · ${recordCount} record${recordCount === 1 ? "" : "s"}`
-              : `${documentCount} document${documentCount === 1 ? "" : "s"} indexed`}
+            {focus.kind !== "none"
+              ? ""
+              : projectId
+                ? t("chat.composer.projectEvidence", {
+                    documents: t("chat.composer.documents", { count: documentCount }),
+                    records: t("chat.composer.records", { count: recordCount }),
+                  })
+                : t("chat.composer.indexed", { count: documentCount })}
           </span>
 
           <Button
             type="submit"
             size="icon"
             disabled={!canSend}
-            aria-label="Ask"
+            aria-label={t("chat.composer.ask")}
             className="ml-auto rounded-full"
           >
             {pending ? (
@@ -203,18 +217,18 @@ export function Composer({
 
       {evidenceCount === 0 ? (
         <p className="mt-2 px-1 text-xs text-amber-700">
-          This scope has no indexed documents or approved project records yet.
+          {t("chat.composer.noEvidence")}
         </p>
       ) : (
         <p className="mt-2 px-1 text-xs text-slate-400">
           {focus.kind === "task"
-            ? "Answers come from this task, its connected records, and its linked documents, and can propose edits you apply."
+            ? t("chat.composer.hintTask")
             : focus.kind === "documents"
-              ? "Answers come only from the chosen documents."
+              ? t("chat.composer.hintDocuments")
               : projectId
-                ? "Answers combine this project's documents with its current approved records, and cite both. Pick a task or document to narrow it."
-                : "Answers come from your indexed documents. Pick a project to include its live records."}
-          {" Enter to send, Shift+Enter for a new line."}
+                ? t("chat.composer.hintProject")
+                : t("chat.composer.hintAll")}
+          {` ${t("chat.composer.keys")}`}
         </p>
       )}
     </div>

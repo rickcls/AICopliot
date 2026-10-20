@@ -2,23 +2,23 @@
 
 import { useState } from "react";
 import { Check, Flag } from "lucide-react";
+import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Button, Spinner } from "@/components/ui";
+import { labelOr, type Translate } from "@/lib/i18n/translate";
 import { PRIORITY_FLAG } from "@/components/task-types";
 import type { TaskProposal } from "@/lib/schemas";
 import { cn, formatDay } from "@/lib/utils";
 
-const FIELD_LABEL: Record<TaskProposal["field"], string> = {
-  description: "Description",
-  priority: "Priority",
-  estimatedHours: "Estimate",
-  startDate: "Start date",
-  dueDate: "Due date",
-};
-
-function display(field: TaskProposal["field"], value: string | number | null) {
+function display(
+  field: TaskProposal["field"],
+  value: string | number | null,
+  t: Translate,
+  dateLocale: string,
+) {
   if (value === null || value === "") return "—";
-  if (field === "startDate" || field === "dueDate") return formatDay(String(value));
-  if (field === "estimatedHours") return `${value} h`;
+  if (field === "startDate" || field === "dueDate") return formatDay(String(value), dateLocale);
+  if (field === "estimatedHours") return t("chat.proposal.hours", { hours: value });
+  if (field === "priority") return labelOr(t, `priority.${value}`, String(value));
   return String(value);
 }
 
@@ -48,6 +48,8 @@ export function ProposalCard({
 }) {
   const [applying, setApplying] = useState(false);
   const [appliedHere, setAppliedHere] = useState(false);
+  const t = useT();
+  const dateLocale = useDateLocale();
 
   const currentValue = current?.[proposal.field];
   const known = current !== undefined && proposal.field in current;
@@ -69,27 +71,30 @@ export function ProposalCard({
     <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-xs font-semibold tracking-wide text-violet-800 uppercase">
-          Proposed {FIELD_LABEL[proposal.field].toLowerCase()}
+          {t(`chat.proposal.proposed.${proposal.field}`)}
         </span>
         {known && !applied ? (
           <span className="text-xs text-slate-500">
-            now: {proposal.field === "description"
-              ? currentValue
-                ? "set"
-                : "empty"
-              : display(proposal.field, currentValue ?? null)}
+            {t("chat.proposal.now", {
+              value:
+                proposal.field === "description"
+                  ? currentValue
+                    ? t("chat.proposal.set")
+                    : t("chat.proposal.empty")
+                  : display(proposal.field, currentValue ?? null, t, dateLocale),
+            })}
           </span>
         ) : null}
         <span className="ml-auto">
           {applied ? (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
               <Check className="size-3.5" aria-hidden />
-              Applied
+              {t("chat.proposal.applied")}
             </span>
           ) : (
             <Button type="button" size="sm" onClick={() => void apply()} disabled={applying}>
               {applying ? <Spinner className="size-3.5 border-white/40 border-t-white" /> : null}
-              Apply
+              {t("chat.proposal.apply")}
             </Button>
           )}
         </span>
@@ -99,7 +104,7 @@ export function ProposalCard({
         {proposal.field === "description" ? (
           <p className="whitespace-pre-wrap">{String(proposal.value)}</p>
         ) : proposal.field === "priority" ? (
-          <span className="inline-flex items-center gap-1.5 font-medium capitalize">
+          <span className="inline-flex items-center gap-1.5 font-medium">
             <Flag
               fill="currentColor"
               aria-hidden
@@ -108,10 +113,12 @@ export function ProposalCard({
                 PRIORITY_FLAG[proposal.value as keyof typeof PRIORITY_FLAG],
               )}
             />
-            {String(proposal.value)}
+            {display(proposal.field, proposal.value, t, dateLocale)}
           </span>
         ) : (
-          <span className="font-medium">{display(proposal.field, proposal.value)}</span>
+          <span className="font-medium">
+            {display(proposal.field, proposal.value, t, dateLocale)}
+          </span>
         )}
       </div>
 

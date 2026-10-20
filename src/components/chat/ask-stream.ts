@@ -1,5 +1,6 @@
 import { parseSseChunk } from "@/lib/chat/sse";
 import type { AnswerProgress } from "@/lib/rag/answer";
+import type { Translate } from "@/lib/i18n/translate";
 import { citationSchema, taskProposalSchema } from "@/lib/schemas";
 import type { AssistantTurn } from "./types";
 
@@ -42,6 +43,7 @@ export type StreamOutcome = "answered" | "failed" | "superseded";
 export async function streamAnswer(
   body: Record<string, unknown>,
   handlers: AnswerStreamHandlers,
+  t: Translate,
 ): Promise<StreamOutcome> {
   try {
     const response = await fetch("/api/chat", {
@@ -53,7 +55,7 @@ export async function streamAnswer(
     // Guards return JSON with a real status; only a 200 carries a stream.
     if (!response.ok || !response.body) {
       const data = await response.json().catch(() => ({}));
-      handlers.onError(data.error ?? "Could not get an answer.");
+      handlers.onError(data.error ?? t("chat.stream.failed"));
       return "failed";
     }
 
@@ -80,17 +82,17 @@ export async function streamAnswer(
           handlers.onResult(payload);
         } else if (frame.event === "error") {
           outcome = "failed";
-          handlers.onError(payload.error ?? "Could not get an answer.");
+          handlers.onError(payload.error ?? t("chat.stream.failed"));
         }
       }
     }
 
     if (outcome) return outcome;
-    handlers.onError("The answer stream ended unexpectedly.");
+    handlers.onError(t("chat.stream.ended"));
     return "failed";
   } catch {
     if (!handlers.isCurrent()) return "superseded";
-    handlers.onError("Could not reach the server. Please try again.");
+    handlers.onError(t("chat.stream.unreachable"));
     return "failed";
   }
 }

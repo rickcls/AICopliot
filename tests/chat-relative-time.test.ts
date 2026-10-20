@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { formatThreadTime } from "@/lib/chat/relative-time";
+import { formatThreadTime as formatWith } from "@/lib/chat/relative-time";
+import { DICTIONARIES } from "@/lib/i18n/dictionaries";
+import { createTranslator } from "@/lib/i18n/translate";
 
 /**
  * The rail renders inside a client component, so the same input must produce
@@ -8,6 +10,12 @@ import { formatThreadTime } from "@/lib/chat/relative-time";
  */
 
 const now = "2026-08-06T12:00:00.000Z";
+const en = createTranslator("en", DICTIONARIES.en, DICTIONARIES.en);
+const zh = createTranslator("zh-Hant", DICTIONARIES["zh-Hant"], DICTIONARIES.en);
+
+function formatThreadTime(iso: string, nowIso: string) {
+  return formatWith(iso, nowIso, en, "en-GB");
+}
 
 describe("formatThreadTime", () => {
   it("reads anything under a minute as just now", () => {
@@ -34,5 +42,11 @@ describe("formatThreadTime", () => {
   it("is stable regardless of the machine's timezone", () => {
     // A UTC-pinned fallback is what keeps server render and hydration equal.
     expect(formatThreadTime("2026-07-20T23:30:00.000Z", now)).toBe("20 Jul");
+  });
+
+  it("speaks the viewer's language", () => {
+    expect(formatWith("2026-08-06T11:35:00.000Z", now, zh, "zh-HK")).toBe("25 分鐘前");
+    expect(formatWith("2026-08-06T11:59:30.000Z", now, zh, "zh-HK")).toBe("剛剛");
+    expect(formatWith("2026-07-20T12:00:00.000Z", now, zh, "zh-HK")).toBe("7月20日");
   });
 });

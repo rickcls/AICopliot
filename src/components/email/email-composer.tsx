@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Check, Copy, ExternalLink, Mail, PenLine, Trash2 } from "lucide-react";
-import { useLocale, useT } from "@/components/i18n-provider";
+import { useLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import {
   Badge,
@@ -19,7 +19,7 @@ import {
 import { gmailComposeUrl, mailtoUrl, recipientAddress } from "@/lib/email/links";
 import type { EmailDraftView } from "@/lib/email/service";
 import { intlLocale } from "@/lib/i18n/locales";
-import { cn, formatDay } from "@/lib/utils";
+import { cn, formatInstantDay } from "@/lib/utils";
 
 const PURPOSES = ["reply", "follow_up", "update", "request", "thanks", "other"] as const;
 type Purpose = (typeof PURPOSES)[number];
@@ -55,6 +55,7 @@ export function EmailComposer({
 }) {
   const t = useT();
   const locale = useLocale();
+  const timeZone = useTimeZone();
   const toast = useToast();
   const ids = useId();
   const [purpose, setPurpose] = useState<Purpose>(initialIncoming ? "reply" : "follow_up");
@@ -324,7 +325,7 @@ export function EmailComposer({
                 </button>
                 {item.flags.length > 0 ? <Badge tone="warning">{item.flags.length}</Badge> : null}
                 <span className="text-xs text-slate-500">
-                  {[t(`email.purposes.${item.purpose as Purpose}`), item.recipient, formatDay(item.createdAt, intlLocale(locale))]
+                  {[t(`email.purposes.${item.purpose as Purpose}`), item.recipient, formatInstantDay(item.createdAt, intlLocale(locale), timeZone)]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>

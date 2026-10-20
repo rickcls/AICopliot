@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useT } from "@/components/i18n-provider";
 import { X } from "lucide-react";
 import { FOCUS_RING } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ export function Modal({
 }) {
   const dialogRef = React.useRef<HTMLDialogElement>(null);
   const titleId = React.useId();
+  const t = useT();
 
   // `open` as a prop renders a *non-modal* dialog — no backdrop, no focus trap.
   // Only `showModal()` gives those, so visibility is driven imperatively. The
@@ -88,7 +90,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.close")}
             className={cn(
               "-mr-1.5 -mt-0.5 grid size-7 shrink-0 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900",
               FOCUS_RING,

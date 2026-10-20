@@ -54,6 +54,24 @@ describe("validateDayPlan", () => {
     expect(plan.items[0].minutes).toBe(90);
   });
 
+  it("plans a blocked task as a short follow-up, not its whole estimate", () => {
+    const blocked = new Map([["T1", { ...candidate("T1", "task-1", 180), status: "blocked" }]]);
+    const chase = validateDayPlan(
+      { summary: "", items: [{ task: "T1", minutes: 15, reason: "Chase it" }] },
+      blocked,
+      480,
+      "en",
+    );
+    expect(chase.items[0].minutes).toBe(15);
+    const greedy = validateDayPlan(
+      { summary: "", items: [{ task: "T1", minutes: 120, reason: "" }] },
+      blocked,
+      480,
+      "en",
+    );
+    expect(greedy.items[0].minutes).toBe(30);
+  });
+
   it("clamps silly blocks and stops at the first one that overruns the time", () => {
     const plan = validateDayPlan(
       {
@@ -96,6 +114,14 @@ describe("the planner's input", () => {
     expect(describeDue(new Date("2026-10-16T00:00:00Z"), today)).toBe("due today");
     expect(describeDue(new Date("2026-10-17T00:00:00Z"), today)).toBe("due in 1 day");
     expect(describeDue(new Date("2026-11-03T00:00:00Z"), today)).toBe("due 2026-11-03");
+  });
+
+  it("writes the due fact in the language the model will answer in", () => {
+    expect(describeDue(null, today, "zh-Hant")).toBe("未定到期日");
+    expect(describeDue(new Date("2026-10-13T00:00:00Z"), today, "zh-Hant")).toBe("已逾期 3 日");
+    expect(describeDue(new Date("2026-10-16T00:00:00Z"), today, "zh-Hant")).toBe("今日到期");
+    expect(describeDue(new Date("2026-10-17T00:00:00Z"), today, "zh-Hant")).toBe("1 日後到期");
+    expect(describeDue(new Date("2026-11-03T00:00:00Z"), today, "zh-Hant")).toBe("2026-11-03 到期");
   });
 
   it("names tasks by label only", () => {

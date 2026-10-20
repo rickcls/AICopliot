@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireProject, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
+import { translatorFor } from "@/lib/i18n/dictionaries";
+import { getFileLocale } from "@/lib/i18n/server";
 import {
   buildPack,
   exportFilename,
@@ -11,6 +13,7 @@ import {
   requirementsToMarkdown,
 } from "@/lib/pm/requirements-export";
 import { requirementSelect } from "@/lib/pm/select";
+import { getViewerToday } from "@/lib/viewer";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -51,12 +54,14 @@ export async function GET(request: Request, { params }: Params) {
       select: requirementSelect,
     });
 
-    const now = new Date();
+    const t = translatorFor(await getFileLocale(search.get("lang")));
+    // Only ever printed as a date, so it is the viewer's day (see the print page).
+    const now = await getViewerToday();
     const body = pack
-      ? packToMarkdown(pack, project.name, buildPack(pack, requirements), now)
+      ? packToMarkdown(pack, project.name, buildPack(pack, requirements, t), now, t)
       : format === "csv"
-        ? requirementsToCsv(requirements)
-        : requirementsToMarkdown(project.name, requirements, now);
+        ? requirementsToCsv(requirements, t)
+        : requirementsToMarkdown(project.name, requirements, now, t);
     const filename = exportFilename(
       project.name,
       format,

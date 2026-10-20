@@ -2,7 +2,9 @@
 
 import { Check, RotateCcw, Sparkles } from "lucide-react";
 import type { AnswerProgress } from "@/lib/rag/answer";
+import { useT } from "@/components/i18n-provider";
 import { Badge, Button, Spinner, type BadgeTone } from "@/components/ui";
+import type { Translate } from "@/lib/i18n/translate";
 import { cn } from "@/lib/utils";
 import { AnswerBody } from "./answer-body";
 import { FeedbackButtons } from "./feedback-buttons";
@@ -28,6 +30,7 @@ export function UserTurn({
   turn: UserTurnModel;
   onRetry?: () => void;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div
@@ -42,7 +45,7 @@ export function UserTurn({
       {turn.status === "failed" && onRetry ? (
         <Button variant="ghost" size="sm" onClick={onRetry} className="text-red-700">
           <RotateCcw className="size-3.5" aria-hidden />
-          Retry
+          {t("chat.turn.retry")}
         </Button>
       ) : null}
     </div>
@@ -51,15 +54,16 @@ export function UserTurn({
 
 /** A question persisted with no reply — the answer failed after it was stored. */
 export function UnansweredNotice({ onRetry }: { onRetry?: () => void }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">
       <p className="text-xs text-amber-800">
-        This question was not answered. The reply failed before it could be saved.
+        {t("chat.turn.unanswered")}
       </p>
       {onRetry ? (
         <Button variant="ghost" size="sm" onClick={onRetry} className="ml-auto shrink-0">
           <RotateCcw className="size-3.5" aria-hidden />
-          Ask again
+          {t("chat.turn.askAgain")}
         </Button>
       ) : null}
     </div>
@@ -76,6 +80,7 @@ export function AssistantTurn({
   /** Apply-able edits, rendered by whoever can apply them. */
   proposals?: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="flex gap-3">
       <span
@@ -88,10 +93,10 @@ export function AssistantTurn({
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {turn.refused ? (
-            <Badge tone="warning">No supporting evidence</Badge>
+            <Badge tone="warning">{t("chat.turn.noEvidence")}</Badge>
           ) : turn.confidence ? (
             <Badge tone={CONFIDENCE_TONE[turn.confidence]}>
-              {turn.confidence} confidence
+              {t("chat.turn.confidence", { level: t(`confidence.${turn.confidence}`) })}
             </Badge>
           ) : null}
           {turn.latencyMs !== null ? (
@@ -111,9 +116,7 @@ export function AssistantTurn({
 
         {turn.refused ? (
           <p className="mt-3 text-xs text-slate-500">
-            {projectScoped
-              ? "Neither this project's documents nor its current records support an answer. Try rephrasing, or update the project data."
-              : "Nothing in your indexed documents matched this closely enough to answer from. Try rephrasing, or upload a document that covers it."}
+            {projectScoped ? t("chat.turn.refusedProject") : t("chat.turn.refusedDocuments")}
           </p>
         ) : null}
 
@@ -121,14 +124,14 @@ export function AssistantTurn({
           // Never render a historic answer as an uncited assertion, even though
           // it was properly cited when it was produced.
           <p className="mt-3 text-xs text-slate-500">
-            Sources for this answer are no longer available.
+            {t("chat.turn.sourcesGone")}
           </p>
         ) : null}
 
         {turn.citations.length > 0 ? (
           <div className="mt-4">
             <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              Sources ({turn.citations.length})
+              {t("chat.turn.sources", { count: turn.citations.length })}
             </h3>
             <div className="mt-2 space-y-2">
               {turn.citations.map((citation, index) => (
@@ -165,28 +168,30 @@ export function AssistantTurn({
  * "Drafting" — the refusal arriving with no drafting step is the visible form of
  * the guard that refuses before spending a model call.
  */
-function phaseLabel(progress: AnswerProgress, projectScoped: boolean): string {
+function phaseLabel(progress: AnswerProgress, projectScoped: boolean, t: Translate): string {
   switch (progress.phase) {
     case "rewriting":
-      return "Reading the conversation…";
+      return t("chat.turn.phases.rewriting");
     case "retrieving":
       return projectScoped
-        ? "Searching documents and project records…"
-        : "Searching documents…";
+        ? t("chat.turn.phases.retrievingProject")
+        : t("chat.turn.phases.retrieving");
     case "retrieved": {
-      const chunks = progress.chunkCount ?? 0;
       const records = progress.projectSourceCount ?? 0;
-      const passages = `${chunks} passage${chunks === 1 ? "" : "s"}`;
+      const passages = t("chat.turn.phases.passages", { count: progress.chunkCount ?? 0 });
       return records > 0
-        ? `Found ${passages} and ${records} project record${records === 1 ? "" : "s"}`
-        : `Found ${passages}`;
+        ? t("chat.turn.phases.foundBoth", {
+            passages,
+            records: t("chat.turn.phases.records", { count: records }),
+          })
+        : t("chat.turn.phases.found", { passages });
     }
     case "repairing":
-      return "Reformatting the model's reply…";
+      return t("chat.turn.phases.repairing");
     case "validating":
-      return "Checking every claim has a citation…";
+      return t("chat.turn.phases.validating");
     default:
-      return "Drafting a grounded answer…";
+      return t("chat.turn.phases.drafting");
   }
 }
 
@@ -198,6 +203,7 @@ export function PendingTurn({
   projectScoped: boolean;
 }) {
   const current = phases.at(-1);
+  const t = useT();
 
   return (
     <div className="flex gap-3">
@@ -216,7 +222,7 @@ export function PendingTurn({
             className="flex items-center gap-2 text-xs text-slate-400"
           >
             <Check className="size-3.5 shrink-0 text-emerald-500" />
-            {phaseLabel(progress, projectScoped)}
+            {phaseLabel(progress, projectScoped, t)}
           </p>
         ))}
         {/* One polite live region for the current step only. Putting aria-live
@@ -227,7 +233,7 @@ export function PendingTurn({
           className="flex items-center gap-2 text-xs font-medium text-slate-600"
         >
           <Spinner className="size-3.5 shrink-0" />
-          {current ? phaseLabel(current, projectScoped) : "Starting…"}
+          {current ? phaseLabel(current, projectScoped, t) : t("chat.turn.starting")}
         </p>
       </div>
     </div>

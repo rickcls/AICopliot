@@ -8,8 +8,9 @@ import { Badge, Card, LinkButton, SectionHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { intlLocale } from "@/lib/i18n/locales";
+import { getViewerTimeZone } from "@/lib/viewer";
 import { getLocale, getT } from "@/lib/i18n/server";
-import { formatBytes, formatDay } from "@/lib/utils";
+import { formatBytes, formatInstantDay } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function DocumentDetailPage({
 }) {
   const { workspaceId } = await requireWorkspace();
   const { id } = await params;
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const [t, locale, timeZone] = await Promise.all([getT(), getLocale(), getViewerTimeZone()]);
   const dateLocale = intlLocale(locale);
 
   // Scoped by workspaceId: an ID from another workspace 404s rather than leaking.
@@ -55,7 +56,7 @@ export default async function DocumentDetailPage({
             {document.title ? `${document.originalFilename} · ` : null}
             {t("documents.detail.uploaded", {
               size: formatBytes(document.sizeBytes),
-              date: formatDay(document.createdAt, dateLocale),
+              date: formatInstantDay(document.createdAt, dateLocale, timeZone),
             })}
           </p>
         </div>
@@ -109,7 +110,7 @@ export default async function DocumentDetailPage({
           { label: t("documents.detail.project"), value: document.project?.name ?? t("documents.unassigned") },
           { label: t("documents.detail.passagesIndexed"), value: String(document.chunkCount) },
           { label: t("documents.detail.contentType"), value: document.mimeType || "—" },
-          { label: t("documents.detail.updated"), value: formatDay(document.updatedAt, dateLocale) },
+          { label: t("documents.detail.updated"), value: formatInstantDay(document.updatedAt, dateLocale, timeZone) },
         ].map((item) => (
           <div key={item.label}>
             <dt className="text-xs text-slate-500">{item.label}</dt>

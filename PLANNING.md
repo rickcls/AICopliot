@@ -36,7 +36,7 @@ Each phase is one branch and PR, usable on its own.
 | P5 | Emails in my tone | Writing-style profile from samples, drafts per task or incoming email, unsupported-fact flags, copy/mailto only | **Built on `feat/assistant-foundation`** |
 | P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | **Built on `feat/assistant-foundation`** |
 | P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | **Agent built on `feat/assistant-foundation`**; the remaining-page translation moves to P8 |
-| P8 | Finish the Chinese UI | Translate the older panels still in English (task board and detail, requirements, timeline, risks, plan review, reports, chat, projects, dashboard), and the status labels in `labels.ts` | Next |
+| P8 | Finish the Chinese UI | Translate the older panels still in English (task board and detail, requirements, timeline, risks, plan review, reports, chat, projects, dashboard), and the status labels in `labels.ts` | **Built on `feat/translate-remaining`.** API error messages and the language of generated plans, extractions, and weekly-report narratives remain English — next candidates |
 
 ---
 
@@ -205,6 +205,8 @@ question ─▶ rewrite if follow-up ─▶ selected project ─▶ embed ─┬
 | 59 | One supervised agent, fenced inside a request (user decision, 2026-10-16) | The person asked for help that takes several look-ups ("prepare me for tomorrow's meeting"). A bounded loop inside one request gives that without the risks of an autonomous agent: a step cap and a time limit, tools that only read or save a draft, opaque labels, and every change returned as a proposal through the capture validator and the shared write path. |
 | 60 | JSON steps instead of native tool calling | Works with any JSON-mode model (the configured model may not support tools well), keeps the provider contract a plain string, and makes the loop replayable in tests with a scripted fake. |
 | 61 | `applyChange` takes the claim as a hook | Capture and assistant proposals live in different tables but must write identically; the claim-and-record hooks are the only difference, so there is one write path to keep correct. |
+| 62 | Dictionaries split by area, one type over all of them | One 3,000-line file per language was unreviewable. Area files spread into the roots keep `satisfies Dictionary` and the key-parity test covering everything, with no runtime loading. |
+| 63 | Exports and client packs pick their own language | A Hong Kong consultant may work in Chinese and send an English pack, or the reverse. `?lang=` and a link on the print page cost one parameter; tying the file to the UI language would force a settings change per client. Client text inside the file is never translated. |
 
 ### Deviations from the original spec (approved)
 

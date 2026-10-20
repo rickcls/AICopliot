@@ -34,7 +34,7 @@ export default async function ProjectLayout({
 
   return (
     <div>
-      <nav aria-label="Breadcrumb" className="text-sm">
+      <nav aria-label={t("project.breadcrumbLabel")} className="text-sm">
         <Link href="/projects" className="text-slate-500 hover:text-slate-900">
           {t("project.breadcrumb")}
         </Link>

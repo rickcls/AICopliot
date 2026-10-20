@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useT } from "@/components/i18n-provider";
 import { CircleAlert, CircleCheck, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FOCUS_RING } from "./ui";
@@ -69,6 +70,7 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<ToastRecord[]>([]);
+  const t = useT();
   const nextId = React.useRef(0);
 
   const dismiss = React.useCallback((id: number) => {
@@ -101,7 +103,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           same moment as its content is not reliably announced. */}
       <ol
         aria-live="polite"
-        aria-label="Notifications"
+        aria-label={t("common.notifications")}
         className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-end gap-2 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-96"
       >
         {toasts.map((toast) => (
@@ -122,6 +124,7 @@ function ToastItem({
   // WCAG 2.2.2: auto-dismissing content must be pausable. Hovering or tabbing
   // into a toast holds it open, and the close button is the explicit escape.
   const [held, setHeld] = React.useState(false);
+  const t = useT();
   const Icon = TONE_ICONS[toast.tone];
   const tone = TONE_STYLES[toast.tone];
 
@@ -152,7 +155,7 @@ function ToastItem({
       <button
         type="button"
         onClick={() => onDismiss(toast.id)}
-        aria-label="Dismiss notification"
+        aria-label={t("common.dismissNotification")}
         className={cn(
           "-mr-1 shrink-0 rounded p-1 opacity-60 transition-opacity hover:opacity-100",
           FOCUS_RING,

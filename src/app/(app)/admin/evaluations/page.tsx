@@ -2,6 +2,7 @@ import { EvaluationsPanel } from "@/components/evaluations-panel";
 import { requireAdmin, requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { computeMetrics } from "@/lib/evaluation/scoring";
+import { getT } from "@/lib/i18n/server";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export default async function EvaluationsPage() {
   // Admin-only: throws AuthError(403), which Next renders as an error boundary.
   const access = await requireWorkspace();
   requireAdmin(access);
+  const t = await getT();
 
   const [evaluations, projects] = await Promise.all([
     prisma.evaluationCase.findMany({
@@ -39,13 +41,8 @@ export default async function EvaluationsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Evaluations</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          A regression suite for retrieval quality. Cases with expected keywords
-          or a &ldquo;should refuse&rdquo; expectation are scored automatically;
-          the rest fall to human review. Re-run them after changing a model,
-          threshold, or chunk size and compare the metrics.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("evaluations.title")}</h1>
+        <p className="mt-1 text-sm text-slate-600">{t("evaluations.lead")}</p>
       </div>
       <EvaluationsPanel
         projects={projects}

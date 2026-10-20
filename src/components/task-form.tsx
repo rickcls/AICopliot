@@ -13,10 +13,12 @@ import {
   Spinner,
   Textarea,
 } from "@/components/ui";
+import { useT } from "@/components/i18n-provider";
 import { Modal, ModalBody, ModalFooter } from "@/components/modal";
 import { TaskDocumentsField } from "@/components/task-documents-field";
 import { fillBlockedReason, TaskFillBar } from "@/components/task-fill-bar";
 import { fillDraft, type FillSummary } from "@/components/task-fill-client";
+import { displayStatusLabel } from "@/lib/i18n/status-labels";
 import { cn } from "@/lib/utils";
 import {
   PRIORITY_FLAG,
@@ -198,6 +200,7 @@ export function TaskForm({
   const [filling, setFilling] = useState(false);
   const [fillError, setFillError] = useState<string | null>(null);
   const [fillSummary, setFillSummary] = useState<FillSummary | null>(initialFill);
+  const t = useT();
 
   async function runFill() {
     setFilling(true);
@@ -206,6 +209,7 @@ export function TaskForm({
       const result = await fillDraft(projectId, draft, {
         priorityIsBlank: !priorityTouched && draft.priority === "medium",
         linkedRequirementIds,
+        t,
       });
       onChange(result.draft);
       setFillSummary(result.summary);
@@ -237,7 +241,7 @@ export function TaskForm({
 
   return (
     <Modal
-      title={editing ? "Edit task" : "New task"}
+      title={editing ? t("tasks.form.editTitle") : t("tasks.form.newTitle")}
       // No subtitle: the fields below already carry their own defaults and
       // placeholders, and a line of explanation above them was one more thing
       // to read before starting to type.
@@ -259,8 +263,8 @@ export function TaskForm({
             id="task-title"
             value={draft.title}
             onChange={(event) => onChange({ ...draft, title: event.target.value })}
-            placeholder="Task name"
-            aria-label="Task name"
+            placeholder={t("tasks.fields.name")}
+            aria-label={t("tasks.fields.name")}
             maxLength={200}
             disabled={busy}
             required
@@ -274,7 +278,7 @@ export function TaskForm({
 
           <div className="mt-2">
             <TaskFillBar
-              blockedReason={fillBlockedReason(draft.title, linked)}
+              blockedReason={fillBlockedReason(draft.title, linked, t)}
               filling={filling}
               error={fillError}
               summary={fillSummary}
@@ -313,7 +317,7 @@ export function TaskForm({
               other compete for one glance. */}
           <div className="mt-3 grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
             <label htmlFor="task-assignee" className={ROW_LABEL}>
-              Assignee
+              {t("tasks.fields.assignee")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               {assignee ? (
@@ -332,7 +336,7 @@ export function TaskForm({
                 }
                 disabled={busy}
               >
-                <option value="">Unassigned</option>
+                <option value="">{t("common.unassigned")}</option>
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.name}
@@ -342,7 +346,7 @@ export function TaskForm({
             </div>
 
             <label htmlFor="task-status" className={ROW_LABEL}>
-              Status
+              {t("tasks.fields.status")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               <span aria-hidden className={ROW_ICON}>
@@ -361,14 +365,14 @@ export function TaskForm({
               >
                 {statuses.map((status) => (
                   <option key={status.id} value={status.id}>
-                    {status.label}
+                    {displayStatusLabel(status, t)}
                   </option>
                 ))}
               </Select>
             </div>
 
             <label htmlFor="task-priority" className={ROW_LABEL}>
-              Priority
+              {t("tasks.fields.priority")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               <span aria-hidden className={ROW_ICON}>
@@ -379,7 +383,7 @@ export function TaskForm({
               </span>
               <Select
                 id="task-priority"
-                className={cn(QUIET_CONTROL, "capitalize")}
+                className={QUIET_CONTROL}
                 value={draft.priority}
                 onChange={(event) => {
                   setPriorityTouched(true);
@@ -391,15 +395,15 @@ export function TaskForm({
                 disabled={busy}
               >
                 {TASK_PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority} className="capitalize">
-                    {priority}
+                  <option key={priority} value={priority}>
+                    {t(`priority.${priority}`)}
                   </option>
                 ))}
               </Select>
             </div>
 
             <label htmlFor="task-milestone" className={ROW_LABEL}>
-              Milestone
+              {t("tasks.fields.milestone")}
             </label>
             <div className="flex min-w-0 items-center gap-2">
               <span aria-hidden className={ROW_ICON} />
@@ -412,7 +416,7 @@ export function TaskForm({
                 }
                 disabled={busy}
               >
-                <option value="">None</option>
+                <option value="">{t("common.none")}</option>
                 {milestones.map((milestone) => (
                   <option key={milestone.id} value={milestone.id}>
                     {milestone.title}
@@ -424,7 +428,7 @@ export function TaskForm({
             {/* Start and due share one row: they are one span, and splitting
                 them cost a whole row to say so twice. */}
             <label htmlFor="task-start" className={ROW_LABEL}>
-              Dates
+              {t("tasks.fields.dates")}
             </label>
             <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
               <span aria-hidden className={ROW_ICON} />
@@ -437,7 +441,7 @@ export function TaskForm({
                   onChange({ ...draft, startDate: event.target.value })
                 }
                 disabled={busy}
-                aria-label="Start date"
+                aria-label={t("tasks.fields.startDate")}
                 aria-invalid={datesInverted || undefined}
                 aria-describedby={datesInverted ? "task-date-error" : undefined}
               />
@@ -453,14 +457,14 @@ export function TaskForm({
                   onChange({ ...draft, dueDate: event.target.value })
                 }
                 disabled={busy}
-                aria-label="Due date"
+                aria-label={t("tasks.fields.dueDate")}
                 aria-invalid={datesInverted || undefined}
                 aria-describedby={datesInverted ? "task-date-error" : undefined}
               />
             </div>
 
             <label htmlFor="task-estimate" className={ROW_LABEL}>
-              Estimate
+              {t("tasks.fields.estimate")}
             </label>
             <div className="flex items-center gap-1.5">
               <span aria-hidden className={ROW_ICON} />
@@ -479,12 +483,14 @@ export function TaskForm({
                 }
                 disabled={busy}
               />
-              <span className="text-xs text-slate-400">hours</span>
+              <span className="text-xs text-slate-400">{t("tasks.fields.hours")}</span>
             </div>
 
             {/* Starts at the top rather than centred: the value grows a line
                 per linked document. */}
-            <span className={cn(ROW_LABEL, "self-start pt-2")}>Documents</span>
+            <span className={cn(ROW_LABEL, "self-start pt-2")}>
+              {t("tasks.fields.documents")}
+            </span>
             <div className="min-w-0 py-1">
               <TaskDocumentsField
                 projectId={projectId}
@@ -516,16 +522,13 @@ export function TaskForm({
               role="alert"
               className="mt-2 text-xs font-medium text-red-700"
             >
-              Start date must be on or before the due date.
+              {t("tasks.fields.datesInverted")}
             </p>
           ) : draft.startDate || draft.dueDate ? (
             // Only once a date exists. Explaining how dates draw on the
             // timeline to someone who has not entered one is a line of text
             // earning nothing.
-            <p className="mt-2 text-xs text-slate-500">
-              A start and due date together draw a bar on the timeline; a due
-              date alone shows as a single marker.
-            </p>
+            <p className="mt-2 text-xs text-slate-500">{t("tasks.form.timelineHint")}</p>
           ) : null}
 
           {/* The one field that needs room to think in, so it gets the space
@@ -535,7 +538,7 @@ export function TaskForm({
               htmlFor="task-description"
               className="mb-1.5 block text-xs font-medium text-slate-500"
             >
-              Description
+              {t("tasks.fields.description")}
             </label>
             <Textarea
               id="task-description"
@@ -543,7 +546,7 @@ export function TaskForm({
               onChange={(event) =>
                 onChange({ ...draft, description: event.target.value })
               }
-              placeholder="What does this task involve?"
+              placeholder={t("tasks.fields.descriptionPlaceholder")}
               maxLength={4000}
               disabled={busy}
               className="min-h-56 resize-y leading-relaxed"
@@ -558,18 +561,18 @@ export function TaskForm({
             onClick={onCancel}
             disabled={busy}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" disabled={!submittable}>
             {saving ? (
               <>
                 <Spinner className="border-white/40 border-t-white" />
-                Saving…
+                {t("common.saving")}
               </>
             ) : editing ? (
-              "Save changes"
+              t("tasks.form.saveChanges")
             ) : (
-              "Create task"
+              t("tasks.form.create")
             )}
           </Button>
         </ModalFooter>

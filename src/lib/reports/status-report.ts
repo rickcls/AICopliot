@@ -1,3 +1,4 @@
+import { labelOr, type Translate } from "@/lib/i18n/translate";
 import {
   DONE_TASK_CATEGORY,
   isDueWithinDays,
@@ -457,30 +458,43 @@ export function buildReportGroundingSources(
   return [snapshot, ...detailed];
 }
 
-export function statusReportToMarkdown(report: SavedStatusReport): string {
+/**
+ * How a report item's stored status reads. Tasks store their column label
+ * (data, shown as typed); milestones and risks store an enum value, and a
+ * dependency a fixed marker, which have labels.
+ */
+export function reportItemStatus(item: StatusReportItem, t: Translate): string {
+  if (item.kind === "dependency") return t("reports.blockedByPrerequisite");
+  const words = item.status.replaceAll("_", " ");
+  if (item.kind === "milestone") return labelOr(t, `milestoneStatus.${item.status}`, words);
+  if (item.kind === "risk") return labelOr(t, `riskStatus.${item.status}`, words);
+  return words;
+}
+
+export function statusReportToMarkdown(report: SavedStatusReport, t: Translate): string {
   const lines = [
-    `# ${report.project.name} — Weekly Status Report`,
+    `# ${t("reports.markdown.title", { project: report.project.name })}`,
     "",
-    `**Period:** ${report.period.start} to ${report.period.end}`,
-    `**Health:** ${report.health.toUpperCase()}`,
+    t("reports.markdown.period", { start: report.period.start, end: report.period.end }),
+    t("reports.markdown.health", { health: t(`reportHealth.${report.health}`) }),
     "",
     report.narrative,
   ];
   const sections: Array<[string, StatusReportItem[]]> = [
-    ["Completed", report.sections.completed],
-    ["Blockers", report.sections.blockers],
-    ["Overdue", report.sections.overdue],
-    ["Upcoming", report.sections.upcoming],
-    ["Open and monitoring risks", report.sections.risks],
-    ["Dependency blockers", report.sections.dependencyBlockers],
+    [t("reports.sections.completed"), report.sections.completed],
+    [t("reports.sections.blockers"), report.sections.blockers],
+    [t("reports.sections.overdue"), report.sections.overdue],
+    [t("reports.sections.upcoming"), report.sections.upcoming],
+    [t("reports.sections.risks"), report.sections.risks],
+    [t("reports.sections.dependencyBlockers"), report.sections.dependencyBlockers],
   ];
   for (const [title, items] of sections) {
     lines.push("", `## ${title}`, "");
-    if (items.length === 0) lines.push("- None");
+    if (items.length === 0) lines.push(t("reports.markdown.none"));
     else {
       for (const item of items) {
         lines.push(
-          `- ${item.title} — ${item.status.replaceAll("_", " ")}${item.date ? ` (${item.date})` : ""}`,
+          `- ${item.title} — ${reportItemStatus(item, t)}${item.date ? ` (${item.date})` : ""}`,
         );
       }
     }

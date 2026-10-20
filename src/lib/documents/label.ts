@@ -12,7 +12,7 @@ import { languageDirective, type ReplyLanguage } from "@/lib/language";
  * A title, type, and tags are filing aids rather than claims and need none.
  */
 
-export const DOCUMENT_LABEL_PROMPT_VERSION = "document-label-v1";
+export const DOCUMENT_LABEL_PROMPT_VERSION = "document-label-v2";
 export const MAX_LABEL_CHUNKS = 12;
 export const LABEL_OVERVIEW_QUERY =
   "what this document is: its purpose, parties, subject, dates, and conclusions";
@@ -42,7 +42,7 @@ You receive the filename, passages from the document labelled [S1]..[Sn], and th
 
 Return:
 - title: what a person would call this document, at most 80 characters, in the document's own language. Keep names, numbers, and codes exactly.
-- summary: two or three sentences on what the document is and says, using only the passages, with the S labels you used in "citations". If the passages do not say enough, summary is null.
+- summary: two or three sentences on what the document is and says, using only the passages. Put the S labels you used in "citations", never inside the summary text — people read it as plain prose. If the passages do not say enough, summary is null.
 - docType: one of ${DOC_TYPES.join(", ")}.
 - tags: up to ${MAX_TAGS} short keywords someone would search for (client, subject, period), in the document's language.
 - project: the P label of the project this document clearly belongs to, or null when no project clearly matches. Do not guess.
@@ -91,6 +91,23 @@ export interface ValidatedDocumentLabel {
   suggestedProjectId: string | null;
 }
 
+/**
+ * Removes source labels the model wrote into prose anyway — "[S1]", "（S2、S3）",
+ * and a leading "根據 S1，" or "According to S1," — since the summary is shown
+ * as plain text and a label means nothing to the reader. A bare "S1" mid-
+ * sentence is left alone: it could be the document's own wording.
+ */
+export function stripSourceLabels(text: string): string {
+  const label = String.raw`S\d+(?:\s*[,，、]\s*S\d+)*`;
+  return text
+    .replace(new RegExp(String.raw`^\s*(?:根據|依據|按照)\s*\[?${label}\]?\s*[，,、:：]?\s*`, "u"), "")
+    .replace(new RegExp(String.raw`^\s*(?:According to|Per|Based on)\s+\[?${label}\]?\s*,?\s*`, "i"), "")
+    .replace(new RegExp(String.raw`\s*[\[［【(（]\s*${label}\s*[\]］】)）]`, "gu"), "")
+    .replace(/^(?:根據|依據)\s*[，,]\s*/u, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function validateDocumentLabel(
   model: ModelDocumentLabel,
   {
@@ -124,7 +141,7 @@ export function validateDocumentLabel(
 
   return {
     title: model.title ? prose(model.title).slice(0, 120) : null,
-    summary: cited && model.summary ? prose(model.summary) : null,
+    summary: cited && model.summary ? stripSourceLabels(prose(model.summary)) || null : null,
     docType,
     tags,
     // A suggestion to move only makes sense when it points somewhere else.

@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Link2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useLocale, useT } from "@/components/i18n-provider";
+import { useLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import {
   Avatar,
@@ -17,7 +17,7 @@ import {
   Select,
 } from "@/components/ui";
 import { intlLocale } from "@/lib/i18n/locales";
-import { cn, formatDay } from "@/lib/utils";
+import { cn, formatInstantDay } from "@/lib/utils";
 
 type Role = "admin" | "member";
 
@@ -60,6 +60,7 @@ export function MembersPanel({
 }) {
   const t = useT();
   const locale = useLocale();
+  const timeZone = useTimeZone();
   const toast = useToast();
   const confirm = useConfirm();
   const router = useRouter();
@@ -322,7 +323,7 @@ export function MembersPanel({
                         <span className="mx-1.5 text-slate-300">·</span>
                         <span className="text-slate-500">
                           {t("members.expires", {
-                            date: formatDay(invite.expiresAt, intlLocale(locale)),
+                            date: formatInstantDay(invite.expiresAt, intlLocale(locale), timeZone),
                           })}
                         </span>
                       </span>

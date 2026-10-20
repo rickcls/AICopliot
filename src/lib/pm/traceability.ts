@@ -22,13 +22,6 @@ export const DELIVERY_STATES: readonly DeliveryState[] = [
   "delivered",
 ];
 
-export const DELIVERY_STATE_LABEL: Record<DeliveryState, string> = {
-  no_task: "No task",
-  planned: "Planned",
-  partial: "Partly done",
-  delivered: "Delivered",
-};
-
 export interface TracedLink {
   targetType: "task" | "milestone" | "risk";
   task: { status: { category: string } } | null;

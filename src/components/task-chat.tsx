@@ -9,16 +9,13 @@ import {
 } from "@/components/chat/proposal-card";
 import { Transcript } from "@/components/chat/transcript";
 import { toTurns, type Turn } from "@/components/chat/types";
+import { useT } from "@/components/i18n-provider";
 import { Button, ErrorState, Spinner, Textarea } from "@/components/ui";
 import type { LoadedConversation } from "@/lib/chat/history";
 import type { AnswerProgress } from "@/lib/rag/answer";
 import type { TaskProposal } from "@/lib/schemas";
 
-const SUGGESTIONS = [
-  "What does this task involve, according to its documents?",
-  "Fill in the description from the linked documents.",
-  "Is there a deadline or effort estimate in the documents?",
-];
+const SUGGESTIONS = ["involve", "description", "deadline"] as const;
 
 /**
  * A conversation about one task, inside its detail panel.
@@ -50,13 +47,14 @@ export function TaskChat({
   const [phases, setPhases] = useState<AnswerProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const t = useT();
 
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/tasks/${taskId}/conversation`, { signal: controller.signal })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error ?? "Could not load the conversation.");
+        if (!response.ok) throw new Error(data.error ?? t("tasks.chat.loadFailed"));
         const conversation = data.conversation as LoadedConversation | null;
         if (conversation) {
           setConversationId(conversation.conversation.id);
@@ -65,13 +63,13 @@ export function TaskChat({
       })
       .catch((cause: Error) => {
         if (controller.signal.aborted) return;
-        setError(cause.message || "Could not load the conversation.");
+        setError(cause.message || t("tasks.chat.loadFailed"));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoaded(true);
       });
     return () => controller.abort();
-  }, [taskId]);
+  }, [taskId, t]);
 
   async function ask(content: string) {
     const trimmed = content.trim();
@@ -116,6 +114,7 @@ export function TaskChat({
           );
         },
       },
+      t,
     );
     if (outcome === "superseded") return;
     setPending(false);
@@ -135,7 +134,7 @@ export function TaskChat({
     return (
       <div className="flex items-center gap-2 p-4 text-sm text-slate-500">
         <Spinner className="size-4" />
-        Loading conversation…
+        {t("tasks.chat.loading")}
       </div>
     );
   }
@@ -146,8 +145,8 @@ export function TaskChat({
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
           <span className="mr-auto">
             {linkedDocumentCount > 0
-              ? `Reads this task and its ${linkedDocumentCount} linked document${linkedDocumentCount === 1 ? "" : "s"}.`
-              : "Reads this task and searches the project's documents. Link documents to focus it."}
+              ? t("tasks.chat.readsLinked", { count: linkedDocumentCount })
+              : t("tasks.chat.readsProject")}
           </span>
           {conversationId ? (
             <>
@@ -156,7 +155,7 @@ export function TaskChat({
                 className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-slate-100 hover:text-slate-800"
               >
                 <ExternalLink className="size-3.5" aria-hidden />
-                Open in Ask
+                {t("tasks.chat.openInAsk")}
               </a>
               <button
                 type="button"
@@ -165,7 +164,7 @@ export function TaskChat({
                 className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
               >
                 <Plus className="size-3.5" aria-hidden />
-                New thread
+                {t("tasks.chat.newThread")}
               </button>
             </>
           ) : null}
@@ -173,22 +172,22 @@ export function TaskChat({
 
         {turns.length === 0 ? (
           <div className="space-y-2">
-            <p className="text-sm text-slate-600">
-              Ask about this task. Answers cite the task and its documents, and
-              can propose edits — nothing changes until you click Apply.
-            </p>
+            <p className="text-sm text-slate-600">{t("tasks.chat.intro")}</p>
             <ul className="space-y-1.5">
-              {SUGGESTIONS.map((suggestion) => (
-                <li key={suggestion}>
-                  <button
-                    type="button"
-                    onClick={() => void ask(suggestion)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    {suggestion}
-                  </button>
-                </li>
-              ))}
+              {SUGGESTIONS.map((key) => {
+                const suggestion = t(`tasks.chat.suggestions.${key}`);
+                return (
+                  <li key={key}>
+                    <button
+                      type="button"
+                      onClick={() => void ask(suggestion)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      {suggestion}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : (
@@ -225,7 +224,7 @@ export function TaskChat({
       >
         <div className="flex items-end gap-2 rounded-2xl border border-slate-300 p-1.5 focus-within:border-slate-900">
           <label htmlFor="task-chat-question" className="sr-only">
-            Ask about this task
+            {t("tasks.chat.inputLabel")}
           </label>
           <Textarea
             id="task-chat-question"
@@ -237,14 +236,14 @@ export function TaskChat({
               event.preventDefault();
               void ask(question);
             }}
-            placeholder="Ask about this task…"
+            placeholder={t("tasks.chat.placeholder")}
             disabled={pending}
             className="max-h-40 min-h-9 resize-none border-transparent bg-transparent px-2 py-1.5 focus-visible:border-transparent focus-visible:ring-0"
           />
           <Button
             type="submit"
             size="icon"
-            aria-label="Ask"
+            aria-label={t("tasks.chat.ask")}
             disabled={pending || question.trim().length < 3}
             className="rounded-full"
           >

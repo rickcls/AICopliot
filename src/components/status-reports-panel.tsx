@@ -12,11 +12,14 @@ import {
   SectionHeader,
   Spinner,
 } from "@/components/ui";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import {
+  reportItemStatus,
   statusReportToMarkdown,
   type SavedStatusReport,
   type StatusReportItem,
 } from "@/lib/reports/status-report";
+import { labelOr } from "@/lib/i18n/translate";
 import { formatDate } from "@/lib/utils";
 import { Download } from "lucide-react";
 
@@ -45,6 +48,7 @@ function ReportSection({
   title: string;
   items: StatusReportItem[];
 }) {
+  const t = useT();
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
@@ -52,7 +56,7 @@ function ReportSection({
         <span className="text-xs text-slate-400 tabular-nums">{items.length}</span>
       </div>
       {items.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-400">Nothing in this period.</p>
+        <p className="mt-2 text-sm text-slate-400">{t("reports.nothingInPeriod")}</p>
       ) : (
         <ul className="mt-3 divide-y divide-slate-100">
           {items.map((item) => (
@@ -62,11 +66,9 @@ function ReportSection({
                   {item.title}
                 </Link>
                 <Badge tone={item.kind === "risk" ? "warning" : "neutral"}>
-                  {item.kind}
+                  {t(`reports.kinds.${item.kind}`)}
                 </Badge>
-                <span className="text-xs text-slate-500">
-                  {item.status.replaceAll("_", " ")}
-                </span>
+                <span className="text-xs text-slate-500">{reportItemStatus(item, t)}</span>
                 {item.date ? (
                   <span className="ml-auto text-xs text-slate-500">{item.date}</span>
                 ) : null}
@@ -84,11 +86,14 @@ function ReportSection({
 
 function ReportView({ run }: { run: ReportRun }) {
   const [copied, setCopied] = useState(false);
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
   if (!run.report) return null;
   const report = run.report;
 
   function downloadMarkdown() {
-    const blob = new Blob([statusReportToMarkdown(report)], {
+    const blob = new Blob([statusReportToMarkdown(report, t)], {
       type: "text/markdown;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -101,7 +106,7 @@ function ReportView({ run }: { run: ReportRun }) {
 
   async function copyMarkdown() {
     try {
-      await navigator.clipboard.writeText(statusReportToMarkdown(report));
+      await navigator.clipboard.writeText(statusReportToMarkdown(report, t));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -110,21 +115,21 @@ function ReportView({ run }: { run: ReportRun }) {
   }
 
   const stats = [
-    ["Open tasks", `${report.counts.openTasks}/${report.counts.tasks}`],
+    [t("reports.stats.openTasks"), `${report.counts.openTasks}/${report.counts.tasks}`],
     [
-      "Open milestones",
+      t("reports.stats.openMilestones"),
       `${report.counts.openMilestones}/${report.counts.milestones}`,
     ],
     [
-      "Completed",
+      t("reports.stats.completed"),
       report.counts.completedTasksInPeriod +
         report.counts.completedMilestonesInPeriod,
     ],
-    ["Blockers", report.counts.blockers],
-    ["Overdue", report.counts.overdue],
-    ["Upcoming", report.counts.upcoming],
-    ["Active risks", report.counts.activeRisks],
-    ["Dependencies", report.counts.dependencyBlockers],
+    [t("reports.stats.blockers"), report.counts.blockers],
+    [t("reports.stats.overdue"), report.counts.overdue],
+    [t("reports.stats.upcoming"), report.counts.upcoming],
+    [t("reports.stats.activeRisks"), report.counts.activeRisks],
+    [t("reports.stats.dependencies"), report.counts.dependencyBlockers],
   ] as const;
 
   return (
@@ -134,17 +139,17 @@ function ReportView({ run }: { run: ReportRun }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={HEALTH_TONE[report.health]}>
-                {report.health.toUpperCase()} health
+                {t("reports.health", { health: t(`reportHealth.${report.health}`) })}
               </Badge>
               <span className="text-xs text-slate-500">
                 {report.period.start} – {report.period.end}
               </span>
             </div>
-            <h2 className="mt-3 text-lg font-semibold">Executive summary</h2>
+            <h2 className="mt-3 text-lg font-semibold">{t("reports.executiveSummary")}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={copyMarkdown}>
-              <span aria-live="polite">{copied ? "Copied" : "Copy as Markdown"}</span>
+              <span aria-live="polite">{copied ? t("reports.copied") : t("reports.copy")}</span>
             </Button>
             <Button
               type="button"
@@ -153,7 +158,7 @@ function ReportView({ run }: { run: ReportRun }) {
               onClick={downloadMarkdown}
             >
               <Download className="size-3.5" aria-hidden />
-              Download .md
+              {t("reports.download")}
             </Button>
           </div>
         </div>
@@ -161,8 +166,14 @@ function ReportView({ run }: { run: ReportRun }) {
           {report.narrative}
         </p>
         <p className="mt-3 text-xs text-slate-400">
-          Generated {formatDate(run.createdAt)} · {run.model} ·{" "}
-          {run.latencyMs === null ? "latency unavailable" : `${(run.latencyMs / 1000).toFixed(1)}s`}
+          {t("reports.generatedMeta", {
+            date: formatDate(run.createdAt, dateLocale, timeZone),
+            model: run.model,
+            latency:
+              run.latencyMs === null
+                ? t("reports.latencyUnavailable")
+                : `${(run.latencyMs / 1000).toFixed(1)}s`,
+          })}
         </p>
       </Card>
 
@@ -176,20 +187,20 @@ function ReportView({ run }: { run: ReportRun }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ReportSection title="Completed this period" items={report.sections.completed} />
-        <ReportSection title="Current blockers" items={report.sections.blockers} />
-        <ReportSection title="Overdue" items={report.sections.overdue} />
-        <ReportSection title="Next seven days" items={report.sections.upcoming} />
-        <ReportSection title="Open and monitoring risks" items={report.sections.risks} />
+        <ReportSection title={t("reports.sections.completed")} items={report.sections.completed} />
+        <ReportSection title={t("reports.sections.blockers")} items={report.sections.blockers} />
+        <ReportSection title={t("reports.sections.overdue")} items={report.sections.overdue} />
+        <ReportSection title={t("reports.sections.upcoming")} items={report.sections.upcoming} />
+        <ReportSection title={t("reports.sections.risks")} items={report.sections.risks} />
         <ReportSection
-          title="Dependency blockers"
+          title={t("reports.sections.dependencyBlockers")}
           items={report.sections.dependencyBlockers}
         />
       </div>
 
       <Card className="p-4">
         <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-          Narrative sources
+          {t("reports.narrativeSources")}
         </h3>
         <div className="mt-3 space-y-2">
           {report.citations.map((citation) => (
@@ -198,12 +209,12 @@ function ReportView({ run }: { run: ReportRun }) {
               className="rounded-lg border border-blue-200 bg-blue-50/40 p-3"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <Badge tone="info">{citation.kind.replaceAll("_", " ")}</Badge>
+                <Badge tone="info">{t(`reports.kinds.${citation.kind}`)}</Badge>
                 <Link href={citation.href} className="text-xs font-medium hover:underline">
                   {citation.title}
                 </Link>
                 <span className="ml-auto text-xs text-slate-400">
-                  observed {formatDate(citation.observedAt)}
+                  {t("reports.observed", { date: formatDate(citation.observedAt, dateLocale, timeZone) })}
                 </span>
               </div>
               <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-slate-600 italic">
@@ -230,6 +241,9 @@ export function StatusReportsPanel({
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
   const selected = useMemo(
     () => runs.find((run) => run.id === selectedId && run.report) ?? null,
     [runs, selectedId],
@@ -245,7 +259,7 @@ export function StatusReportsPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "Could not generate the status report.");
+        setError(data.error ?? t("reports.generateFailed"));
         // Generation failures are audit records too. Refresh the immutable run
         // history so the failed attempt is visible without a page reload.
         const historyResponse = await fetch(
@@ -260,7 +274,7 @@ export function StatusReportsPanel({
       setRuns((previous) => [data.report, ...previous]);
       setSelectedId(data.report.id);
     } catch {
-      setError("Could not reach the server. Please try again.");
+      setError(t("reports.unreachable"));
     } finally {
       setPending(false);
     }
@@ -269,17 +283,17 @@ export function StatusReportsPanel({
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Weekly status reports"
-        description="Exact project sections with a concise, cited executive narrative."
+        title={t("reports.title")}
+        description={t("reports.lead")}
       >
         <Button type="button" onClick={generate} disabled={pending}>
           {pending ? (
             <>
               <Spinner className="border-white/40 border-t-white" />
-              Generating…
+              {t("reports.generating")}
             </>
           ) : (
-            "Generate report"
+            t("reports.generate")
           )}
         </Button>
       </SectionHeader>
@@ -289,7 +303,7 @@ export function StatusReportsPanel({
       {runs.length > 0 ? (
         <Card className="p-3">
           <p className="px-1 pb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-            History
+            {t("reports.history")}
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {runs.map((run) => (
@@ -305,11 +319,15 @@ export function StatusReportsPanel({
                     : "border-slate-200 bg-white hover:bg-slate-50"
                 }`}
               >
-                <span className="block font-medium">{formatDate(run.createdAt)}</span>
+                <span className="block font-medium">
+                  {formatDate(run.createdAt, dateLocale, timeZone)}
+                </span>
                 <span className={selectedId === run.id ? "text-slate-300" : "text-slate-500"}>
                   {run.report
                     ? `${run.report.period.start} – ${run.report.period.end}`
-                    : `${run.status}: ${run.errorMessage ?? "No report output"}`}
+                    : `${labelOr(t, `runStatus.${run.status}`, run.status)}: ${
+                        run.errorMessage ?? t("reports.noOutput")
+                      }`}
                 </span>
               </button>
             ))}
@@ -321,8 +339,8 @@ export function StatusReportsPanel({
         <ReportView run={selected} />
       ) : (
         <EmptyState
-          title="No weekly report yet"
-          description="Generate a report after adding approved project work. Empty projects are rejected before any model call."
+          title={t("reports.emptyTitle")}
+          description={t("reports.emptyBody")}
         />
       )}
     </div>

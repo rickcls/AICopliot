@@ -89,3 +89,13 @@ export function createTranslator(
     return interpolate(form, vars);
   };
 }
+
+/**
+ * A label for a stored value the dictionaries may not know — an enum value a
+ * newer build added, a status string from a saved snapshot. Falls back to the
+ * caller's text instead of rendering the dotted key.
+ */
+export function labelOr(t: Translate, key: string, fallback: string): string {
+  const label = t(key as MessageKey);
+  return label === key ? fallback : label;
+}
