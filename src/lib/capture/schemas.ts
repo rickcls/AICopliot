@@ -65,9 +65,16 @@ export const proposalOverridesSchema = z
       .nullable(),
     status: z.enum(["done", "blocked", "open"]).nullable(),
     note: z.string().trim().min(1).max(4000),
+    /** A new task's assignee; the person applying when absent. Membership is checked on write. */
+    assigneeId: z.string().trim().min(1),
   })
   .partial();
 export type ProposalOverrides = z.infer<typeof proposalOverridesSchema>;
+
+/** What the person says is wrong with one suggestion, for the model to redo it. */
+export const reviseProposalSchema = z.object({
+  instruction: z.string().trim().min(2, "Say what is wrong first").max(500),
+});
 
 export const createCaptureSchema = z.object({
   text: z.string().trim().min(3, "Write a little more first").max(8000).optional(),

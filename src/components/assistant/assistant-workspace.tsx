@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bot, Plus, Send, Trash2 } from "lucide-react";
 import { AssistantMessage } from "@/components/assistant/assistant-message";
-import type { ProjectOption } from "@/components/capture/proposal-list";
+import type { ColleagueOption, ProjectOption } from "@/components/capture/proposal-list";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
@@ -29,12 +29,14 @@ export function AssistantWorkspace({
   threadId,
   messages,
   projects,
+  colleagues,
   webSearchAvailable,
 }: {
   threads: ThreadSummary[];
   threadId: string | null;
   messages: AssistantMessageView[];
   projects: ProjectOption[];
+  colleagues: ColleagueOption[];
   webSearchAvailable: boolean;
 }) {
   // Lives above the keyed conversation, so the first answer (which creates a
@@ -47,6 +49,7 @@ export function AssistantWorkspace({
       threadId={threadId}
       messages={messages}
       projects={projects}
+      colleagues={colleagues}
       webSearch={webSearchAvailable && webSearch}
       webSearchAvailable={webSearchAvailable}
       onWebSearchChange={setWebSearch}
@@ -59,6 +62,7 @@ function AssistantConversation({
   threadId: initialThreadId,
   messages: initialMessages,
   projects,
+  colleagues,
   webSearch,
   webSearchAvailable,
   onWebSearchChange,
@@ -67,6 +71,7 @@ function AssistantConversation({
   threadId: string | null;
   messages: AssistantMessageView[];
   projects: ProjectOption[];
+  colleagues: ColleagueOption[];
   webSearch: boolean;
   webSearchAvailable: boolean;
   onWebSearchChange: (on: boolean) => void;
@@ -239,6 +244,7 @@ function AssistantConversation({
                   <AssistantMessage
                     message={message}
                     projects={projects}
+                    colleagues={colleagues}
                     onChange={(updated) =>
                       setMessages((list) => list.map((row) => (row.id === updated.id ? updated : row)))
                     }

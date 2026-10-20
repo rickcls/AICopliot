@@ -3,7 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { FileText, Trash2 } from "lucide-react";
-import { ProposalList, type ProjectOption } from "@/components/capture/proposal-list";
+import {
+  ProposalList,
+  type ColleagueOption,
+  type ProjectOption,
+} from "@/components/capture/proposal-list";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
@@ -28,11 +32,13 @@ const SOURCE_KEY = {
 export function CaptureCard({
   capture,
   projects,
+  colleagues,
   onChange,
   onDelete,
 }: {
   capture: CaptureView;
   projects: ProjectOption[];
+  colleagues: ColleagueOption[];
   onChange: (capture: CaptureView) => void;
   onDelete: (captureId: string) => void;
 }) {
@@ -57,6 +63,28 @@ export function CaptureCard({
       toast.error(t("common.couldNotReach"));
     } finally {
       setBusy(null);
+    }
+  }
+
+  /** The whole capture comes back: the correction is now part of the note. */
+  async function revise(proposalId: string, instruction: string) {
+    try {
+      const response = await fetch(`/api/capture-proposals/${proposalId}/revise`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.capture) {
+        toast.error(t("capture.reviseFailed"), data.error);
+        return false;
+      }
+      onChange(data.capture as CaptureView);
+      toast.success(t("capture.revised"));
+      return true;
+    } catch {
+      toast.error(t("common.couldNotReach"));
+      return false;
     }
   }
 
@@ -185,12 +213,14 @@ export function CaptureCard({
         <ProposalList
           proposals={capture.proposals}
           projects={projects}
+          colleagues={colleagues}
           applyUrl={`/api/captures/${capture.id}/apply`}
           decideUrl={(id) => `/api/capture-proposals/${id}`}
           readProposals={(data) =>
             (data as { capture?: CaptureView | null }).capture?.proposals ?? null
           }
           onChange={(proposals) => onChange({ ...capture, proposals })}
+          onRevise={revise}
         />
       )}
     </Card>

@@ -1,6 +1,7 @@
 import type { TaskPriority, TaskStatusCategory } from "@/generated/prisma/enums";
 import { resolveDateExpression } from "@/lib/capture/dates";
 import { citedNeighbourhood, type CaptureLine } from "@/lib/capture/lines";
+import { stripClarificationMarker } from "@/lib/capture/prompt";
 import { modelProposalSchema, type ModelProposal } from "@/lib/capture/schemas";
 import { requirementTitleKey } from "@/lib/generation/requirements-validate";
 import { sourceStatesEffort } from "@/lib/generation/task-fill-validate";
@@ -85,6 +86,11 @@ export interface CaptureValidationContext {
   /** The capture's local date, YYYY-MM-DD. */
   anchor: string;
   language: ReplyLanguage;
+  /**
+   * New-task titles already on the list when one suggestion is redone, so a
+   * replacement that repeats one is flagged like a duplicate of an open task.
+   */
+  pendingTitles?: readonly string[];
 }
 
 export type DropReason =
@@ -153,7 +159,9 @@ export function validateCaptureProposals(
 } {
   const lineByLabel = new Map(ctx.lines.map((line) => [line.label, line]));
   const openTitleKeys = new Set(
-    [...ctx.tasks.values()].map((task) => duplicateKey(task.title)),
+    [...[...ctx.tasks.values()].map((task) => task.title), ...(ctx.pendingTitles ?? [])].map(
+      duplicateKey,
+    ),
   );
 
   const proposals: ValidatedProposal[] = [];
@@ -200,7 +208,11 @@ export function validateCaptureProposals(
         flags: [...flags],
         payload: {
           title: prose(title, ctx.language),
-          description: proposal.description ? prose(proposal.description, ctx.language) : null,
+          // With no description of its own, a new task keeps the lines it came
+          // from: the person's own words, so never converted (invariant 21).
+          description: proposal.description
+            ? prose(proposal.description, ctx.language)
+            : citations.map((citation) => stripClarificationMarker(citation.text)).join("\n").slice(0, 4000),
           projectId: proposal.project ? (ctx.projects.get(proposal.project) ?? null) : null,
           priority: proposal.priority,
           status: proposal.status === "blocked" && citedStatesWaiting(citedText) ? "blocked" : null,

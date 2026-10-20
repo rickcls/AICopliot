@@ -36,6 +36,7 @@ export default async function AssistantPage({
         threadId={thread?.id ?? null}
         messages={thread?.messages ?? []}
         projects={options.projects}
+        colleagues={options.colleagues}
         webSearchAvailable={Boolean(getEnv().TAVILY_API_KEY)}
       />
     </div>

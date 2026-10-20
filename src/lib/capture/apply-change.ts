@@ -115,7 +115,8 @@ export async function applyChange(
         title: overrides.title ?? payload.title,
         description: overrides.description !== undefined ? overrides.description : payload.description,
         priority: (overrides.priority !== undefined ? overrides.priority : payload.priority) ?? "medium",
-        assigneeId: access.userId,
+        // `prepareTaskCreate` refuses an assignee outside the workspace.
+        assigneeId: overrides.assigneeId ?? access.userId,
         estimatedHours: payload.estimatedHours,
         dueDate: overrides.dueDate !== undefined ? overrides.dueDate : payload.dueDate,
         ...(column.statusId ? { statusId: column.statusId } : {}),

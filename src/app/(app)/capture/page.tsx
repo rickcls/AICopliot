@@ -52,6 +52,7 @@ export default async function CapturePage({
       <CaptureWorkspace
         initialCaptures={captures.map(toCaptureView)}
         projects={options.projects}
+        colleagues={options.colleagues}
         personalProjectId={options.personalProjectId}
         gmail={gmail}
       />

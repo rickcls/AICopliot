@@ -348,6 +348,9 @@ Three abstractions exist so pieces can be swapped without touching call sites:
   Flash ("Reasoning is mandatory"), so the provider retries such a model with
   `effort: "minimal"` (zero thinking tokens there) and remembers it; DeepSeek
   V4 Flash still thinks at minimal, which is why the off switch goes first.
+  OpenRouter spreads GLM over ~34 hosts and some refuse `minimal` as well, so
+  the last resort sends no setting at all — the model's default, slower but
+  never refused, and still inside the call's time limit.
   **Every provider call has a time limit** (`timeoutMs`, default 45 s), and a
   timed-out call is a `ProviderError` that `isProviderTimeout()` recognises, so
   a route can name it instead of being killed silently. Calls that share one
@@ -753,19 +756,47 @@ assistant something — typed, pasted, dictated, or from a file. One model call
   lines (per newline and sentence, hard-splitting long unpunctuated dictation);
   `context.ts` loads the person's open tasks as `T` candidates
   (`rankTaskCandidates` — shared words first, Chinese by character pairs) and
-  visible projects as `P`; `prompt.ts` (`capture-v1`); `schemas.ts` parses each
+  visible projects as `P`; `prompt.ts` (`capture-v3`); `schemas.ts` parses each
   proposal separately so one bad item costs only itself; `validate.ts` is the
   deterministic gate; `service.ts` stores, calls, validates, and applies.
+- **When unsure, create — don't update.** Rule 2 once said "prefer changing an
+  existing task", and the model read new work as an update to whatever task
+  shared a word with it. A wrong update silently changes real work, while a
+  new task that repeats one is flagged and dismissed in one click, so
+  `capture-v3` changes a task only when the line is clearly about it.
 - **Updates must change something.** A status the task already has, or its
   current due date, is dropped as a no-op rather than offered as an Apply that
   does nothing. A new task matching an open title is *flagged*
   `possible_duplicate`, never dropped.
+- **A wrong suggestion can be redone, not just dismissed.** Each pending row
+  takes a correction ("this is a new task, not the monthly report"), sent to
+  `POST /api/capture-proposals/[id]/revise` (`reviseProposal`). The correction
+  is the person's own words, so it is appended to the note in SQL (`body ||`,
+  so two corrections at once both survive) as a `補充：` / `Clarification:`
+  line *before* the model is called, and kept whatever happens. Appending
+  leaves every earlier `C` label where it was. Rule 12 makes a correction win
+  over the lines it corrects; `buildReviseBlock()` names the suggestion by its
+  `T`/`C` labels, never an id, and lists the other pending suggestions so the
+  replacement does not repeat one — `pendingTitles` flags it
+  `possible_duplicate` if it does anyway. Replacements (≤3) pass the same validator, and
+  the old row is claimed (`pending` → deleted) in the transaction that writes
+  them, so a row applied meanwhile is never replaced. A note at the
+  150-line limit refuses, rather than have the correction cut off its end.
+- **A new task always has a description.** The model writes one or two
+  sentences from the cited lines; with none, `validate.ts` uses the cited lines
+  themselves — the person's own words, unconverted, marker stripped.
+- **Priority is read, never guessed:** only explicit words (急, 重要, 唔急…).
+  Without them a new task is saved at medium, and the row says so ("default:
+  not mentioned") rather than showing a blank that reads as a judgement.
 - **Status goes by category, never by label.** `pickStatusForCategory()` picks
   the first column of that category in board order, preferring the seeded
   `in_progress` for "still going". A project with no blocked column refuses
   the update with a message instead of inventing one.
 - **New tasks land in the personal project** unless the person (or a
-  confident `P` label) names another, and are assigned to the person applying.
+  confident `P` label) names another, and are assigned to the person applying
+  unless they pick a colleague in the row (`assigneeId` override; the picker
+  shows only with colleagues, and `prepareTaskCreate` refuses a non-member).
+  The assignee is code and the person's choice, never the model's.
   "Apply all" skips flagged proposals; each item applies in its own
   transaction so one refusal does not undo the rest.
 - **Files:** `.txt`/`.md` are read in the browser into the box. PDF and Word go
