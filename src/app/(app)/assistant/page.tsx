@@ -2,6 +2,7 @@ import { AssistantWorkspace } from "@/components/assistant/assistant-workspace";
 import { getThread, listThreads } from "@/lib/assistant/service";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { getCaptureProjectOptions } from "@/lib/capture/service";
+import { getEnv } from "@/lib/env";
 import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -27,14 +28,15 @@ export default async function AssistantPage({
         <h1 className="text-2xl font-semibold tracking-tight">{t("assistant.title")}</h1>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">{t("assistant.lead")}</p>
       </div>
-      {/* Keyed on the thread, so opening another conversation starts from its
-          own messages rather than keeping the previous one's state. */}
+      {/* The workspace keeps the web-search switch across thread changes.
+          The conversation itself is keyed inside, so opening another one
+          starts from that thread's messages. */}
       <AssistantWorkspace
-        key={thread?.id ?? "new"}
         threads={threads.map((row) => ({ id: row.id, title: row.title }))}
         threadId={thread?.id ?? null}
         messages={thread?.messages ?? []}
         projects={options.projects}
+        webSearchAvailable={Boolean(getEnv().TAVILY_API_KEY)}
       />
     </div>
   );

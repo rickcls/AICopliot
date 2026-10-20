@@ -35,6 +35,7 @@ export interface DayPlanView {
   localDate: string;
   availableMinutes: number;
   summary: string;
+  note: string | null;
   items: Array<
     PlannedItem & {
       title: string;
@@ -154,6 +155,7 @@ export async function planMyDay(
       availableMinutes,
       items: plan.items as unknown as Prisma.InputJsonValue,
       summary: plan.summary,
+      note,
       modelName: chat.modelName,
       promptVersion: DAY_PLAN_PROMPT_VERSION,
     },
@@ -161,6 +163,7 @@ export async function planMyDay(
       availableMinutes,
       items: plan.items as unknown as Prisma.InputJsonValue,
       summary: plan.summary,
+      note,
       modelName: chat.modelName,
       promptVersion: DAY_PLAN_PROMPT_VERSION,
     },
@@ -204,6 +207,7 @@ export async function getDayPlan(
     localDate: today.toISOString().slice(0, 10),
     availableMinutes: plan.availableMinutes,
     summary: plan.summary,
+    note: plan.note,
     items: items.flatMap((item) => {
       const task = byId.get(item.taskId);
       return task

@@ -37,6 +37,15 @@ const envSchema = z.object({
   // registering with Google.
   APP_URL: z.string().url().optional(),
 
+  // Optional. Unset, the assistant's web-search switch stays disabled.
+  TAVILY_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : undefined;
+    }),
+
   EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
 
   STORAGE_DIR: z.string().default("./storage"),

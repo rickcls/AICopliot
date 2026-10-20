@@ -15,6 +15,8 @@ export function sourceHref(source: PublicSource): string {
       return `/email?draft=${source.draftId}`;
     case "project":
       return `/projects/${source.projectId}`;
+    case "web":
+      return source.url;
   }
 }
 
@@ -30,6 +32,8 @@ export function sourceTitle(source: PublicSource): string {
       return source.subject;
     case "project":
       return source.name;
+    case "web":
+      return `${source.title}\n${source.url}`;
   }
 }
 
@@ -49,14 +53,7 @@ export function AnswerText({ content, sources }: { content: string; sources: Pub
       const source = byLabel.get(label);
       parts.push(
         source ? (
-          <Link
-            key={`${at}-${label}`}
-            href={sourceHref(source)}
-            title={sourceTitle(source)}
-            className="mx-0.5 inline-flex rounded bg-slate-100 px-1 align-baseline font-mono text-[11px] text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-          >
-            {label}
-          </Link>
+          <Citation key={`${at}-${label}`} source={source} label={label} />
         ) : null,
       );
     }
@@ -64,4 +61,22 @@ export function AnswerText({ content, sources }: { content: string; sources: Pub
   }
   if (last < content.length) parts.push(content.slice(last));
   return <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-800">{parts}</p>;
+}
+
+const CHIP =
+  "mx-0.5 inline-flex rounded bg-slate-100 px-1 align-baseline font-mono text-[11px] text-slate-600 hover:bg-slate-200 hover:text-slate-900";
+
+function Citation({ source, label }: { source: PublicSource; label: string }) {
+  if (source.kind === "web") {
+    return (
+      <a href={source.url} target="_blank" rel="noopener noreferrer" title={sourceTitle(source)} className={CHIP}>
+        {label}
+      </a>
+    );
+  }
+  return (
+    <Link href={sourceHref(source)} title={sourceTitle(source)} className={CHIP}>
+      {label}
+    </Link>
+  );
 }

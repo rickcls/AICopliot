@@ -626,6 +626,7 @@ export const emailDraftRequestSchema = z.object({
 export const assistantQuestionSchema = z.object({
   threadId: z.string().trim().min(1).optional(),
   question: z.string().trim().min(1, "Ask something first").max(2000),
+  webSearch: z.boolean().optional().default(false),
 });
 
 export const loginSchema = z.object({

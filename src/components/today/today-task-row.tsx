@@ -135,9 +135,11 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
           <Button type="button" size="sm" variant="secondary" disabled={busy !== null} onClick={() => void report("blocked")}>
             {t("checkIn.blocked")}
           </Button>
-          <Button type="button" size="sm" variant="ghost" disabled={busy !== null} onClick={() => void report("snooze")}>
-            {t("checkIn.snooze")}
-          </Button>
+          {task.staleDays !== null ? (
+            <Button type="button" size="sm" variant="ghost" disabled={busy !== null} onClick={() => void report("snooze")}>
+              {t("checkIn.snooze")}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </li>

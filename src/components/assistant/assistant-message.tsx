@@ -89,6 +89,29 @@ export function AssistantMessage({
         </div>
       ) : null}
 
+      {message.sources.some((source) => source.kind === "web") ? (
+        <div className="flex flex-wrap gap-1.5">
+          {message.sources
+            .filter((source) => source.kind === "web")
+            .map((source) =>
+              source.kind === "web" ? (
+                <a
+                  key={source.label}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={source.excerpt}
+                  className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 hover:bg-slate-200"
+                >
+                  <ExternalLink className="size-3" aria-hidden />
+                  <span className="font-mono text-[11px] text-slate-500">{source.label}</span>
+                  <span className="max-w-48 truncate">{source.title}</span>
+                </a>
+              ) : null,
+            )}
+        </div>
+      ) : null}
+
       {message.drafts.map((draft) => (
         <Card key={draft.id} className="space-y-2 p-3">
           <div className="flex flex-wrap items-center gap-2">

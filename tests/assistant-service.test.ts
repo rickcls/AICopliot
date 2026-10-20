@@ -20,7 +20,11 @@ const mockPrisma = {
   emailDraft: { findMany: vi.fn() },
   $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
 };
+const { mockEnv } = vi.hoisted(() => ({
+  mockEnv: vi.fn(() => ({ TAVILY_API_KEY: undefined as string | undefined })),
+}));
 vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
+vi.mock("@/lib/env", () => ({ getEnv: () => mockEnv() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/auth-guard", async (importOriginal) => ({
@@ -57,6 +61,7 @@ function scriptedChat(...replies: string[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockEnv.mockReturnValue({ TAVILY_API_KEY: undefined });
   mockPrisma.assistantThread.create.mockResolvedValue({ id: "thread-1" });
   mockPrisma.assistantMessage.findMany.mockResolvedValue([]);
   mockPrisma.project.findMany.mockResolvedValue([{ id: "project-secret", name: "Sales", personalOwnerId: null }]);
@@ -94,6 +99,61 @@ describe("runAssistantTurn", () => {
       { label: "T1", kind: "task", taskId: "task-secret", projectId: "project-secret", title: "Send quote" },
     ]);
     expect(saved.steps).toEqual([{ tool: "list_my_tasks", input: "week", summary: "1" }]);
+  });
+
+  it("reports search_web as unknown when the switch is off, and does not run it", async () => {
+    const chat = scriptedChat(
+      '{"action":"search_web","input":{"query":"ABC quotation"}}',
+      '{"action":"answer","answer":"I stayed inside your files.","citations":[],"general":true,"proposals":[]}',
+    );
+
+    await service.runAssistantTurn(access, { question: "What is a typical quote validity?", webSearch: false }, { chat, now: NOW });
+
+    expect(mockRunTool).not.toHaveBeenCalled();
+    expect(chat.seen[0][0].content).not.toContain("search_web");
+    expect(chat.seen[1].at(-1)!.content).toContain('there is no tool called "search_web"');
+  });
+
+  it("runs search_web only when the switch is on and a key is set", async () => {
+    mockEnv.mockReturnValue({ TAVILY_API_KEY: "tavily-test" });
+    const chat = scriptedChat(
+      '{"action":"search_web","input":{"query":"ABC quotation"}}',
+      '{"action":"answer","answer":"From the web [W1].","citations":["W1"],"general":false,"proposals":[]}',
+    );
+    mockRunTool.mockImplementationOnce(async (_tool, _input, ctx) => {
+      ctx.registry.add("W", "web:https://example.com/a", (label: string) => ({
+        label,
+        kind: "web",
+        title: "ABC guide",
+        url: "https://example.com/a",
+        excerpt: "A snippet",
+      }));
+      return { text: "[W1] ABC guide\nhttps://example.com/a\nA snippet", summary: "1" };
+    });
+
+    await service.runAssistantTurn(access, { question: "What is a typical quote validity?", webSearch: true }, { chat, now: NOW });
+
+    expect(mockRunTool).toHaveBeenCalledTimes(1);
+    expect(mockRunTool.mock.calls[0][0]).toBe("search_web");
+    expect(chat.seen[0][0].content).toContain("search_web");
+    expect(JSON.stringify(chat.seen)).not.toContain("ws-1");
+    const saved = tx.assistantMessage.create.mock.calls[0][0].data;
+    expect(saved.general).toBe(false);
+    expect(saved.sources).toEqual([
+      { label: "W1", kind: "web", title: "ABC guide", url: "https://example.com/a", excerpt: "A snippet" },
+    ]);
+  });
+
+  it("ignores a request for web search when no key is configured", async () => {
+    const chat = scriptedChat(
+      '{"action":"search_web","input":{"query":"ABC quotation"}}',
+      '{"action":"answer","answer":"Nothing from the web.","citations":[],"general":true,"proposals":[]}',
+    );
+
+    await service.runAssistantTurn(access, { question: "Search the web", webSearch: true }, { chat, now: NOW });
+
+    expect(mockRunTool).not.toHaveBeenCalled();
+    expect(chat.seen[1].at(-1)!.content).toContain('there is no tool called "search_web"');
   });
 
   it("never sends a database id to the model", async () => {

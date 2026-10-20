@@ -5,10 +5,13 @@ const mockPrisma = {
   task: { findFirst: vi.fn() },
   documentChunk: { findMany: vi.fn() },
 };
+const { mockEnv } = vi.hoisted(() => ({
+  mockEnv: vi.fn(() => ({ RAG_MIN_SCORE: 0.25, TAVILY_API_KEY: undefined as string | undefined })),
+}));
 vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/env", () => ({ getEnv: () => ({ RAG_MIN_SCORE: 0.25 }) }));
+vi.mock("@/lib/env", () => ({ getEnv: () => mockEnv() }));
 const mockMyTasks = vi.fn();
 vi.mock("@/lib/pm/my-work", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/pm/my-work")>()),
@@ -51,6 +54,7 @@ function task(id: string, due: string | null, category: "open" | "blocked" = "op
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockEnv.mockReturnValue({ RAG_MIN_SCORE: 0.25, TAVILY_API_KEY: undefined });
 });
 
 describe("assistant tools", () => {
@@ -100,5 +104,46 @@ describe("assistant tools", () => {
     expect(outcome.text).toContain("Not sent");
     expect(ctx.draftIds).toEqual(["draft-1"]);
     expect(mockDraft.mock.calls[0][1]).toMatchObject({ purpose: "follow_up", keyPoints: "chase the quote" });
+  });
+
+  it("labels https hits as W and drops anything that is not https", async () => {
+    mockEnv.mockReturnValue({ RAG_MIN_SCORE: 0.25, TAVILY_API_KEY: "tavily-test" });
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        results: [
+          { title: "One", url: "https://example.com/one", content: "first snippet" },
+          { title: "Two", url: "https://example.com/two", content: "second" },
+          { title: "Three", url: "https://example.com/three", content: "third" },
+          { title: "Four", url: "https://example.com/four", content: "fourth" },
+          { title: "Five", url: "https://example.com/five", content: "fifth" },
+          { title: "Script", url: "javascript:alert(1)", content: "must not be labelled" },
+          { title: "Plain", url: "http://example.com/plain", content: "must not be labelled" },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const ctx = context();
+
+    const outcome = await runTool("search_web", { query: "ABC quotation" }, ctx);
+
+    expect(outcome.summary).toBe("5");
+    expect(outcome.text).toContain("[W1] One\nhttps://example.com/one\nfirst snippet");
+    expect(outcome.text).toContain("[W5]");
+    expect(outcome.text).not.toContain("javascript:");
+    expect(outcome.text).not.toContain("http://example.com");
+    expect(outcome.text).not.toContain("ws-1");
+    expect(outcome.text).not.toContain("tavily-test");
+    expect(ctx.registry.get("W1")).toMatchObject({ kind: "web", url: "https://example.com/one" });
+    expect(ctx.registry.get("W6")).toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.tavily.com/search");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      query: "ABC quotation",
+      max_results: 5,
+      include_raw_content: false,
+    });
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tavily-test");
+    vi.unstubAllGlobals();
   });
 });

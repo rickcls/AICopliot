@@ -277,11 +277,20 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    and that is all it may do: at most `MAX_TOOL_STEPS` (5) tools, then — or
    once `DEADLINE_MS` (40 s) has passed — it is told to answer and gets no
    more tools. Its tools only read inside the workspace (notes: the caller's
-   own) or save a private email draft; none writes a task, sends, or calls
-   out. Every source a tool returns gets an opaque label (S, T, N, D, P; U1 is
-   the question) through `SourceRegistry`; `finalizeAnswer` strips labels the
-   run never issued and marks an answer `general` when it cites no source,
-   whatever the model claimed. Changes it suggests go through
+   own) or save a private email draft, except `search_web`: one read-only
+   Tavily request, offered only when the person turns on "Search the web" for
+   that turn and `TAVILY_API_KEY` is set. Without the key the switch
+   stays disabled, and a request that asks for web search runs without the
+   tool. The page itself is never fetched — title, an https URL, and a short
+   snippet; anything else (`javascript:`, plain http) is dropped. The key
+   never reaches the browser. None of the tools writes a task, sends, or
+   writes to another system. Every source a tool returns gets an opaque label
+   (S, T, N, D, P, W; U1 is the question) through `SourceRegistry`;
+   `finalizeAnswer` strips labels the run never issued. A W citation is
+   evidence, so a web-only answer is not marked `general`; an answer with no
+   W and no workspace source still is, whatever the model claimed. Web
+   results are not the person's files and are not general knowledge. Document
+   Q&A is unchanged. Changes it suggests go through
    `validateCaptureProposals` (citations, server-resolved dates) and are
    applied only by Apply, through `applyChange` and a claim on
    `AssistantProposal`. History carries wording only, with labels stripped.
@@ -819,12 +828,23 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
   the same evidence bar, falling back to a literal match without
   embeddings), `list_my_tasks` (Today's buckets, staleness, and ranking),
   `get_task` (description, recent notes, linked documents — by label only),
-  `search_notes` (the caller's own captures), and `draft_email` (saves a
-  private draft through the email service; never sends). Bad input returns
-  text the model can correct.
+  `search_notes` (the caller's own captures), `draft_email` (saves a
+  private draft through the email service; never sends), and `search_web`
+  (one Tavily search, snippets only). `search_web` is listed in the system
+  prompt only when the composer switch is on and `TAVILY_API_KEY` is
+  set; otherwise `parseStep` reports it as an unknown tool and it is not
+  run. Bad input returns text the model can correct.
+- **Web search is a composer switch, off by default.** The chip lives on the
+  assistant page (`aria-pressed`, 「搜尋網頁」 / "Search the web") and stays
+  as set while the page is open. The page reads whether the key is set and
+  passes only that boolean; the key stays server-side. Each hit is a W
+  source (title, https URL, excerpt) stored in the message's existing
+  `sources` JSON. A W chip is an external link (`target="_blank"`,
+  `rel="noopener noreferrer"`). Document chips stay inside the app.
 - **What a turn stores:** the answer, the public form of each cited source
-  (enough to link — passage, task, note, draft, project), the tool trace shown
-  as "What it looked up", the general flag, draft ids, and proposals.
+  (enough to link — passage, task, note, draft, project, web page), the tool
+  trace shown as "What it looked up", the general flag, draft ids, and
+  proposals.
 - **Proposals render through `ProposalList`** (`components/capture/
   proposal-list.tsx`), shared with captures; only the apply and decide
   endpoints differ. Applying both kinds goes through

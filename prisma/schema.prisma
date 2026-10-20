@@ -1190,6 +1190,8 @@ model DailyPlan {
   /// [{ taskId, minutes, reason }] in the suggested order.
   items            Json
   summary          String
+  /// The person's own note for the day (a meeting, a focus). Shown with the plan.
+  note             String?
   modelName        String
   promptVersion    String
   createdAt        DateTime @default(now())

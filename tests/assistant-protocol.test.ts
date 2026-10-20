@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  assistantSystemPrompt,
   finalizeAnswer,
   parseStep,
   SourceRegistry,
   stripLabels,
   toPublicSources,
+  toolsForTurn,
   validateAssistantProposals,
 } from "@/lib/assistant/protocol";
 
@@ -58,6 +60,14 @@ describe("parseStep", () => {
     expect(parseStep('{"action":"send_email","input":{}}')).toEqual({ kind: "unknown_tool", action: "send_email" });
   });
 
+  it("offers web search only on a turn whose switch is on", () => {
+    const call = '{"action":"search_web","input":{"query":"ABC quotation"}}';
+    expect(parseStep(call, toolsForTurn(false))).toEqual({ kind: "unknown_tool", action: "search_web" });
+    expect(parseStep(call, toolsForTurn(true))).toMatchObject({ kind: "tool", tool: "search_web" });
+    expect(assistantSystemPrompt(false)).not.toContain("search_web");
+    expect(assistantSystemPrompt(true)).toContain("search_web");
+  });
+
   it("returns null for anything that is not one valid step", () => {
     expect(parseStep("I will now search")).toBeNull();
     expect(parseStep('{"action":"answer","answer":""}')).toBeNull();
@@ -89,6 +99,24 @@ describe("finalizeAnswer", () => {
     expect(result.content).toBe("Valid until 30 Nov [S1]. Due 20 Oct .");
     expect(result.used).toEqual(["S1"]);
     expect(result.general).toBe(false);
+  });
+
+  it("treats a web page the run returned as evidence, and drops one it never issued", () => {
+    const r = registry();
+    r.add("W", "web:https://example.com/a", (label) => ({
+      label,
+      kind: "web" as const,
+      title: "ABC quotation guide",
+      url: "https://example.com/a",
+      excerpt: "A public snippet.",
+    }));
+    const result = finalizeAnswer("See the guide [W1, W9].", [], false, r, "en");
+    expect(result.content).toBe("See the guide [W1].");
+    expect(result.used).toEqual(["W1"]);
+    expect(result.general).toBe(false);
+    expect(toPublicSources(r, result.used)).toEqual([
+      { label: "W1", kind: "web", title: "ABC quotation guide", url: "https://example.com/a", excerpt: "A public snippet." },
+    ]);
   });
 
   it("calls an answer general when it cites no source, whatever the model says", () => {

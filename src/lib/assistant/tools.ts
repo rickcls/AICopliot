@@ -18,6 +18,8 @@ import { SourceRegistry, TASK_FILTERS, type ToolName } from "@/lib/assistant/pro
  * for notes, only the caller's own — and labels what it returns through the
  * run's registry. The only one that writes is `draft_email`, and what it
  * writes is a private draft the person may or may not send themselves.
+ * `search_web` is the exception: one read-only Tavily request, offered only
+ * on a turn whose composer switch is on.
  */
 
 export interface ToolContext {
@@ -37,6 +39,9 @@ export interface ToolOutcome {
 }
 
 const PASSAGE_CHARS = 700;
+const WEB_RESULTS = 5;
+const WEB_SNIPPET_CHARS = 400;
+const TAVILY_SEARCH_URL = "https://api.tavily.com/search";
 
 const inputs = {
   search_documents: z.object({
@@ -51,6 +56,9 @@ const inputs = {
     key_points: z.string().trim().min(1).max(2000),
     recipient: z.string().trim().max(200).optional(),
     task: z.string().trim().max(12).optional(),
+  }),
+  search_web: z.object({
+    query: z.string().trim().min(1).max(300),
   }),
 } satisfies Record<ToolName, z.ZodType>;
 
@@ -225,6 +233,82 @@ async function writeDraft(ctx: ToolContext, input: z.infer<typeof inputs.draft_e
   };
 }
 
+/** An https URL only. `javascript:` and other schemes never become a W label. */
+function httpsPage(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function searchSnippet(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, WEB_SNIPPET_CHARS);
+}
+
+/**
+ * One Tavily search. The page itself is never fetched — the model sees the
+ * title, the https URL, and a short snippet, each labelled W. Tavily's own
+ * answer and raw page text stay off, so the assistant still writes the reply.
+ */
+async function searchWeb(ctx: ToolContext, input: { query: string }): Promise<ToolOutcome> {
+  const key = getEnv().TAVILY_API_KEY;
+  if (!key) return { text: "Web search is not available.", summary: "unavailable" };
+
+  let payload: unknown;
+  try {
+    const response = await fetch(TAVILY_SEARCH_URL, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        query: input.query,
+        max_results: WEB_RESULTS,
+        search_depth: "basic",
+        include_answer: false,
+        include_raw_content: false,
+        include_images: false,
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return { text: "Web search failed.", summary: "failed" };
+    payload = await response.json();
+  } catch {
+    return { text: "Web search failed.", summary: "failed" };
+  }
+
+  const results = (payload as { results?: { title?: unknown; url?: unknown; content?: unknown }[] }).results;
+  const hits = (results ?? []).flatMap((result) => {
+    if (typeof result.title !== "string" || typeof result.url !== "string") return [];
+    const url = httpsPage(result.url);
+    if (!url) return [];
+    return [
+      {
+        title: result.title.replace(/\s+/g, " ").trim().slice(0, 200),
+        url,
+        snippet: searchSnippet(typeof result.content === "string" ? result.content : ""),
+      },
+    ];
+  });
+  if (hits.length === 0) return { text: "No web results.", summary: "0" };
+
+  const blocks = hits.map((hit) => {
+    const source = ctx.registry.add("W", `web:${hit.url}`, (label) => ({
+      label,
+      kind: "web" as const,
+      title: hit.title,
+      url: hit.url,
+      excerpt: hit.snippet,
+    }));
+    return `[${source.label}] ${source.title}\n${source.url}\n${source.excerpt}`;
+  });
+  return { text: blocks.join("\n\n"), summary: String(hits.length) };
+}
+
 /** Runs one tool. Bad input comes back as text the model can correct, not an exception. */
 export async function runTool(tool: ToolName, rawInput: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutcome> {
   const parsed = inputs[tool].safeParse(rawInput);
@@ -242,5 +326,7 @@ export async function runTool(tool: ToolName, rawInput: Record<string, unknown>,
       return searchNotes(ctx, parsed.data as z.infer<typeof inputs.search_notes>);
     case "draft_email":
       return writeDraft(ctx, parsed.data as z.infer<typeof inputs.draft_email>);
+    case "search_web":
+      return searchWeb(ctx, parsed.data as z.infer<typeof inputs.search_web>);
   }
 }

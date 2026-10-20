@@ -20,7 +20,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
   const [plan, setPlan] = useState(initialPlan);
   const [editing, setEditing] = useState(initialPlan === null);
   const [hours, setHours] = useState(initialPlan ? initialPlan.availableMinutes / 60 : 6);
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(initialPlan?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +78,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
           }}
           className="flex flex-wrap items-end gap-3 p-4"
         >
+          {plan ? <p className="w-full text-xs text-slate-500">{t("plan.replaces")}</p> : null}
           <div>
             <label htmlFor={`${ids}-hours`} className="mb-1 block text-xs font-medium text-slate-500">
               {t("plan.hours")}
@@ -120,7 +121,12 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
 
       {plan && !editing ? (
         <div className="p-4">
-          {plan.summary ? <p className="mb-3 text-sm text-pretty text-slate-700">{plan.summary}</p> : null}
+          {plan.summary || plan.note ? (
+            <div className="mb-3 space-y-1">
+              {plan.summary ? <p className="text-sm text-pretty text-slate-700">{plan.summary}</p> : null}
+              {plan.note ? <p className="text-sm text-slate-500">{plan.note}</p> : null}
+            </div>
+          ) : null}
           <ol className="space-y-2">
             {plan.items.map((item, index) => (
               <li key={item.taskId} className="flex items-start gap-3">

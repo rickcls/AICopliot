@@ -2,7 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { getUserPreferences, type SessionUser, type WorkspaceAccess } from "@/lib/auth-guard";
 import {
-  ASSISTANT_SYSTEM_PROMPT,
+  assistantSystemPrompt,
   buildOpeningMessage,
   finalizeAnswer,
   foundSoFar,
@@ -11,6 +11,7 @@ import {
   SourceRegistry,
   stripLabels,
   toPublicSources,
+  toolsForTurn,
   validateAssistantProposals,
   type PublicSource,
 } from "@/lib/assistant/protocol";
@@ -19,6 +20,7 @@ import { applyChange } from "@/lib/capture/apply-change";
 import type { ProposalOverrides } from "@/lib/capture/schemas";
 import type { CaptureProposalView } from "@/lib/capture/view";
 import { prisma } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import type { EmailDraftView } from "@/lib/email/service";
 import type { FactFlag } from "@/lib/email/facts";
 import { detectReplyLanguage } from "@/lib/language";
@@ -107,7 +109,7 @@ function describeInput(input: Record<string, unknown>): string {
 
 export async function runAssistantTurn(
   access: AssistantAccess,
-  input: { threadId?: string; question: string },
+  input: { threadId?: string; question: string; webSearch?: boolean },
   deps: AssistantDeps = {},
 ): Promise<{ threadId: string; message: AssistantMessageView }> {
   const clock = deps.clock ?? Date.now;
@@ -156,8 +158,11 @@ export async function runAssistantTurn(
 
   const chat = deps.chat ?? getChatProvider();
   const anchor = today.toISOString().slice(0, 10);
+  // The switch only counts when a key exists. Without one the turn runs as usual.
+  const webSearch = input.webSearch === true && Boolean(getEnv().TAVILY_API_KEY);
+  const allowedTools = toolsForTurn(webSearch);
   const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
-    { role: "system", content: ASSISTANT_SYSTEM_PROMPT },
+    { role: "system", content: assistantSystemPrompt(webSearch) },
     {
       role: "user",
       content: buildOpeningMessage({
@@ -210,7 +215,7 @@ export async function runAssistantTurn(
     }
     const raw = await ask();
     if (raw === null) break;
-    const step = parseStep(raw);
+    const step = parseStep(raw, allowedTools);
     messages.push({ role: "assistant", content: raw });
 
     if (!step) {
@@ -241,7 +246,7 @@ export async function runAssistantTurn(
       content: 'Answer now. Reply with exactly one {"action":"answer","answer":"…","citations":[…]} object built from the results above. Do not call any tool.',
     });
     const raw = await ask();
-    const step = raw === null ? null : parseStep(raw);
+    const step = raw === null ? null : parseStep(raw, allowedTools);
     if (step?.kind === "answer") answer = step;
   }
 

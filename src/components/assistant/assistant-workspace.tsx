@@ -9,7 +9,7 @@ import type { ProjectOption } from "@/components/capture/proposal-list";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
-import { Button, Card, ErrorState, FOCUS_RING, Spinner, Textarea } from "@/components/ui";
+import { Button, Card, ErrorState, FilterChip, FOCUS_RING, Spinner, Textarea } from "@/components/ui";
 import type { AssistantMessageView } from "@/lib/assistant/service";
 import { cn } from "@/lib/utils";
 
@@ -25,15 +25,51 @@ export interface ThreadSummary {
  * rather than streaming partial steps.
  */
 export function AssistantWorkspace({
-  threads: initialThreads,
-  threadId: initialThreadId,
-  messages: initialMessages,
+  threads,
+  threadId,
+  messages,
   projects,
+  webSearchAvailable,
 }: {
   threads: ThreadSummary[];
   threadId: string | null;
   messages: AssistantMessageView[];
   projects: ProjectOption[];
+  webSearchAvailable: boolean;
+}) {
+  // Lives above the keyed conversation, so the first answer (which creates a
+  // thread and remounts the conversation) does not snap the switch back off.
+  const [webSearch, setWebSearch] = useState(false);
+  return (
+    <AssistantConversation
+      key={threadId ?? "new"}
+      threads={threads}
+      threadId={threadId}
+      messages={messages}
+      projects={projects}
+      webSearch={webSearchAvailable && webSearch}
+      webSearchAvailable={webSearchAvailable}
+      onWebSearchChange={setWebSearch}
+    />
+  );
+}
+
+function AssistantConversation({
+  threads: initialThreads,
+  threadId: initialThreadId,
+  messages: initialMessages,
+  projects,
+  webSearch,
+  webSearchAvailable,
+  onWebSearchChange,
+}: {
+  threads: ThreadSummary[];
+  threadId: string | null;
+  messages: AssistantMessageView[];
+  projects: ProjectOption[];
+  webSearch: boolean;
+  webSearchAvailable: boolean;
+  onWebSearchChange: (on: boolean) => void;
 }) {
   const t = useT();
   const toast = useToast();
@@ -74,7 +110,11 @@ export function AssistantWorkspace({
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed, ...(threadId ? { threadId } : {}) }),
+        body: JSON.stringify({
+          question: trimmed,
+          webSearch,
+          ...(threadId ? { threadId } : {}),
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.message) {
@@ -243,7 +283,17 @@ export function AssistantWorkspace({
             }}
           />
           <div className="mt-2 flex items-center justify-between gap-3">
-            <span className="text-xs text-slate-400">{t("capture.shortcutHint", { key: "Ctrl/⌘" })}</span>
+            <div className="flex min-w-0 items-center gap-2">
+              <FilterChip
+                pressed={webSearch}
+                disabled={!webSearchAvailable || busy}
+                title={webSearchAvailable ? undefined : t("assistant.webUnavailable")}
+                onClick={() => onWebSearchChange(!webSearch)}
+              >
+                {webSearchAvailable ? t("assistant.webSearch") : t("assistant.webUnavailable")}
+              </FilterChip>
+              <span className="hidden text-xs text-slate-400 sm:inline">{t("capture.shortcutHint", { key: "Ctrl/⌘" })}</span>
+            </div>
             <Button type="submit" size="sm" disabled={busy || !question.trim()}>
               {busy ? <Spinner className="border-white/40 border-t-white" /> : <Send className="size-3.5" aria-hidden />}
               {t("assistant.ask")}
