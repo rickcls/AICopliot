@@ -1211,7 +1211,14 @@ private `TaskSuggestion` per person and is never applied by itself: "Add steps
 to the description" goes through the panel's own `save()`, and "Create tasks"
 (`POST /api/task-suggestions/[id]/create-tasks`) goes through `task-write`,
 claiming each step index on `createdSteps` in the same transaction as its
-task so a second click creates nothing. The step formatter lives in
+task so a second click creates nothing. **A step's task is linked, not
+annotated:** the same transaction adds a dependency from the original task
+to it, so the original's panel lists its steps and "waits on" them, and the
+step's panel shows the original under "Needed for" (reverse edges are found
+in the board's own rows, not a second query). It also joins the original's
+milestone and carries the passages its step cited as Sources, with their
+documents linked; a milestone or document that has since left the project is
+left off rather than failing the request. The step formatter lives in
 `approach/format.ts`, apart from the validator, so the browser bundle never
 pulls in OpenCC.
 

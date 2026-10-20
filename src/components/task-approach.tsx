@@ -29,7 +29,8 @@ export function TaskApproach({
   taskId: string;
   /** Appends text to the task's description through the panel's own save. */
   onAppend: (text: string) => Promise<boolean>;
-  onTasksCreated: (tasks: TaskRow[]) => void;
+  /** The new tasks, and the original task read back with its new dependencies. */
+  onTasksCreated: (tasks: TaskRow[], parent: TaskRow | null) => void;
 }) {
   const t = useT();
   const toast = useToast();
@@ -96,7 +97,7 @@ export function TaskApproach({
         return;
       }
       const tasks = (data.tasks ?? []) as TaskRow[];
-      onTasksCreated(tasks);
+      onTasksCreated(tasks, (data.parent ?? null) as TaskRow | null);
       setApproach({ ...approach, createdSteps: [...approach.createdSteps, ...selected] });
       setSelected(new Set());
       toast.success(t("approach.createdCount", { count: tasks.length }));

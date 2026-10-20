@@ -196,6 +196,7 @@ export const tasksEn = {
       add: "Add a dependency…",
       addFailed: "Could not add the dependency.",
       removeFailed: "Could not remove the dependency.",
+      neededFor: "Needed for",
     },
     documents: {
       tooLarge: "That file is too large to upload.",

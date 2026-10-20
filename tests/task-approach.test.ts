@@ -82,14 +82,19 @@ describe("approach formatting", () => {
     expect(stepTitle("Call the vendor. Ask for three references.")).toBe("Call the vendor.");
     expect(stepTitle("聯絡財務部。確認預算。")).toBe("聯絡財務部。");
     expect(stepTitle("x".repeat(200))).toHaveLength(120);
+    // A dot inside a file name or a version number is not the end of a sentence.
+    expect(stepTitle("細閱 client-brief.md，確認報價內容。再提交。")).toBe("細閱 client-brief.md，確認報價內容。");
+    expect(stepTitle("Check v2.1 of the spec. Then sign.")).toBe("Check v2.1 of the spec.");
   });
 });
 
 // --- Service ---------------------------------------------------------------
 
-const tx = { taskSuggestion: { updateMany: vi.fn() } };
+const tx = { taskSuggestion: { updateMany: vi.fn() }, taskDependency: { create: vi.fn() } };
 const mockPrisma = {
   task: { findFirst: vi.fn() },
+  document: { findMany: vi.fn() },
+  milestone: { findFirst: vi.fn() },
   taskDocument: { findMany: vi.fn() },
   taskSuggestion: { create: vi.fn(), findFirst: vi.fn() },
   $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
@@ -169,8 +174,13 @@ describe("createTasksFromSteps", () => {
         { text: "Confirm the budget with finance. Then sign.", basis: "document", citations: ["S1"] },
         { text: "Call the vendor.", basis: "general", citations: [] },
       ],
-      task: { projectId: "p1", title: "Onboard the new vendor" },
+      sources: [
+        { label: "S1", chunkId: "c1", documentId: "doc-1", filename: "brief.pdf", pageNumber: 2, excerpt: "Budget needs finance sign-off." },
+      ],
+      task: { id: "t1", projectId: "p1", milestoneId: "m1" },
     });
+    mockPrisma.document.findMany.mockResolvedValue([{ id: "doc-1" }]);
+    mockPrisma.milestone.findFirst.mockResolvedValue({ id: "m1", title: "Go-live" });
     writes.prepareTaskCreate.mockResolvedValue({ ok: true, value: { prepared: true } });
     writes.createTaskRecord.mockResolvedValue({ id: "task-new" });
   });
@@ -178,9 +188,9 @@ describe("createTasksFromSteps", () => {
   it("creates the task in the same project, assigned to the person, marking general steps", async () => {
     tx.taskSuggestion.updateMany.mockResolvedValue({ count: 1 });
 
-    const created = await service.createTasksFromSteps(access, "sug-1", [1], "[AI suggestion]");
+    const { tasks } = await service.createTasksFromSteps(access, "sug-1", [1], "[AI suggestion]");
 
-    expect(created).toEqual([{ id: "task-new" }]);
+    expect(tasks).toEqual([{ id: "task-new" }]);
     const [workspaceId, projectId, input] = writes.prepareTaskCreate.mock.calls[0];
     expect([workspaceId, projectId]).toEqual(["ws-1", "p1"]);
     expect(input).toMatchObject({ title: "Call the vendor.", assigneeId: "u-1" });
@@ -191,10 +201,46 @@ describe("createTasksFromSteps", () => {
     });
   });
 
+  it("links the new task to the original task, its milestone, and the step's sources", async () => {
+    tx.taskSuggestion.updateMany.mockResolvedValue({ count: 1 });
+
+    const { parent } = await service.createTasksFromSteps(access, "sug-1", [0], "x");
+
+    const input = writes.prepareTaskCreate.mock.calls[0][2];
+    expect(input).toMatchObject({
+      milestoneId: "m1",
+      documentIds: ["doc-1"],
+      citations: [{ chunkId: "c1", quote: "Budget needs finance sign-off." }],
+    });
+    // The link is a dependency, not a line of text in the description.
+    expect(input.description).toBe("Confirm the budget with finance. Then sign.");
+    expect(tx.taskDependency.create).toHaveBeenCalledWith({
+      data: { workspaceId: "ws-1", taskId: "t1", dependsOnTaskId: "task-new" },
+    });
+    // The original task is read back, so the board shows it waiting on the step.
+    expect(mockPrisma.task.findFirst.mock.calls.at(-1)![0].where).toMatchObject({ id: "t1", workspaceId: "ws-1" });
+    expect(parent).toMatchObject({ id: "t1" });
+  });
+
+  it("leaves off a milestone or document that left the project", async () => {
+    tx.taskSuggestion.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.document.findMany.mockResolvedValue([]);
+    mockPrisma.milestone.findFirst.mockResolvedValue(null);
+
+    await service.createTasksFromSteps(access, "sug-1", [0], "x");
+
+    expect(writes.prepareTaskCreate.mock.calls[0][2]).toMatchObject({
+      milestoneId: null,
+      documentIds: [],
+      citations: [],
+    });
+  });
+
   it("creates nothing for a step already turned into a task", async () => {
     tx.taskSuggestion.updateMany.mockResolvedValue({ count: 0 });
-    expect(await service.createTasksFromSteps(access, "sug-1", [0], "x")).toEqual([]);
+    expect(await service.createTasksFromSteps(access, "sug-1", [0], "x")).toEqual({ tasks: [], parent: null });
     expect(writes.createTaskRecord).not.toHaveBeenCalled();
+    expect(tx.taskDependency.create).not.toHaveBeenCalled();
   });
 
   it("only reads the caller's own suggestion", async () => {

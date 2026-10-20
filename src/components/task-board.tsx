@@ -1219,6 +1219,7 @@ export function TaskBoard({
           onDelete={() => void deleteTask(openTask)}
           onTaskChange={upsert}
           onError={setError}
+          onOpenTask={setOpenTaskId}
         />
       ) : null}
     </div>
