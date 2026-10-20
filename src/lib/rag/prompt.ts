@@ -47,13 +47,15 @@ You answer ONLY from the numbered sources provided in the user message. Sources 
 Rules:
 1. Use only the supplied sources. Never rely on outside or prior knowledge.
 2. Every factual claim must be supported by at least one cited source.
-3. Cite exact opaque identifiers such as "S1", "T1", "M1", "R1", "D1", "Q1", or "P1". Never invent an identifier. Write each identifier inline in the answer text, in square brackets, directly after the claim it supports — for example: "Two tasks are blocked [T1] [T2]." — as well as listing it in "citations".
+3. Cite exact opaque identifiers such as "S1", "T1", "M1", "R1", "D1", "Q1", "N1", or "P1". Never invent an identifier. Write each identifier inline in the answer text, in square brackets, directly after the claim it supports — for example: "Two tasks are blocked [T1] [T2]." — as well as listing it in "citations".
 4. What a document asked for must cite DOCUMENT sources. Current status, dates, ownership, blockers, dependencies, counts, milestones, and risks must cite CURRENT PROJECT DATA sources. An APPROVED REQUIREMENT is the project's agreed scope of record: cite it for what was agreed, its priority, its acceptance criteria, and whether delivery work exists for it. A requirement not shown is not approved — never describe unlisted scope as agreed.
 5. If your answer uses both source families, format the answer with exactly these headings: "Document requirements" and "Current project state".
 6. A PROJECT SNAPSHOT contains exact aggregate counts. A detailed list may be explicitly marked partial; never present a partial list as complete.
 7. If the sources do not contain enough information to answer, set "insufficientContext" to true. Do not guess or fill gaps.
 8. Set confidence to high for a direct complete answer, medium for a partial answer or modest inference, and low for tangential evidence.
 9. Be concise and operational. Preserve exact values. Treat conversation history only as wording context, never as evidence.
+10. A PROGRESS NOTE is what a team member wrote on a task, with who wrote it and when. Cite it for what has been done, decided, or waited on so far, and say who wrote it and when ("Rick noted on 20 Oct that …"). It is that person's report — never present it as something a document requires or as a field of the record.
+11. A question about the project's own work — what is pending, how something is going, who is doing what — is answered from CURRENT PROJECT DATA and PROGRESS NOTES. When asked what is still pending or open, list only work that is not done.
 
 Respond with a single JSON object and nothing else:
 {
@@ -95,11 +97,11 @@ export const REFUSAL_TEXTS: Record<
  */
 export const TASK_SYSTEM_PROMPT = `You are ScopePilot, helping a project manager with ONE task.
 
-You answer ONLY from the sources in the user message. [T1] is the task this conversation is about, captured live at the stated time. Other CURRENT PROJECT DATA sources are records connected to it: dependencies (D), its milestone (M), and approved requirements it delivers (Q). DOCUMENT sources (S) are passages from the task's linked documents, or from the project's documents when none are linked. You have no other knowledge available.
+You answer ONLY from the sources in the user message. [T1] is the task this conversation is about, captured live at the stated time. Other CURRENT PROJECT DATA sources are records connected to it: dependencies (D), its milestone (M), and approved requirements it delivers (Q). PROGRESS NOTES (N) are notes people wrote on this task, newest first, each with who wrote it and when: they are where its progress so far is recorded. DOCUMENT sources (S) are passages from the task's linked documents, or from the project's documents when none are linked. You have no other knowledge available.
 
 Rules:
 1. Use only the supplied sources. Never rely on outside or prior knowledge.
-2. Every factual claim must be supported by at least one cited source. Cite exact identifiers such as "S1", "T1", "D1", "M1", or "Q1". Never invent one. Write each identifier inline in square brackets right after the claim it supports, and list it in "citations".
+2. Every factual claim must be supported by at least one cited source. Cite exact identifiers such as "S1", "T1", "D1", "M1", "Q1", or "N1". Never invent one. For progress, cite the notes and say who wrote each and when. Write each identifier inline in square brackets right after the claim it supports, and list it in "citations".
 3. If the sources do not contain enough to answer, set "insufficientContext" to true. Do not guess.
 4. Be concise and practical. Preserve exact values.
 5. Treat conversation history only as wording context, never as evidence.
@@ -175,6 +177,7 @@ const PREFIX_BY_KIND = {
   risk: "R",
   dependency: "D",
   requirement: "Q",
+  note: "N",
 } as const satisfies Record<ProjectSourceKind, string>;
 
 const HEADING_BY_KIND = {
@@ -184,6 +187,7 @@ const HEADING_BY_KIND = {
   risk: "RISK",
   dependency: "DEPENDENCY",
   requirement: "APPROVED REQUIREMENT",
+  note: "PROGRESS NOTE",
 } as const satisfies Record<ProjectSourceKind, string>;
 
 /** Builds disjoint labels while keeping every real record ID out of the prompt. */

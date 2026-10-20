@@ -68,6 +68,13 @@ export function SourceCard({
           ? citation.snapshot.targetDate
           : null;
     const label = t(`chat.source.kinds.${citation.kind}`);
+    // A note is someone's report, so who wrote it and when sit beside it.
+    const writtenBy =
+      citation.kind === "note" &&
+      typeof citation.snapshot.author === "string" &&
+      typeof citation.snapshot.writtenAt === "string"
+        ? `${citation.snapshot.author} · ${formatDate(citation.snapshot.writtenAt, dateLocale, timeZone)}`
+        : null;
 
     return (
       <div
@@ -87,6 +94,7 @@ export function SourceCard({
           {sourceDate ? (
             <span className="text-xs text-slate-500">{sourceDate}</span>
           ) : null}
+          {writtenBy ? <span className="text-xs text-slate-500">{writtenBy}</span> : null}
           <span className="ml-auto text-xs text-slate-400">
             {t("chat.source.observed", { date: formatDate(citation.observedAt, dateLocale, timeZone) })}
           </span>

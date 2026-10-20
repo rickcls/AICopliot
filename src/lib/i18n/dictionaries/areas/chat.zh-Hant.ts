@@ -123,6 +123,7 @@ export const chatZhHant = {
         risk: "風險",
         dependency: "依賴",
         requirement: "需求",
+        note: "進度記錄",
         project_snapshot: "專案快照",
       },
       observed: "記錄於 {date}",

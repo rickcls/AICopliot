@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { assistantSystemPrompt } from "@/lib/assistant/protocol";
 import {
   buildReviseBlock,
   CAPTURE_SYSTEM_PROMPT,
   clarificationLine,
   stripClarificationMarker,
+  TASK_TITLE_STYLE,
 } from "@/lib/capture/prompt";
 
 /**
@@ -21,6 +23,13 @@ describe("capture prompt", () => {
   it("asks for a description drawn from the cited lines", () => {
     expect(CAPTURE_SYSTEM_PROMPT).toContain("adding nothing the lines do not say");
     expect(CAPTURE_SYSTEM_PROMPT).not.toContain('"description":null');
+  });
+
+  it("names tasks in clean written Chinese or plain English, in capture and the assistant alike", () => {
+    expect(TASK_TITLE_STYLE).toContain("standard written Chinese (書面語), never Cantonese colloquial");
+    expect(TASK_TITLE_STYLE).toContain("Keep names, numbers, amounts, codes");
+    expect(CAPTURE_SYSTEM_PROMPT).toContain(TASK_TITLE_STYLE);
+    expect(assistantSystemPrompt(false)).toContain(TASK_TITLE_STYLE);
   });
 
   it("lets a later correction win over the lines it corrects", () => {

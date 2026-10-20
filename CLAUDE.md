@@ -161,6 +161,17 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    project-data selection run in parallel, live records are frozen with
    `observedAt`, and exact aggregate counts remain available even if the detail
    list is capped. History supplies wording only and is never evidence.
+   **Progress notes are a third family, labelled `N` and attributed.** A
+   task's comments — Today check-ins, capture progress notes, typed comments —
+   are where its progress lives, so a progress question in project chat
+   reads the newest three on its top tasks, and a task thread always reads
+   that task's newest eight. Each says who wrote it and when, and the prompt
+   says to cite it as that person's report, never as a document's requirement
+   or a field of the record. **Which records are read is decided by the
+   question's words** (`readQuestionIntent`, `src/lib/rag/intent.ts`), never
+   by the model: "pending"/"未完成" lists only unfinished work (finished work
+   stays in the snapshot's counts), and a question about the project's own
+   work that does not name its files is answered without document passages.
 
 14. **A requirement carries two independent status axes.** `source` +
    `generationStatus` answer *did a human accept this record?* — identical to the
@@ -764,6 +775,12 @@ assistant something — typed, pasted, dictated, or from a file. One model call
   shared a word with it. A wrong update silently changes real work, while a
   new task that repeats one is flagged and dismissed in one click, so
   `capture-v3` changes a task only when the line is clearly about it.
+- **Titles are tidied, not transcribed** (`capture-v4`, `TASK_TITLE_STYLE`,
+  shared with the assistant). Dictated Cantonese came back as task names like
+  「將月報交俾老闆睇」. Chinese titles and descriptions are written Chinese
+  (書面語), English ones plain English; fillers go; names, numbers, amounts,
+  codes, and technical terms stay exactly as written. Nothing of the person's
+  is lost — their words stay in the cited lines.
 - **Updates must change something.** A status the task already has, or its
   current due date, is dropped as a no-op rather than offered as an Apply that
   does nothing. A new task matching an open title is *flagged*
@@ -1257,9 +1274,12 @@ pulls in OpenCC.
 here.** It has no `source`/`generationStatus`, so it is not a proposal awaiting
 review and never touches `officialRecordWhere()`; the comment routes are the
 only task routes that do *not* use that predicate, because a draft task awaiting
-review is exactly what reviewers need to discuss. It is also **not grounding
-evidence** — project chat answers from documents and official records, and
-letting free-text commentary in would put unreviewed opinion behind a citation.
+review is exactly what reviewers need to discuss. It is grounding evidence
+**only as a progress note** (`N`, invariant 13): attributed to its author and
+time, read for progress questions and task threads, and never passed off as a
+document or a record field — because put behind an ordinary citation it would
+dress up one person's opinion as fact, while leaving it out entirely meant
+"how is it going?" ignored the very place progress is written down.
 
 - `authorId` is `SET NULL` and `taskId` is `CASCADE`, following invariant 9's
   reasoning: removing a person must not delete a thread other people replied to,
@@ -1422,7 +1442,8 @@ its project or task, never re-point it.
   builders as project chat, so a citation's snapshot has one shape. Retrieval
   reads the task's linked documents, fetched fresh each turn so linking one
   takes effect on the next question, or the whole project when it has none.
-  Official tasks only; comments are not evidence. `taskId` is `SET NULL`: a
+  Official tasks only; the task's newest notes come along as `N` sources,
+  because a question in a task thread is usually about its progress. `taskId` is `SET NULL`: a
   deleted task's thread stays readable, `focus` stays `task`, and the route
   refuses to continue it with a 409.
 - **Document focus** is document-only, like global chat. `focusDocumentIds`

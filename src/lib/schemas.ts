@@ -77,6 +77,7 @@ const projectCitationKindSchema = z.enum([
   "risk",
   "dependency",
   "requirement",
+  "note",
   "project_snapshot",
 ]);
 

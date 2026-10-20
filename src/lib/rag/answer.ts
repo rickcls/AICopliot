@@ -27,6 +27,7 @@ import {
 import { validateProposals } from "./proposals";
 import { hasGroundingEvidence } from "./ranking";
 import { retrieveChunks, type RetrievedChunk } from "./retrieve";
+import { asksAboutRecordsOnly, readQuestionIntent } from "./intent";
 import { needsRewrite, rewriteQuestion, type ChatTurn } from "./rewrite";
 
 /**
@@ -229,7 +230,17 @@ export async function answerQuestion(
   ]);
 
   // --- Guard 1: refuse before calling the model when evidence is too weak ---
-  const relevant = retrieved.filter((c) => hasGroundingEvidence(c, minScore));
+  const supported = retrieved.filter((c) => hasGroundingEvidence(c, minScore));
+  // "What is still pending?" and "how is it going?" are about the project's
+  // own work, which its records and notes answer; document passages were cited
+  // in those answers as if they were status. Unless the question names the
+  // files, they are left out. Both wordings are read, in case the rewrite
+  // dropped the words that carry the intent.
+  const recordsOnly =
+    combined &&
+    liveContext.sources.length > 0 &&
+    asksAboutRecordsOnly(readQuestionIntent(`${question}\n${searchQuery}`));
+  const relevant = recordsOnly ? [] : supported;
   // Reported after the gate, so the count shown is what the model will receive.
   report({
     phase: "retrieved",
@@ -331,7 +342,9 @@ export async function answerQuestion(
           refusalText,
           requireMixedHeadings: combined,
           question: searchQuery,
-          enforceIntentFamilies: combined,
+          // A records-only question was sent no document passages on purpose,
+          // so a word like "UAT" in a task's title must not demand one.
+          enforceIntentFamilies: combined && !recordsOnly,
         },
   );
 

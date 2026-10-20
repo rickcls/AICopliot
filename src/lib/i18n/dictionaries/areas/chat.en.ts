@@ -121,6 +121,7 @@ export const chatEn = {
         risk: "Risk",
         dependency: "Dependency",
         requirement: "Requirement",
+        note: "Progress note",
         project_snapshot: "Project snapshot",
       },
       observed: "observed {date}",
