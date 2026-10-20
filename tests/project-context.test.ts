@@ -7,12 +7,13 @@ const mockPrisma = {
   projectRisk: { findMany: vi.fn() },
   taskDependency: { findMany: vi.fn() },
   requirement: { findMany: vi.fn() },
+  taskComment: { findMany: vi.fn() },
 };
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 
-const { getProjectGroundingContext } = await import(
+const { getProjectGroundingContext, getTaskGroundingContext } = await import(
   "@/lib/rag/project-context"
 );
 
@@ -34,6 +35,7 @@ function task(id: string, status: string = "todo") {
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.project.findFirst.mockResolvedValue({ id: "project-1", name: "Launch" });
+  mockPrisma.taskComment.findMany.mockResolvedValue([]);
   mockPrisma.task.findMany.mockResolvedValue([task("1")]);
   mockPrisma.milestone.findMany.mockResolvedValue([]);
   mockPrisma.projectRisk.findMany.mockResolvedValue([]);
@@ -170,5 +172,70 @@ describe("live project grounding context", () => {
     // Character pairs match a Chinese title without any spaces to split on.
     const quote = await getProjectGroundingContext("ws-1", "project-1", "報價幾時要交？");
     expect(quote.sources.slice(1).map((source) => source.title)).toEqual(["準備 ABC 報價"]);
+  });
+
+  it("lists only open work when asked what is pending, and still counts the rest", async () => {
+    mockPrisma.task.findMany.mockResolvedValue([
+      { ...task("open"), title: "準備報價", status: { key: "todo", label: "To do", category: "open" } },
+      { ...task("done"), title: "提交月報", status: { key: "done", label: "Done", category: "done" } },
+    ]);
+
+    const result = await getProjectGroundingContext("ws-1", "project-1", "有什麼 pending task？");
+
+    const listed = result.sources.filter((source) => source.kind === "task").map((source) => source.title);
+    expect(listed).toEqual(["準備報價"]);
+    expect(result.sources[0].snapshot).toMatchObject({ taskCount: 2 });
+  });
+
+  it("reads the newest notes on the tasks a progress question is about", async () => {
+    mockPrisma.task.findMany.mockResolvedValue([
+      { ...task("quote"), title: "準備報價", status: { key: "in_progress", label: "In progress", category: "open" } },
+    ]);
+    const note = (id: string, day: string, body: string) => ({
+      id,
+      taskId: "quote",
+      body,
+      createdAt: new Date(`2026-10-${day}T02:00:00Z`),
+      author: { name: "Rick", email: "rick@example.com" },
+    });
+    mockPrisma.taskComment.findMany.mockResolvedValue([
+      note("n4", "20", "初稿做好，等緊 Peter 覆價錢"),
+      note("n3", "19", "開始寫初稿"),
+      note("n2", "18", "收到客戶需求"),
+      note("n1", "17", "最舊的一則"),
+    ]);
+
+    const result = await getProjectGroundingContext("ws-1", "project-1", "報價進度點？");
+
+    expect(mockPrisma.taskComment.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: "ws-1",
+      taskId: { in: ["quote"] },
+    });
+    const notes = result.sources.filter((source) => source.kind === "note");
+    // Three per task, newest first, each saying who wrote it and when.
+    expect(notes.map((source) => source.id)).toEqual(["n4", "n3", "n2"]);
+    expect(notes[0].content).toContain("Written by: Rick");
+    expect(notes[0].content).toContain("Note: 初稿做好，等緊 Peter 覆價錢");
+    expect(notes[0].href).toBe("/projects/project-1/tasks?task=quote");
+    expect(notes[0].snapshot).toMatchObject({ author: "Rick", writtenAt: "2026-10-20T02:00:00.000Z" });
+  });
+
+  it("reads no notes for a question that is not about progress", async () => {
+    await getProjectGroundingContext("ws-1", "project-1", "Who owns the task?");
+    expect(mockPrisma.taskComment.findMany).not.toHaveBeenCalled();
+  });
+
+  it("always brings a task's own notes into a thread about it", async () => {
+    mockPrisma.task.findMany.mockResolvedValue([
+      { ...task("quote"), title: "準備報價", status: { key: "todo", label: "To do", category: "open" } },
+    ]);
+    mockPrisma.taskComment.findMany.mockResolvedValue([
+      { id: "n1", taskId: "quote", body: "已寄出", createdAt: new Date("2026-10-20T02:00:00Z"), author: null },
+    ]);
+
+    const result = await getTaskGroundingContext("ws-1", "project-1", "quote");
+
+    expect(result.sources.map((source) => source.kind)).toEqual(["task", "note"]);
+    expect(result.sources[1].content).toContain("Written by: a former member");
   });
 });

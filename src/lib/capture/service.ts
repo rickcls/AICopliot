@@ -8,19 +8,30 @@ import { weekdayOf } from "@/lib/capture/dates";
 import { splitCaptureLines } from "@/lib/capture/lines";
 import {
   buildCaptureUserMessage,
+  buildReviseBlock,
   CAPTURE_PROMPT_VERSION,
   CAPTURE_SYSTEM_PROMPT,
+  clarificationLine,
+  MAX_REVISED_PROPOSALS,
+  type ReviseTarget,
 } from "@/lib/capture/prompt";
 import { modelCaptureSchema, type ProposalOverrides } from "@/lib/capture/schemas";
-import { validateCaptureProposals } from "@/lib/capture/validate";
+import {
+  validateCaptureProposals,
+  type AddNotePayload,
+  type CreateTaskPayload,
+  type UpdateTaskPayload,
+} from "@/lib/capture/validate";
 import { prisma } from "@/lib/db";
 import { extractJsonObject } from "@/lib/generation/prompt";
 import { STALE_RUN_MESSAGE, STALE_RUN_MS } from "@/lib/generation/stale-runs";
 import { detectReplyLanguage } from "@/lib/language";
 import { getOrCreatePersonalProject } from "@/lib/pm/personal-project";
+import { getAssignableMembers } from "@/lib/pm/project";
 import { storeDocument } from "@/lib/documents/store";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
 import { getChatProvider, type ChatProvider } from "@/lib/providers";
+import type { ChatMessageInput } from "@/lib/providers/types";
 import { DEFAULT_TIME_ZONE, localDateString, localToday } from "@/lib/time";
 
 /**
@@ -197,6 +208,32 @@ function parseProposals(raw: string): unknown[] | null {
   }
 }
 
+/** One model call, plus one repair when the reply breaks the JSON contract. */
+async function askForProposals(chat: ChatProvider, messages: ChatMessageInput[]) {
+  const options = { jsonMode: true, temperature: 0, maxTokens: 3000, reasoning: false };
+  let raw = await chat.complete(messages, options);
+  let proposals = parseProposals(raw);
+  if (!proposals) {
+    raw = await chat.complete(
+      [
+        ...messages,
+        { role: "assistant" as const, content: raw },
+        {
+          role: "user" as const,
+          content:
+            'That reply did not match the required JSON contract. Reply with only one JSON object of the form {"proposals": [...]}.',
+        },
+      ],
+      options,
+    );
+    proposals = parseProposals(raw);
+  }
+  if (!proposals) {
+    throw new CaptureError("The model returned malformed proposals twice. Try again.", 422);
+  }
+  return { raw, proposals };
+}
+
 /**
  * One model call (plus at most one repair) for one capture. Never throws for a
  * model failure: the capture is marked `failed` with a message instead, because
@@ -242,28 +279,7 @@ export async function proposeForCapture(
         }),
       },
     ];
-    const options = { jsonMode: true, temperature: 0, maxTokens: 3000, reasoning: false };
-
-    let raw = await chat.complete(messages, options);
-    let proposals = parseProposals(raw);
-    if (!proposals) {
-      raw = await chat.complete(
-        [
-          ...messages,
-          { role: "assistant" as const, content: raw },
-          {
-            role: "user" as const,
-            content:
-              'That reply did not match the required JSON contract. Reply with only one JSON object of the form {"proposals": [...]}.',
-          },
-        ],
-        options,
-      );
-      proposals = parseProposals(raw);
-    }
-    if (!proposals) {
-      throw new CaptureError("The model returned malformed proposals twice. Try again.", 422);
-    }
+    const { raw, proposals } = await askForProposals(chat, messages);
 
     const validated = validateCaptureProposals(proposals, {
       lines,
@@ -335,6 +351,180 @@ export async function retryCapture(
     }),
   ]);
   await proposeForCapture(access, capture.id, deps);
+  return getCapture(access, capture.id);
+}
+
+/** The changes an update proposes, in words the model can read. */
+function describeUpdate(payload: UpdateTaskPayload): string {
+  return [
+    payload.status ? `status ${payload.status}` : null,
+    payload.priority ? `priority ${payload.priority}` : null,
+    payload.dueDate ? `due ${payload.dueDate}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * Redoes one pending suggestion from the person's correction ("this is a new
+ * task, not the monthly report").
+ *
+ * The correction is the person's own words, so it is added to the end of the
+ * note before the model is called and kept whatever happens — like any note.
+ * Adding to the end leaves every earlier C label where it was. The replacements
+ * go through the same validator as any capture, and the old suggestion is
+ * claimed (`pending` → deleted) in the same transaction that writes them, so a
+ * suggestion applied meanwhile is never silently replaced.
+ */
+export async function reviseProposal(
+  access: CaptureAccess,
+  proposalId: string,
+  instruction: string,
+  deps: CaptureDeps = {},
+) {
+  const proposal = await prisma.captureProposal.findFirst({
+    where: { id: proposalId, ...scope(access) },
+    select: {
+      id: true,
+      kind: true,
+      state: true,
+      payload: true,
+      citations: true,
+      position: true,
+      taskId: true,
+      task: { select: { title: true } },
+      capture: {
+        select: { id: true, body: true, localDate: true, timeZone: true, replyLanguage: true, source: true },
+      },
+    },
+  });
+  if (!proposal) throw new CaptureError("Suggestion not found", 404);
+  if (proposal.state !== "pending") {
+    throw new CaptureError("This suggestion was already applied or dismissed", 409);
+  }
+
+  const capture = proposal.capture;
+  const language = detectReplyLanguage(instruction, capture.replyLanguage === "en" ? "en" : "zh-Hant");
+  const appended = `\n\n${clarificationLine(instruction, language)}`;
+  // A note already at the line limit would lose the correction off its end.
+  if (splitCaptureLines(capture.body + appended).truncated) {
+    throw new CaptureError("This note is too long to add a correction to", 422);
+  }
+
+  // Appended in SQL, so two corrections sent at once both survive.
+  const [stored] = await prisma.$queryRaw<{ body: string }[]>`
+    UPDATE "Capture" SET "body" = "body" || ${appended}, "updatedAt" = now()
+    WHERE "id" = ${capture.id} AND "workspaceId" = ${access.workspaceId} AND "userId" = ${access.userId}
+    RETURNING "body"`;
+  if (!stored) throw new CaptureError("Capture not found", 404);
+  const body = stored.body;
+  const before = splitCaptureLines(body.slice(0, -appended.length)).lines.length;
+  const { lines } = splitCaptureLines(body);
+
+  const anchor = capture.localDate.toISOString().slice(0, 10);
+  const captureLanguage = capture.replyLanguage === "en" ? "en" : "zh-Hant";
+  const chat = deps.chat ?? getChatProvider();
+  const context = await loadCaptureContext(
+    access,
+    body,
+    localToday(capture.timeZone, deps.now ?? new Date()),
+  );
+
+  const others = await prisma.captureProposal.findMany({
+    where: { captureId: capture.id, ...scope(access), state: "pending", NOT: { id: proposal.id } },
+    orderBy: { position: "asc" },
+    select: { kind: true, payload: true, task: { select: { title: true } } },
+  });
+  const pendingTitles = others
+    .filter((other) => other.kind === "create_task")
+    .map((other) => (other.payload as unknown as CreateTaskPayload).title);
+  const otherSuggestions = others.map((other) =>
+    other.kind === "create_task"
+      ? `new task "${(other.payload as unknown as CreateTaskPayload).title}"`
+      : `${other.kind === "update_task" ? "update" : "note on"} "${other.task?.title ?? ""}"`,
+  );
+
+  const citedLabels = (proposal.citations as unknown as { label: string }[]).map((cited) => cited.label);
+  const taskLabel =
+    [...context.taskLabels].find(([, task]) => task.id === proposal.taskId)?.[0] ?? null;
+  const target: ReviseTarget = {
+    kind: proposal.kind,
+    summary:
+      proposal.kind === "create_task"
+        ? (proposal.payload as unknown as CreateTaskPayload).title
+        : proposal.kind === "add_note"
+          ? (proposal.payload as unknown as AddNotePayload).note
+          : describeUpdate(proposal.payload as unknown as UpdateTaskPayload),
+    taskLabel,
+    taskTitle: proposal.task?.title ?? null,
+    citedLabels,
+  };
+
+  const messages: ChatMessageInput[] = [
+    { role: "system", content: CAPTURE_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: [
+        buildCaptureUserMessage({
+          today: anchor,
+          weekday: weekdayOf(anchor),
+          timeZone: capture.timeZone,
+          lines,
+          tasks: context.promptTasks,
+          projects: context.promptProjects,
+          language: captureLanguage,
+          fromEmail: capture.source === "email",
+        }),
+        "",
+        buildReviseBlock(
+          target,
+          lines.slice(before).map((line) => line.label),
+          otherSuggestions,
+        ),
+      ].join("\n"),
+    },
+  ];
+
+  const { proposals } = await askForProposals(chat, messages);
+  const validated = validateCaptureProposals(proposals, {
+    lines,
+    tasks: context.taskLabels,
+    projects: context.projectLabels,
+    anchor,
+    language: captureLanguage,
+    pendingTitles,
+  }).proposals.slice(0, MAX_REVISED_PROPOSALS);
+  if (validated.length === 0) {
+    throw new CaptureError("Could not redo the suggestion from that. Say a little more about what you mean.", 422);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.captureProposal.deleteMany({
+      where: { id: proposal.id, ...scope(access), state: "pending" },
+    });
+    if (claimed.count === 0) {
+      throw new CaptureError("This suggestion was already applied or dismissed", 409);
+    }
+    // Make room so the replacements sit where the old suggestion was.
+    if (validated.length > 1) {
+      await tx.captureProposal.updateMany({
+        where: { captureId: capture.id, ...scope(access), position: { gt: proposal.position } },
+        data: { position: { increment: validated.length - 1 } },
+      });
+    }
+    await tx.captureProposal.createMany({
+      data: validated.map((replacement, index) => ({
+        ...scope(access),
+        captureId: capture.id,
+        position: proposal.position + index,
+        kind: replacement.kind,
+        payload: replacement.payload as unknown as Prisma.InputJsonValue,
+        citations: replacement.citations as unknown as Prisma.InputJsonValue,
+        flags: replacement.flags,
+        taskId: replacement.taskId,
+      })),
+    });
+  });
   return getCapture(access, capture.id);
 }
 
@@ -442,11 +632,11 @@ export async function applyProposals(
 
 /**
  * What a capture page needs besides the notes: the projects a suggestion can
- * be filed under (the viewer's visible ones) and their personal project, the
- * default home for new tasks.
+ * be filed under (the viewer's visible ones), their personal project, the
+ * default home for new tasks, and the colleagues a new task can be handed to.
  */
 export async function getCaptureProjectOptions(access: CaptureAccess) {
-  const [projects, locale] = await Promise.all([
+  const [projects, locale, members] = await Promise.all([
     prisma.project.findMany({
       where: visibleProjectWhere(access.workspaceId, access.userId),
       orderBy: { name: "asc" },
@@ -455,6 +645,7 @@ export async function getCaptureProjectOptions(access: CaptureAccess) {
     getUserPreferences(access.userId).then((preferences) =>
       preferences?.locale === "en" ? ("en" as const) : ("zh-Hant" as const),
     ),
+    getAssignableMembers(access.workspaceId),
   ]);
   const personal =
     projects.find((project) => project.personalOwnerId === access.userId) ??
@@ -462,6 +653,14 @@ export async function getCaptureProjectOptions(access: CaptureAccess) {
 
   return {
     personalProjectId: personal.id,
+    /**
+     * Who else a new task can be handed to. The person applying is the
+     * default, so they are not listed; a solo workspace gets an empty list
+     * and no picker.
+     */
+    colleagues: members
+      .filter((member) => member.id !== access.userId)
+      .map((member) => ({ id: member.id, name: member.name })),
     projects: [
       { id: personal.id, name: personal.name, personal: true },
       ...projects
@@ -488,11 +687,15 @@ export async function saveCaptureAsDocument(access: CaptureAccess, captureId: st
     throw new CaptureError("This note already has a document", 409);
   }
 
-  const { personalProjectId } = await getCaptureProjectOptions(access);
+  const personal = await getOrCreatePersonalProject(
+    access.workspaceId,
+    access.user,
+    (await getUserPreferences(access.userId))?.locale === "en" ? "en" : "zh-Hant",
+  );
   const day = capture.localDate.toISOString().slice(0, 10);
   const stored = await storeDocument({
     workspaceId: access.workspaceId,
-    projectId: personalProjectId,
+    projectId: personal.id,
     filename: `note-${day}.md`,
     mimeType: "text/markdown",
     buffer: Buffer.from(`# ${day}\n\n${capture.body}\n`, "utf8"),

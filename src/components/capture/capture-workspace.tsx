@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { CaptureBox } from "@/components/capture/capture-box";
 import { CaptureCard, type ProjectOption } from "@/components/capture/capture-card";
+import type { ColleagueOption } from "@/components/capture/proposal-list";
 import { GmailPanel } from "@/components/capture/gmail-panel";
 import { useT } from "@/components/i18n-provider";
 import type { CaptureView } from "@/lib/capture/view";
@@ -18,12 +19,14 @@ import type { GmailStatus } from "@/lib/gmail/service";
 export function CaptureWorkspace({
   initialCaptures,
   projects,
+  colleagues,
   personalProjectId,
   compact = false,
   gmail,
 }: {
   initialCaptures: CaptureView[];
   projects: ProjectOption[];
+  colleagues: ColleagueOption[];
   personalProjectId: string;
   compact?: boolean;
   /** Offered on the Capture page; Today keeps to the box. */
@@ -57,6 +60,7 @@ export function CaptureWorkspace({
           key={capture.id}
           capture={capture}
           projects={projects}
+          colleagues={colleagues}
           onChange={replace}
           onDelete={(id) => setCaptures((current) => current.filter((row) => row.id !== id))}
         />

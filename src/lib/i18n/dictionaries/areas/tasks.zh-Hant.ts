@@ -198,6 +198,7 @@ export const tasksZhHant = {
       add: "新增依賴…",
       addFailed: "無法新增依賴。",
       removeFailed: "無法移除依賴。",
+      neededFor: "需要它的工作",
     },
     documents: {
       tooLarge: "檔案太大，無法上載。",

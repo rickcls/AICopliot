@@ -89,6 +89,7 @@ export function TaskDetail({
   onDelete,
   onTaskChange,
   onError,
+  onOpenTask,
 }: {
   task: TaskRow;
   todayIso: string;
@@ -109,6 +110,8 @@ export function TaskDetail({
   onDelete: () => void;
   onTaskChange: (task: TaskRow) => void;
   onError: (message: string | null) => void;
+  /** Switches the panel to another task on the board. */
+  onOpenTask: (taskId: string) => void;
 }) {
   const [draft, setDraft] = useState<TaskDraft>(() => draftFrom(task));
   const [saving, setSaving] = useState(false);
@@ -371,7 +374,10 @@ export function TaskDetail({
                   description: draft.description ? `${draft.description}\n\n${text}` : text,
                 })
               }
-              onTasksCreated={(created) => created.forEach(onTaskChange)}
+              onTasksCreated={(created, parent) => {
+                created.forEach(onTaskChange);
+                if (parent) onTaskChange(parent);
+              }}
             />
           </div>
         ) : null}
@@ -722,6 +728,7 @@ export function TaskDetail({
               allTasks={allTasks}
               onChange={onTaskChange}
               onError={onError}
+              onOpenTask={onOpenTask}
             />
           </div>
 

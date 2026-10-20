@@ -37,9 +37,10 @@ export function nextActionsFor(citations: Citation[], t: Translate): NextAction[
           }
         : {
             // A task link opens that task, so it is named — several cited
-            // tasks would otherwise be several identical "Open in Tasks".
+            // tasks would otherwise be several identical "Open in Tasks". A
+            // progress note opens the task it was written on.
             label:
-              citation.kind === "task"
+              citation.kind === "task" || citation.kind === "note"
                 ? t("chat.next.openTask", { title: truncate(citation.title, 40) })
                 : t(`chat.next.${citation.kind}`),
             // Already constrained to an in-app path by projectCitationSchema, so

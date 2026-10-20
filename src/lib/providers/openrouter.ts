@@ -153,12 +153,21 @@ interface ChatResponse {
 
 /**
  * Models whose thinking cannot be switched off. OpenRouter refuses
- * `reasoning: { enabled: false }` for them with a 400 but accepts the lowest
- * effort, which spent no thinking tokens on GLM 5.3 Flash. The off switch is
- * still tried first because the lowest effort is not off everywhere: DeepSeek
- * V4 Flash kept thinking at it, and was slower.
+ * `reasoning: { enabled: false }` for them with a 400, and usually accepts the
+ * lowest effort, which spent next to no thinking tokens on GLM 5.3 Flash. The
+ * off switch is still tried first because the lowest effort is not off
+ * everywhere: DeepSeek V4 Flash kept thinking at it, and was slower.
+ *
+ * "Usually" because OpenRouter spreads one model over many hosts (34 for GLM
+ * 5.3 Flash) and some refuse the lowest effort too. The last resort is to send
+ * no setting at all — the model's default thinking, slower but never refused,
+ * and still inside the call's time limit.
  */
 const mandatoryReasoning = new Set<string>();
+
+const THINKING_OFF = { enabled: false } as const;
+const THINKING_MINIMAL = { effort: "minimal" } as const;
+type ReasoningSetting = typeof THINKING_OFF | typeof THINKING_MINIMAL | undefined;
 
 function isReasoningMandatory(error: unknown) {
   return (
@@ -180,7 +189,7 @@ export class OpenRouterChatProvider implements ChatProvider {
     options: ChatCompletionOptions = {},
   ): Promise<string> {
     const { model } = this.config;
-    const send = () =>
+    const send = (reasoning: ReasoningSetting) =>
       postJson<ChatResponse>(
         `${this.config.baseUrl}/chat/completions`,
         this.config.apiKey,
@@ -190,27 +199,29 @@ export class OpenRouterChatProvider implements ChatProvider {
           temperature: options.temperature ?? 0,
           max_tokens: options.maxTokens ?? 1200,
           ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
-          ...(options.reasoning === false
-            ? {
-                reasoning: mandatoryReasoning.has(model)
-                  ? { effort: "minimal" }
-                  : { enabled: false },
-              }
-            : {}),
+          ...(reasoning ? { reasoning } : {}),
         },
         options.timeoutMs,
       );
-
-    let json: ChatResponse;
-    try {
-      json = await send();
-    } catch (error) {
-      if (options.reasoning !== false || mandatoryReasoning.has(model) || !isReasoningMandatory(error)) {
-        throw error;
+    // Each setting is tried only after the one before it was refused as
+    // "reasoning is mandatory"; any other failure is reported as it is.
+    const sendFirstAccepted = async ([reasoning, ...rest]: ReasoningSetting[]): Promise<ChatResponse> => {
+      try {
+        return await send(reasoning);
+      } catch (error) {
+        if (rest.length === 0 || !isReasoningMandatory(error)) throw error;
+        if (reasoning === THINKING_OFF) mandatoryReasoning.add(model);
+        return sendFirstAccepted(rest);
       }
-      mandatoryReasoning.add(model);
-      json = await send();
-    }
+    };
+
+    const json = await sendFirstAccepted(
+      options.reasoning !== false
+        ? [undefined]
+        : mandatoryReasoning.has(model)
+          ? [THINKING_MINIMAL, undefined]
+          : [THINKING_OFF, THINKING_MINIMAL, undefined],
+    );
 
     const choice = json.choices?.[0];
     const content = choice?.message?.content;

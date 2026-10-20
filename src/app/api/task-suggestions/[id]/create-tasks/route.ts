@@ -9,7 +9,11 @@ interface Params {
   params: Promise<{ id: string }>;
 }
 
-/** Creates a task per chosen step. A step already turned into a task is skipped. */
+/**
+ * Creates a task per chosen step, which the original task then depends on. A
+ * step already turned into a task is skipped. `parent` is the original task
+ * read back with its new dependencies.
+ */
 export async function POST(request: Request, { params }: Params) {
   try {
     const access = await requireWorkspace();
@@ -20,13 +24,13 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Choose at least one step" }, { status: 400 });
     }
     const t = await getT();
-    const tasks = await createTasksFromSteps(
+    const { tasks, parent } = await createTasksFromSteps(
       access,
       id,
       parsed.data.stepIndexes,
       t("approach.generalMarker"),
     );
-    return NextResponse.json({ tasks }, { status: 201 });
+    return NextResponse.json({ tasks, parent }, { status: 201 });
   } catch (error) {
     if (error instanceof ApproachError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

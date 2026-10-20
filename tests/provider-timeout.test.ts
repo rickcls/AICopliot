@@ -75,6 +75,36 @@ describe("provider time limit", () => {
     expect(sent).toEqual([{ enabled: false }, { effort: "minimal" }, { effort: "minimal" }]);
   });
 
+  it("falls back to the model's own default when a host refuses the lowest effort too", async () => {
+    const picky = new OpenRouterChatProvider({
+      apiKey: "test-key",
+      baseUrl: "https://provider.test",
+      model: "thinks-always-picky",
+    });
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) =>
+      JSON.parse(String(init.body)).reasoning
+        ? new Response(
+            JSON.stringify({ error: { message: "Reasoning is mandatory for this endpoint and cannot be disabled." } }),
+            { status: 400 },
+          )
+        : new Response(JSON.stringify({ choices: [{ message: { content: "{}" } }] })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(picky.complete(messages, { reasoning: false })).resolves.toBe("{}");
+
+    const sent = fetchMock.mock.calls.map((call) => JSON.parse(String(call[1].body)).reasoning);
+    expect(sent).toEqual([{ enabled: false }, { effort: "minimal" }, undefined]);
+  });
+
+  it("does not retry a failure that is not about thinking", async () => {
+    const fetchMock = vi.fn(async () => new Response("bad request", { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(provider.complete(messages, { reasoning: false })).rejects.toBeInstanceOf(ProviderError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("sends the switch that turns thinking off", async () => {
     const fetchMock = vi.fn(
       async (_url: string, _init: RequestInit) =>

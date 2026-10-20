@@ -8,11 +8,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const tx = {
-  captureProposal: { updateMany: vi.fn(), update: vi.fn() },
+  captureProposal: { updateMany: vi.fn(), update: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
 };
 const mockPrisma = {
+  $queryRaw: vi.fn(),
   capture: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-  captureProposal: { createMany: vi.fn(), findFirst: vi.fn() },
+  captureProposal: { createMany: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
   document: { findFirst: vi.fn() },
   project: { findFirst: vi.fn(), findMany: vi.fn() },
   task: { findFirst: vi.fn() },
@@ -378,6 +379,206 @@ describe("applyProposal", () => {
       taskId: "task-contract",
       authorId: "u-1",
       body: "等緊Peter覆",
+    });
+  });
+});
+
+describe("applyProposal assignee", () => {
+  const createProposal = {
+    id: "prop-1",
+    kind: "create_task",
+    state: "pending",
+    taskId: null,
+    payload: {
+      title: "Send quote",
+      description: "聽日要send報價俾ABC公司",
+      projectId: null,
+      priority: null,
+      dueDate: null,
+      duePhrase: null,
+      estimatedHours: null,
+    },
+    capture: { documentId: null, document: null },
+  };
+
+  beforeEach(() => {
+    mockPersonal.mockResolvedValue({ id: "personal-1", name: "Rick的個人工作" });
+    writes.createTaskRecord.mockResolvedValue({ id: "task-new" });
+    mockPrisma.captureProposal.findFirst.mockResolvedValue(createProposal);
+    tx.captureProposal.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("hands a new task to the colleague the person picked, with its description", async () => {
+    writes.prepareTaskCreate.mockResolvedValue({ ok: true, value: { prepared: true } });
+
+    await service.applyProposal(access, "prop-1", { assigneeId: "u-2" }, NOW);
+
+    expect(writes.prepareTaskCreate.mock.calls[0][2]).toMatchObject({
+      assigneeId: "u-2",
+      description: "聽日要send報價俾ABC公司",
+    });
+  });
+
+  it("refuses an assignee who is not in the workspace", async () => {
+    const { AuthError } = await import("@/lib/auth-guard");
+    writes.prepareTaskCreate.mockRejectedValue(new AuthError("Member not found", 404));
+
+    const result = await service.applyProposal(access, "prop-1", { assigneeId: "u-outsider" }, NOW);
+
+    expect(result).toMatchObject({ ok: false, status: 404 });
+    expect(writes.createTaskRecord).not.toHaveBeenCalled();
+  });
+});
+
+describe("reviseProposal", () => {
+  const body = "聽日要send報價俾ABC公司\n月報已經交咗";
+  const wrongUpdate = {
+    id: "prop-2",
+    kind: "update_task",
+    state: "pending",
+    payload: { status: "done", priority: null, dueDate: null, duePhrase: null },
+    citations: [{ label: "C2", text: "月報已經交咗" }],
+    position: 1,
+    taskId: "task-secret-id",
+    task: { title: "提交月報" },
+    capture: {
+      id: "cap-1",
+      body,
+      localDate: new Date("2026-10-16T00:00:00Z"),
+      timeZone: "Asia/Hong_Kong",
+      replyLanguage: "zh-Hant",
+      source: "text",
+    },
+  };
+  const newTask = JSON.stringify({
+    proposals: [
+      {
+        kind: "create_task",
+        title: "交季度報告",
+        description: null,
+        project: null,
+        priority: null,
+        status: null,
+        due: { phrase: "下星期五", date: "2026-10-23" },
+        estimatedHours: null,
+        citations: ["C3"],
+      },
+    ],
+  });
+
+  beforeEach(() => {
+    mockPrisma.captureProposal.findFirst.mockResolvedValue(wrongUpdate);
+    mockPrisma.captureProposal.findMany.mockResolvedValue([]);
+    mockPrisma.$queryRaw.mockImplementation(async (_sql: unknown, appended: string) => [
+      { body: body + appended },
+    ]);
+    tx.captureProposal.deleteMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("adds the correction to the note before the model runs, and asks by label only", async () => {
+    const chat = fakeChat(newTask);
+
+    await service.reviseProposal(access, "prop-2", "季度報告係新工作，下星期五交", { chat, now: NOW });
+
+    expect(mockPrisma.$queryRaw.mock.calls[0][1]).toBe("\n\n補充：季度報告係新工作，下星期五交");
+    expect(mockPrisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      chat.complete.mock.invocationCallOrder[0],
+    );
+    const prompt = JSON.stringify(chat.complete.mock.calls[0][0]);
+    expect(prompt).toContain("REVISE ONE SUGGESTION");
+    expect(prompt).toContain("update T1");
+    expect(prompt).toContain("Their correction is C3");
+    expect(prompt).not.toContain("task-secret-id");
+    expect(prompt).not.toContain("project-secret-id");
+  });
+
+  it("replaces the suggestion where it was, claiming it in the same transaction", async () => {
+    await service.reviseProposal(access, "prop-2", "季度報告係新工作，下星期五交", {
+      chat: fakeChat(newTask),
+      now: NOW,
+    });
+
+    expect(tx.captureProposal.deleteMany).toHaveBeenCalledWith({
+      where: { id: "prop-2", workspaceId: "ws-1", userId: "u-1", state: "pending" },
+    });
+    const [replacement] = tx.captureProposal.createMany.mock.calls[0][0].data;
+    expect(replacement).toMatchObject({
+      kind: "create_task",
+      position: 1,
+      taskId: null,
+      workspaceId: "ws-1",
+      userId: "u-1",
+      // The date is the server's own reading of "下星期五", and with no
+      // description the task keeps the correction itself, marker removed.
+      payload: { title: "交季度報告", dueDate: "2026-10-23", description: "季度報告係新工作，下星期五交" },
+    });
+  });
+
+  it("shows the other suggestions, and flags a replacement that repeats one", async () => {
+    mockPrisma.captureProposal.findMany.mockResolvedValue([
+      { kind: "create_task", payload: { title: "交季度報告" }, task: null },
+    ]);
+    const chat = fakeChat(newTask);
+
+    await service.reviseProposal(access, "prop-2", "季度報告係新工作，下星期五交", { chat, now: NOW });
+
+    expect(mockPrisma.captureProposal.findMany.mock.calls[0][0].where).toMatchObject({
+      captureId: "cap-1",
+      workspaceId: "ws-1",
+      userId: "u-1",
+      state: "pending",
+      NOT: { id: "prop-2" },
+    });
+    expect(JSON.stringify(chat.complete.mock.calls[0][0])).toContain('new task \\"交季度報告\\"');
+    const [replacement] = tx.captureProposal.createMany.mock.calls[0][0].data;
+    expect(replacement.flags).toContain("possible_duplicate");
+  });
+
+  it("refuses a suggestion that was already applied, before touching the note", async () => {
+    mockPrisma.captureProposal.findFirst.mockResolvedValue({ ...wrongUpdate, state: "applied" });
+    const chat = fakeChat(newTask);
+
+    await expect(
+      service.reviseProposal(access, "prop-2", "季度報告係新工作", { chat, now: NOW }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
+    expect(chat.complete).not.toHaveBeenCalled();
+  });
+
+  it("keeps the old suggestion when nothing valid comes back", async () => {
+    await expect(
+      service.reviseProposal(access, "prop-2", "唔啱", {
+        chat: fakeChat(JSON.stringify({ proposals: [] })),
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ status: 422 });
+    expect(tx.captureProposal.deleteMany).not.toHaveBeenCalled();
+    // The correction is the person's own words, so it stays in the note.
+    expect(mockPrisma.$queryRaw).toHaveBeenCalled();
+  });
+
+  it("does not replace a suggestion applied while the model was answering", async () => {
+    tx.captureProposal.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.reviseProposal(access, "prop-2", "季度報告係新工作，下星期五交", {
+        chat: fakeChat(newTask),
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(tx.captureProposal.createMany).not.toHaveBeenCalled();
+  });
+
+  it("only finds the caller's own suggestion", async () => {
+    mockPrisma.captureProposal.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.reviseProposal(access, "prop-other", "季度報告係新工作", { chat: fakeChat(newTask), now: NOW }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(mockPrisma.captureProposal.findFirst.mock.calls[0][0].where).toEqual({
+      id: "prop-other",
+      workspaceId: "ws-1",
+      userId: "u-1",
     });
   });
 });

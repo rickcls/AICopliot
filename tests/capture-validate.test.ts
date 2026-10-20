@@ -57,6 +57,41 @@ describe("validateCaptureProposals", () => {
     });
   });
 
+  it("gives a new task the lines it came from when the model writes no description", () => {
+    const { proposals } = validateCaptureProposals([create({ description: null })], ctx);
+    expect(proposals[0].payload).toMatchObject({ description: lines[0].text });
+  });
+
+  it("converts the model's description, but never a quoted line", () => {
+    const { lines: simplified } = splitCaptureLines("报价要发给ABC公司");
+    const { proposals } = validateCaptureProposals(
+      [
+        create({ description: "这是报价", due: null }),
+        create({ title: "Another quote", description: null, due: null }),
+      ],
+      { ...ctx, lines: simplified },
+    );
+    expect(proposals[0].payload).toMatchObject({ description: "這是報價" });
+    expect(proposals[1].payload).toMatchObject({ description: "报价要发给ABC公司" });
+  });
+
+  it("leaves the correction marker out of a description built from the lines", () => {
+    const { lines: corrected } = splitCaptureLines("月報已經交咗\n\n補充：季度報告係新工作");
+    const { proposals } = validateCaptureProposals(
+      [create({ description: null, due: null, citations: ["C2"] })],
+      { ...ctx, lines: corrected },
+    );
+    expect(proposals[0].payload).toMatchObject({ description: "季度報告係新工作" });
+  });
+
+  it("flags a new task that repeats a suggestion already on the list", () => {
+    const { proposals } = validateCaptureProposals([create({ title: "Send quote to ABC" })], {
+      ...ctx,
+      pendingTitles: ["send quote to  abc"],
+    });
+    expect(proposals[0].flags).toContain("possible_duplicate");
+  });
+
   it("drops a proposal with no real citation", () => {
     const { proposals, dropped } = validateCaptureProposals(
       [create({ citations: [] }), create({ citations: ["C99", "S1"] })],

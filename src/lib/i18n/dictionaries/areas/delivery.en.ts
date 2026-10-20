@@ -123,6 +123,7 @@ export const deliveryEn = {
       risk: "risk",
       dependency: "dependency",
       requirement: "requirement",
+      note: "progress note",
       project_snapshot: "project snapshot",
     },
     blockedByPrerequisite: "blocked by prerequisite",

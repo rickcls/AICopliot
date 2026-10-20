@@ -161,6 +161,17 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    project-data selection run in parallel, live records are frozen with
    `observedAt`, and exact aggregate counts remain available even if the detail
    list is capped. History supplies wording only and is never evidence.
+   **Progress notes are a third family, labelled `N` and attributed.** A
+   task's comments — Today check-ins, capture progress notes, typed comments —
+   are where its progress lives, so a progress question in project chat
+   reads the newest three on its top tasks, and a task thread always reads
+   that task's newest eight. Each says who wrote it and when, and the prompt
+   says to cite it as that person's report, never as a document's requirement
+   or a field of the record. **Which records are read is decided by the
+   question's words** (`readQuestionIntent`, `src/lib/rag/intent.ts`), never
+   by the model: "pending"/"未完成" lists only unfinished work (finished work
+   stays in the snapshot's counts), and a question about the project's own
+   work that does not name its files is answered without document passages.
 
 14. **A requirement carries two independent status axes.** `source` +
    `generationStatus` answer *did a human accept this record?* — identical to the
@@ -348,6 +359,9 @@ Three abstractions exist so pieces can be swapped without touching call sites:
   Flash ("Reasoning is mandatory"), so the provider retries such a model with
   `effort: "minimal"` (zero thinking tokens there) and remembers it; DeepSeek
   V4 Flash still thinks at minimal, which is why the off switch goes first.
+  OpenRouter spreads GLM over ~34 hosts and some refuse `minimal` as well, so
+  the last resort sends no setting at all — the model's default, slower but
+  never refused, and still inside the call's time limit.
   **Every provider call has a time limit** (`timeoutMs`, default 45 s), and a
   timed-out call is a `ProviderError` that `isProviderTimeout()` recognises, so
   a route can name it instead of being killed silently. Calls that share one
@@ -753,19 +767,53 @@ assistant something — typed, pasted, dictated, or from a file. One model call
   lines (per newline and sentence, hard-splitting long unpunctuated dictation);
   `context.ts` loads the person's open tasks as `T` candidates
   (`rankTaskCandidates` — shared words first, Chinese by character pairs) and
-  visible projects as `P`; `prompt.ts` (`capture-v1`); `schemas.ts` parses each
+  visible projects as `P`; `prompt.ts` (`capture-v3`); `schemas.ts` parses each
   proposal separately so one bad item costs only itself; `validate.ts` is the
   deterministic gate; `service.ts` stores, calls, validates, and applies.
+- **When unsure, create — don't update.** Rule 2 once said "prefer changing an
+  existing task", and the model read new work as an update to whatever task
+  shared a word with it. A wrong update silently changes real work, while a
+  new task that repeats one is flagged and dismissed in one click, so
+  `capture-v3` changes a task only when the line is clearly about it.
+- **Titles are tidied, not transcribed** (`capture-v4`, `TASK_TITLE_STYLE`,
+  shared with the assistant). Dictated Cantonese came back as task names like
+  「將月報交俾老闆睇」. Chinese titles and descriptions are written Chinese
+  (書面語), English ones plain English; fillers go; names, numbers, amounts,
+  codes, and technical terms stay exactly as written. Nothing of the person's
+  is lost — their words stay in the cited lines.
 - **Updates must change something.** A status the task already has, or its
   current due date, is dropped as a no-op rather than offered as an Apply that
   does nothing. A new task matching an open title is *flagged*
   `possible_duplicate`, never dropped.
+- **A wrong suggestion can be redone, not just dismissed.** Each pending row
+  takes a correction ("this is a new task, not the monthly report"), sent to
+  `POST /api/capture-proposals/[id]/revise` (`reviseProposal`). The correction
+  is the person's own words, so it is appended to the note in SQL (`body ||`,
+  so two corrections at once both survive) as a `補充：` / `Clarification:`
+  line *before* the model is called, and kept whatever happens. Appending
+  leaves every earlier `C` label where it was. Rule 12 makes a correction win
+  over the lines it corrects; `buildReviseBlock()` names the suggestion by its
+  `T`/`C` labels, never an id, and lists the other pending suggestions so the
+  replacement does not repeat one — `pendingTitles` flags it
+  `possible_duplicate` if it does anyway. Replacements (≤3) pass the same validator, and
+  the old row is claimed (`pending` → deleted) in the transaction that writes
+  them, so a row applied meanwhile is never replaced. A note at the
+  150-line limit refuses, rather than have the correction cut off its end.
+- **A new task always has a description.** The model writes one or two
+  sentences from the cited lines; with none, `validate.ts` uses the cited lines
+  themselves — the person's own words, unconverted, marker stripped.
+- **Priority is read, never guessed:** only explicit words (急, 重要, 唔急…).
+  Without them a new task is saved at medium, and the row says so ("default:
+  not mentioned") rather than showing a blank that reads as a judgement.
 - **Status goes by category, never by label.** `pickStatusForCategory()` picks
   the first column of that category in board order, preferring the seeded
   `in_progress` for "still going". A project with no blocked column refuses
   the update with a message instead of inventing one.
 - **New tasks land in the personal project** unless the person (or a
-  confident `P` label) names another, and are assigned to the person applying.
+  confident `P` label) names another, and are assigned to the person applying
+  unless they pick a colleague in the row (`assigneeId` override; the picker
+  shows only with colleagues, and `prepareTaskCreate` refuses a non-member).
+  The assignee is code and the person's choice, never the model's.
   "Apply all" skips flagged proposals; each item applies in its own
   transaction so one refusal does not undo the rest.
 - **Files:** `.txt`/`.md` are read in the browser into the box. PDF and Word go
@@ -1211,7 +1259,14 @@ private `TaskSuggestion` per person and is never applied by itself: "Add steps
 to the description" goes through the panel's own `save()`, and "Create tasks"
 (`POST /api/task-suggestions/[id]/create-tasks`) goes through `task-write`,
 claiming each step index on `createdSteps` in the same transaction as its
-task so a second click creates nothing. The step formatter lives in
+task so a second click creates nothing. **A step's task is linked, not
+annotated:** the same transaction adds a dependency from the original task
+to it, so the original's panel lists its steps and "waits on" them, and the
+step's panel shows the original under "Needed for" (reverse edges are found
+in the board's own rows, not a second query). It also joins the original's
+milestone and carries the passages its step cited as Sources, with their
+documents linked; a milestone or document that has since left the project is
+left off rather than failing the request. The step formatter lives in
 `approach/format.ts`, apart from the validator, so the browser bundle never
 pulls in OpenCC.
 
@@ -1219,9 +1274,12 @@ pulls in OpenCC.
 here.** It has no `source`/`generationStatus`, so it is not a proposal awaiting
 review and never touches `officialRecordWhere()`; the comment routes are the
 only task routes that do *not* use that predicate, because a draft task awaiting
-review is exactly what reviewers need to discuss. It is also **not grounding
-evidence** — project chat answers from documents and official records, and
-letting free-text commentary in would put unreviewed opinion behind a citation.
+review is exactly what reviewers need to discuss. It is grounding evidence
+**only as a progress note** (`N`, invariant 13): attributed to its author and
+time, read for progress questions and task threads, and never passed off as a
+document or a record field — because put behind an ordinary citation it would
+dress up one person's opinion as fact, while leaving it out entirely meant
+"how is it going?" ignored the very place progress is written down.
 
 - `authorId` is `SET NULL` and `taskId` is `CASCADE`, following invariant 9's
   reasoning: removing a person must not delete a thread other people replied to,
@@ -1384,7 +1442,8 @@ its project or task, never re-point it.
   builders as project chat, so a citation's snapshot has one shape. Retrieval
   reads the task's linked documents, fetched fresh each turn so linking one
   takes effect on the next question, or the whole project when it has none.
-  Official tasks only; comments are not evidence. `taskId` is `SET NULL`: a
+  Official tasks only; the task's newest notes come along as `N` sources,
+  because a question in a task thread is usually about its progress. `taskId` is `SET NULL`: a
   deleted task's thread stays readable, `focus` stays `task`, and the route
   refuses to continue it with a 409.
 - **Document focus** is document-only, like global chat. `focusDocumentIds`

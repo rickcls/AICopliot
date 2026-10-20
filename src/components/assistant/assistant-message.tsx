@@ -4,7 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { BookOpen, Check, Copy, ExternalLink, Lightbulb, Mail, Search } from "lucide-react";
 import { AnswerText, sourceHref } from "@/components/assistant/answer-text";
-import { ProposalList, type ProjectOption } from "@/components/capture/proposal-list";
+import {
+  ProposalList,
+  type ColleagueOption,
+  type ProjectOption,
+} from "@/components/capture/proposal-list";
 import { useT } from "@/components/i18n-provider";
 import { Badge, Card, FOCUS_RING } from "@/components/ui";
 import type { AssistantMessageView } from "@/lib/assistant/service";
@@ -21,10 +25,12 @@ import { cn } from "@/lib/utils";
 export function AssistantMessage({
   message,
   projects,
+  colleagues,
   onChange,
 }: {
   message: AssistantMessageView;
   projects: ProjectOption[];
+  colleagues: ColleagueOption[];
   onChange: (message: AssistantMessageView) => void;
 }) {
   const t = useT();
@@ -154,6 +160,7 @@ export function AssistantMessage({
           <ProposalList
             proposals={message.proposals}
             projects={projects}
+            colleagues={colleagues}
             applyUrl={`/api/assistant/messages/${message.id}/apply`}
             decideUrl={(id) => `/api/assistant-proposals/${id}`}
             readProposals={(data) =>

@@ -88,6 +88,7 @@ export default async function TodayPage() {
           compact
           initialCaptures={waiting.map(toCaptureView)}
           projects={captureOptions.projects}
+          colleagues={captureOptions.colleagues}
           personalProjectId={captureOptions.personalProjectId}
         />
       </div>

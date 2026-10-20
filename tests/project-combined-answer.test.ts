@@ -94,6 +94,104 @@ beforeEach(() => {
 });
 
 describe("project-combined grounding", () => {
+  it("answers what is pending from the records alone, leaving document passages out", async () => {
+    retrieveChunks.mockResolvedValue([documentChunk()]);
+    const chat = chatReturning({
+      answer: "One task is still open [T1].",
+      confidence: "high",
+      insufficientContext: false,
+      citations: [{ sourceId: "T1", quote: "Status: open" }],
+    });
+
+    const result = await answerQuestion("ws-1", "有什麼 pending task？", {
+      projectId: "project-1",
+      groundingScope: "project_combined",
+      embeddings,
+      chat,
+      projectContext: context(liveSource("task", { content: "Task: Prepare quote\nStatus: open" })),
+    });
+
+    const prompt = chat.complete.mock.calls[0][0].map((message) => message.content).join("\n");
+    expect(prompt).toContain("[T1]");
+    expect(prompt).not.toContain("[S1]");
+    expect(result.refused).toBe(false);
+  });
+
+  it("does not demand a document citation for a records-only question that mentions UAT", async () => {
+    retrieveChunks.mockResolvedValue([documentChunk()]);
+    const result = await answerQuestion("ws-1", "「Schedule UAT sign-off」進度點？", {
+      projectId: "project-1",
+      groundingScope: "project_combined",
+      embeddings,
+      chat: chatReturning({
+        answer: "Rick noted the script is half done [N1].",
+        confidence: "high",
+        insufficientContext: false,
+        citations: [{ sourceId: "N1", quote: "half done" }],
+      }),
+      projectContext: context(
+        liveSource("note", {
+          title: "Schedule UAT sign-off",
+          content: "Progress note on the task: Schedule UAT sign-off\nWritten by: Rick\nNote: script half done",
+        }),
+      ),
+    });
+
+    expect(result.refused).toBe(false);
+    expect(result.citations[0]).toMatchObject({ kind: "note", label: "N1" });
+  });
+
+  it("keeps document passages when the question names the files", async () => {
+    retrieveChunks.mockResolvedValue([documentChunk()]);
+    const chat = chatReturning({
+      answer: "UAT waits for security approval [S1].",
+      confidence: "high",
+      insufficientContext: false,
+      citations: [{ sourceId: "S1", quote: "UAT starts only after security approval" }],
+    });
+
+    await answerQuestion("ws-1", "根據文件，有什麼未完成？", {
+      projectId: "project-1",
+      groundingScope: "project_combined",
+      embeddings,
+      chat,
+      projectContext: context(liveSource("task")),
+    });
+
+    const prompt = chat.complete.mock.calls[0][0].map((message) => message.content).join("\n");
+    expect(prompt).toContain("[S1]");
+  });
+
+  it("cites a progress note as its own family, with who wrote it", async () => {
+    retrieveChunks.mockResolvedValue([]);
+    const note = liveSource("note", {
+      title: "Prepare quote",
+      content: "Progress note on the task: Prepare quote\nWritten by: Rick\nWritten at: 2026-10-20T02:00:00.000Z\nNote: Draft done, waiting on Peter for prices",
+      snapshot: { taskId: "task-1", taskTitle: "Prepare quote", author: "Rick", writtenAt: "2026-10-20T02:00:00.000Z" },
+    });
+    const chat = chatReturning({
+      answer: "Rick noted the draft is done and he is waiting on Peter [N1].",
+      confidence: "high",
+      insufficientContext: false,
+      citations: [{ sourceId: "N1", quote: "Draft done, waiting on Peter for prices" }],
+    });
+
+    const result = await answerQuestion("ws-1", "How is the quote going?", {
+      projectId: "project-1",
+      groundingScope: "project_combined",
+      embeddings,
+      chat,
+      projectContext: context(note),
+    });
+
+    const prompt = chat.complete.mock.calls[0][0].map((message) => message.content).join("\n");
+    expect(prompt).toContain("[N1] (CURRENT PROJECT DATA — PROGRESS NOTE");
+    expect(prompt).not.toContain("real-note-database-id");
+    expect(result.citations).toEqual([
+      expect.objectContaining({ kind: "note", label: "N1", title: "Prepare quote" }),
+    ]);
+  });
+
   it("answers a live-only current-state question without indexed documents", async () => {
     retrieveChunks.mockResolvedValue([]);
     const source = liveSource("task", {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TASK_TITLE_STYLE } from "@/lib/capture/prompt";
 import type { CandidateRef } from "@/lib/capture/validate";
 import { validateCaptureProposals, type ValidatedProposal } from "@/lib/capture/validate";
 import { languageDirective, type ReplyLanguage } from "@/lib/language";
@@ -59,6 +60,7 @@ Rules:
 4. Proposals use exactly these shapes and cite labels — U1 is the person's question; S, N, and T labels are sources:
    {"kind":"create_task","title":"...","description":null,"project":"P2","priority":null,"status":"blocked","due":{"phrase":"the exact words that state the date","date":"YYYY-MM-DD"},"estimatedHours":null,"citations":["U1"]}
    A new task's status is "blocked" only when they are waiting on someone and no existing task covers it; otherwise null. Never mark a new task done.
+   ${TASK_TITLE_STYLE} A description, when given, is one or two sentences in the same style.
    {"kind":"update_task","task":"T3","status":"done","priority":null,"due":null,"citations":["N2"]}
    {"kind":"add_note","task":"T3","note":"...","citations":["U1"]}
    Quote due-date words exactly as written; never guess a date.

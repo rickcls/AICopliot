@@ -15,9 +15,12 @@ export function stepsAsDescription(
     .join("\n");
 }
 
-/** A step's first sentence, as a task title. */
+/**
+ * A step's first sentence, as a task title. A full stop ends a sentence only
+ * when a space follows it, so "client-brief.md" or "v2.1" is not cut short.
+ */
 export function stepTitle(text: string): string {
-  const first = text.split(/(?<=[。！？.!?])\s*/u)[0] ?? text;
+  const first = text.split(/(?<=[。！？])\s*|(?<=[.!?])\s+/u)[0] ?? text;
   const title = first.trim() || text.trim();
   return title.length > 120 ? `${title.slice(0, 119)}…` : title;
 }

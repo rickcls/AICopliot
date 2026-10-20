@@ -10,6 +10,7 @@ import {
   ListPlus,
   MessageSquareText,
   RefreshCw,
+  Sparkles,
   Undo2,
 } from "lucide-react";
 import { useLocale, useT } from "@/components/i18n-provider";
@@ -38,6 +39,12 @@ export interface ProjectOption {
   personal: boolean;
 }
 
+/** A workspace member other than the viewer, who a new task can be handed to. */
+export interface ColleagueOption {
+  id: string;
+  name: string;
+}
+
 type Priority = "low" | "medium" | "high" | "urgent";
 const PRIORITIES: Priority[] = ["urgent", "high", "medium", "low"];
 const STATUS_KEY = {
@@ -61,6 +68,8 @@ function effective(proposal: CaptureProposalView, draft: ProposalOverrides) {
     case "create_task":
       return {
         title: draft.title ?? proposal.payload.title,
+        description:
+          draft.description !== undefined ? draft.description : proposal.payload.description,
         projectId: draft.projectId ?? proposal.payload.projectId,
         dueDate: draft.dueDate !== undefined ? draft.dueDate : proposal.payload.dueDate,
         priority: draft.priority !== undefined ? draft.priority : proposal.payload.priority,
@@ -70,6 +79,7 @@ function effective(proposal: CaptureProposalView, draft: ProposalOverrides) {
     case "update_task":
       return {
         title: proposal.task?.title ?? "",
+        description: null,
         projectId: proposal.task?.projectId ?? null,
         dueDate: draft.dueDate !== undefined ? draft.dueDate : proposal.payload.dueDate,
         priority: draft.priority !== undefined ? draft.priority : proposal.payload.priority,
@@ -79,6 +89,7 @@ function effective(proposal: CaptureProposalView, draft: ProposalOverrides) {
     case "add_note":
       return {
         title: proposal.task?.title ?? "",
+        description: null,
         projectId: proposal.task?.projectId ?? null,
         dueDate: null,
         priority: null,
@@ -96,24 +107,30 @@ function effective(proposal: CaptureProposalView, draft: ProposalOverrides) {
  * every field. Expanding a row shows its editable fields and the lines it
  * rests on, so a suggestion can be checked against what was actually said
  * before it is applied. Where proposals are stored is the caller's business:
- * it passes the apply and decide endpoints.
+ * it passes the apply and decide endpoints, and — for a capture — a way to
+ * have the model redo one suggestion from the person's correction.
  */
 export function ProposalList({
   proposals,
   projects,
+  colleagues,
   applyUrl,
   decideUrl,
   readProposals,
   onChange,
+  onRevise,
 }: {
   proposals: CaptureProposalView[];
   projects: ProjectOption[];
+  colleagues: ColleagueOption[];
   /** POST { items } → { results, … }. */
   applyUrl: string;
   decideUrl: (proposalId: string) => string;
   /** Pulls the updated proposals out of the apply response. */
   readProposals: (data: unknown) => CaptureProposalView[] | null;
   onChange: (proposals: CaptureProposalView[]) => void;
+  /** Redoes one suggestion from what the person says is wrong; true once replaced. */
+  onRevise?: (proposalId: string, instruction: string) => Promise<boolean>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -127,8 +144,11 @@ export function ProposalList({
   const dateLocale = intlLocale(locale);
   const pending = proposals.filter((proposal) => proposal.state === "pending");
   const unflagged = pending.filter((proposal) => proposal.flags.length === 0);
-  const projectName = (id: string | null) =>
-    id ? (projects.find((project) => project.id === id)?.name ?? "") : t("capture.personalProject");
+  // The personal project reads the same whether the model named it or left it blank.
+  const projectName = (id: string | null) => {
+    const project = id ? projects.find((option) => option.id === id) : null;
+    return !id || project?.personal ? t("capture.personalProject") : (project?.name ?? "");
+  };
 
   async function apply(ids: string[]) {
     setBusy(ids.length === 1 ? ids[0] : "all");
@@ -224,7 +244,13 @@ export function ProposalList({
             onApply={() => void apply([proposal.id])}
             onDismiss={() => void decide(proposal, "dismissed")}
             onRestore={() => void decide(proposal, "pending")}
+            onRevise={
+              onRevise && proposal.state === "pending"
+                ? (instruction) => onRevise(proposal.id, instruction)
+                : undefined
+            }
             projects={projects}
+            colleagues={colleagues}
             projectName={projectName}
             dateLocale={dateLocale}
             t={t}
@@ -246,7 +272,9 @@ function ProposalRow({
   onApply,
   onDismiss,
   onRestore,
+  onRevise,
   projects,
+  colleagues,
   projectName,
   dateLocale,
   t,
@@ -261,13 +289,17 @@ function ProposalRow({
   onApply: () => void;
   onDismiss: () => void;
   onRestore: () => void;
+  onRevise?: (instruction: string) => Promise<boolean>;
   projects: ProjectOption[];
+  colleagues: ColleagueOption[];
   projectName: (id: string | null) => string;
   dateLocale: string;
   t: Translate;
 }) {
   const ids = useId();
   const values = effective(proposal, draft);
+  const [instruction, setInstruction] = useState("");
+  const [revising, setRevising] = useState(false);
   // The personal project is the select's empty option, so it is chosen by
   // default and never listed twice.
   const personalId = projects.find((project) => project.personal)?.id;
@@ -380,6 +412,16 @@ function ProposalRow({
                   className="h-9"
                 />
               </FieldRow>
+              <FieldRow label={t("capture.fieldDescription")} id={`${ids}-description`}>
+                <Textarea
+                  id={`${ids}-description`}
+                  value={values.description ?? ""}
+                  rows={3}
+                  maxLength={4000}
+                  disabled={decided}
+                  onChange={(event) => onDraft({ description: event.target.value || null })}
+                />
+              </FieldRow>
               <FieldRow label={t("capture.fieldProject")} id={`${ids}-project`}>
                 <Select
                   id={`${ids}-project`}
@@ -398,6 +440,24 @@ function ProposalRow({
                     ))}
                 </Select>
               </FieldRow>
+              {colleagues.length > 0 ? (
+                <FieldRow label={t("capture.fieldAssignee")} id={`${ids}-assignee`}>
+                  <Select
+                    id={`${ids}-assignee`}
+                    value={draft.assigneeId ?? ""}
+                    disabled={decided}
+                    onChange={(event) => onDraft({ assigneeId: event.target.value || undefined })}
+                    className={cn(QUIET_CONTROL, "h-9")}
+                  >
+                    <option value="">{t("capture.assigneeMe")}</option>
+                    {colleagues.map((colleague) => (
+                      <option key={colleague.id} value={colleague.id}>
+                        {colleague.name}
+                      </option>
+                    ))}
+                  </Select>
+                </FieldRow>
+              ) : null}
             </>
           ) : null}
 
@@ -442,8 +502,12 @@ function ProposalRow({
                   onChange={(event) => onDraft({ priority: (event.target.value || null) as Priority | null })}
                   className={cn(QUIET_CONTROL, "h-9")}
                 >
+                  {/* Priority is only read from words like 急 or 唔急; with none, a
+                      new task is saved at medium, and the option says so. */}
                   <option value="">
-                    {proposal.kind === "update_task" ? t("capture.noChange") : t("capture.notSet")}
+                    {proposal.kind === "update_task"
+                      ? t("capture.noChange")
+                      : t("capture.priorityDefault")}
                   </option>
                   {PRIORITIES.map((priority) => (
                     <option key={priority} value={priority}>
@@ -477,6 +541,45 @@ function ProposalRow({
               ))}
             </ul>
           </div>
+
+          {onRevise ? (
+            <form
+              className="space-y-2 border-t border-slate-100 pt-3"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (instruction.trim().length < 2) return;
+                setRevising(true);
+                const replaced = await onRevise(instruction.trim());
+                // A replaced row unmounts; only a failed one keeps its text.
+                if (!replaced) setRevising(false);
+              }}
+            >
+              <label htmlFor={`${ids}-revise`} className={ROW_LABEL}>
+                {t("capture.reviseLabel")}
+              </label>
+              <Textarea
+                id={`${ids}-revise`}
+                value={instruction}
+                rows={2}
+                maxLength={500}
+                disabled={revising}
+                placeholder={t("capture.revisePlaceholder")}
+                onChange={(event) => setInstruction(event.target.value)}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  disabled={revising || instruction.trim().length < 2}
+                >
+                  {revising ? <Spinner /> : <Sparkles className="size-3.5" aria-hidden />}
+                  {revising ? t("capture.revising") : t("capture.revise")}
+                </Button>
+                <span className="text-xs text-slate-500">{t("capture.reviseHint")}</span>
+              </div>
+            </form>
+          ) : null}
         </div>
       ) : null}
     </li>

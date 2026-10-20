@@ -18,7 +18,9 @@ import { buildLabelledContext, selectDocumentContext } from "@/lib/generation/co
 import { extractJsonObject } from "@/lib/generation/prompt";
 import type { GenerationSource } from "@/lib/generation/validate";
 import { detectReplyLanguage } from "@/lib/language";
+import { findOfficialProjectMilestone } from "@/lib/pm/project";
 import { officialRecordWhere } from "@/lib/pm/rules";
+import { taskSelect } from "@/lib/pm/select";
 import { createTaskRecord, prepareTaskCreate } from "@/lib/pm/task-write";
 import {
   getChatProvider,
@@ -219,6 +221,12 @@ export async function suggestApproach(
  * Each step is claimed (its index pushed onto `createdSteps` only if absent)
  * in the same transaction as its task, so a second click creates nothing.
  * General steps keep their marker in the new task's description.
+ *
+ * A new task is linked the way the app already links work, not by a line of
+ * text: the original task depends on it, so the original's panel lists its
+ * steps and waits on them; it joins the original's milestone; and a document
+ * step carries the passages it cited as Sources, with their documents linked.
+ * The original task is read back so the board shows its new dependencies.
  */
 export async function createTasksFromSteps(
   access: WorkspaceAccess,
@@ -228,22 +236,54 @@ export async function createTasksFromSteps(
 ) {
   const suggestion = await prisma.taskSuggestion.findFirst({
     where: { id: suggestionId, workspaceId: access.workspaceId, userId: access.userId },
-    select: { id: true, steps: true, task: { select: { projectId: true, title: true } } },
+    select: {
+      id: true,
+      steps: true,
+      sources: true,
+      task: { select: { id: true, projectId: true, milestoneId: true } },
+    },
   });
   if (!suggestion) throw new ApproachError("Suggestion not found", 404);
   const steps = suggestion.steps as unknown as ApproachStep[];
+  const sources = new Map(
+    (suggestion.sources as unknown as ApproachSource[]).map((source) => [source.label, source]),
+  );
+  const parent = suggestion.task;
+
+  // A milestone deleted or a document moved since the suggestion is left
+  // off the new task rather than failing the whole request.
+  const [milestone, documents] = await Promise.all([
+    parent.milestoneId
+      ? findOfficialProjectMilestone(access.workspaceId, parent.projectId, parent.milestoneId)
+      : null,
+    prisma.document.findMany({
+      where: {
+        workspaceId: access.workspaceId,
+        projectId: parent.projectId,
+        id: { in: [...new Set([...sources.values()].map((source) => source.documentId))] },
+      },
+      select: { id: true },
+    }),
+  ]);
+  const inProject = new Set(documents.map((document) => document.id));
 
   const created = [];
   for (const index of [...new Set(stepIndexes)]) {
     const step = steps[index];
     if (!step) continue;
+    const cited = step.citations
+      .map((label) => sources.get(label))
+      .filter((source): source is ApproachSource => !!source && inProject.has(source.documentId));
     const input = createTaskSchema.parse({
       title: stepTitle(step.text),
-      description: `${step.basis === "general" ? `${generalMarker} ` : ""}${step.text}\n\n— ${suggestion.task.title}`,
+      description: `${step.basis === "general" ? `${generalMarker} ` : ""}${step.text}`,
       priority: "medium",
       assigneeId: access.userId,
+      milestoneId: milestone?.id ?? null,
+      documentIds: [...new Set(cited.map((source) => source.documentId))],
+      citations: cited.map((source) => ({ chunkId: source.chunkId, quote: source.excerpt })),
     });
-    const prepared = await prepareTaskCreate(access.workspaceId, suggestion.task.projectId, input);
+    const prepared = await prepareTaskCreate(access.workspaceId, parent.projectId, input);
     if (!prepared.ok) throw new ApproachError(prepared.error, 404);
 
     const task = await prisma.$transaction(async (tx) => {
@@ -256,9 +296,22 @@ export async function createTasksFromSteps(
         data: { createdSteps: { push: index } },
       });
       if (claimed.count === 0) return null;
-      return createTaskRecord(tx, prepared.value, access.userId);
+      const record = await createTaskRecord(tx, prepared.value, access.userId);
+      // A brand-new task has no edges, so this cannot close a cycle.
+      await tx.taskDependency.create({
+        data: { workspaceId: access.workspaceId, taskId: parent.id, dependsOnTaskId: record.id },
+      });
+      return record;
     });
     if (task) created.push(task);
   }
-  return created;
+
+  const updatedParent =
+    created.length > 0
+      ? await prisma.task.findFirst({
+          where: officialRecordWhere({ id: parent.id, workspaceId: access.workspaceId }),
+          select: taskSelect,
+        })
+      : null;
+  return { tasks: created, parent: updatedParent };
 }

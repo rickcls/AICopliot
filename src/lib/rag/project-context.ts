@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
+import { readQuestionIntent } from "@/lib/rag/intent";
 import {
   baselinedRequirementWhere,
   DONE_TASK_CATEGORY,
@@ -18,6 +19,7 @@ export type ProjectSourceKind =
   | "risk"
   | "dependency"
   | "requirement"
+  | "note"
   | "project_snapshot";
 
 export type ProjectSnapshotValue = string | number | boolean | null;
@@ -47,6 +49,12 @@ export interface ProjectGroundingContext {
 }
 
 const MAX_DETAILED_SOURCES = 60;
+/** A progress question reads the newest notes on the tasks it is about. */
+const NOTES_PER_TASK = 3;
+const NOTE_TASKS = 10;
+/** A thread about one task reads more of that task's notes. */
+const TASK_FOCUS_NOTES = 8;
+const MAX_NOTE_CHARS = 600;
 
 const STOP_WORDS = new Set([
   "a",
@@ -408,6 +416,86 @@ function requirementSource(
   };
 }
 
+type NoteRow = Awaited<ReturnType<typeof loadNotes>>[number];
+
+/**
+ * The newest notes on each task, newest first. Notes are what people write as
+ * they work — a Today check-in, a progress note from a capture, a comment —
+ * so they are where "how is it going?" is answered. Only official tasks reach
+ * here, and the notes are read inside the same workspace.
+ */
+async function loadNotes(workspaceId: string, taskIds: string[], perTask: number) {
+  if (taskIds.length === 0) return [];
+  const rows = await prisma.taskComment.findMany({
+    where: { workspaceId, taskId: { in: taskIds } },
+    orderBy: { createdAt: "desc" },
+    // Enough for every task to have its share even when one is chatty.
+    take: taskIds.length * perTask * 3,
+    select: {
+      id: true,
+      taskId: true,
+      body: true,
+      createdAt: true,
+      author: { select: { name: true, email: true } },
+    },
+  });
+  const kept = new Map<string, number>();
+  return rows.filter((row) => {
+    const count = kept.get(row.taskId) ?? 0;
+    kept.set(row.taskId, count + 1);
+    return count < perTask;
+  });
+}
+
+/**
+ * A person's note on a task, as evidence of its own kind. It says who wrote
+ * what and when — a report of progress, never a document's requirement or a
+ * field of the record — and the prompt asks for it to be attributed that way.
+ */
+function noteSource(
+  note: NoteRow,
+  task: { id: string; title: string },
+  projectId: string,
+  observedAt: string,
+): ProjectGroundingSource {
+  const author = note.author?.name ?? note.author?.email ?? "a former member";
+  const writtenAt = note.createdAt.toISOString();
+  return {
+    kind: "note",
+    id: note.id,
+    title: task.title,
+    content: [
+      `Progress note on the task: ${task.title}`,
+      `Written by: ${author}`,
+      `Written at: ${writtenAt}`,
+      `Note: ${note.body.slice(0, MAX_NOTE_CHARS)}`,
+    ].join("\n"),
+    href: `/projects/${projectId}/tasks?task=${task.id}`,
+    observedAt,
+    snapshot: { taskId: task.id, taskTitle: task.title, author, writtenAt },
+  };
+}
+
+async function noteSourcesFor(
+  workspaceId: string,
+  projectId: string,
+  tasks: { id: string; title: string }[],
+  perTask: number,
+  observedAt: string,
+) {
+  const titleById = new Map(tasks.map((task) => [task.id, task.title]));
+  const notes = await loadNotes(workspaceId, [...titleById.keys()], perTask);
+  return notes.map((note) =>
+    noteSource(note, { id: note.taskId, title: titleById.get(note.taskId) ?? "" }, projectId, observedAt),
+  );
+}
+
+/** Finished work: counted in the snapshot, left out of a list of what is still open. */
+function isFinished(source: ProjectGroundingSource): boolean {
+  const status = source.snapshot.status;
+  return status === "done" || status === "completed" || status === "mitigated" || status === "accepted";
+}
+
 function dependencySource(
   dependency: DependencyRow,
   projectId: string,
@@ -713,6 +801,7 @@ export async function getProjectGroundingContext(
       dependencySource(dependency, projectId, observedAt),
     ),
   ];
+  const intent = readQuestionIntent(question);
   const queryTokens = tokens(question);
   const scored = detailed
     .map((source, index) => ({
@@ -720,11 +809,23 @@ export async function getProjectGroundingContext(
       index,
       score: sourceScore(source, question, queryTokens, now),
     }))
-    .filter((candidate) => candidate.score > 0)
+    // "What is still pending?" was answered with finished tasks, because the
+    // word "task" alone selected every task. Finished work stays in the
+    // snapshot's exact counts; only the open work is listed.
+    .filter((candidate) => candidate.score > 0 && !(intent.openWork && isFinished(candidate.source)))
     .sort((a, b) => b.score - a.score || a.index - b.index);
   const selected = scored
     .slice(0, MAX_DETAILED_SOURCES)
     .map((candidate) => candidate.source);
+  const notes = intent.progress
+    ? await noteSourcesFor(
+        workspaceId,
+        projectId,
+        selected.filter((source) => source.kind === "task").slice(0, NOTE_TASKS),
+        NOTES_PER_TASK,
+        observedAt,
+      )
+    : [];
   const snapshot = buildSnapshotSource(
     rows.project,
     rows.tasks,
@@ -739,7 +840,7 @@ export async function getProjectGroundingContext(
   );
 
   return {
-    sources: [snapshot, ...selected],
+    sources: [snapshot, ...selected, ...notes],
     observedAt,
     hasProjectData: true,
     totalDetailedRecords: scored.length,
@@ -785,6 +886,9 @@ export async function getTaskGroundingContext(
   const requirements = rows.requirements.filter((requirement) =>
     requirement.links.some((link) => link.task?.id === taskId),
   );
+  // A thread about one task is usually a question about its progress, so its
+  // notes always come along.
+  const notes = await noteSourcesFor(workspaceId, projectId, [task], TASK_FOCUS_NOTES, observedAt);
 
   return {
     task: { id: task.id, projectId, title: task.title },
@@ -793,6 +897,7 @@ export async function getTaskGroundingContext(
       ...dependencies.map((row) => dependencySource(row, projectId, observedAt)),
       ...(milestone ? [milestoneSource(milestone, projectId, observedAt)] : []),
       ...requirements.map((row) => requirementSource(row, projectId, observedAt)),
+      ...notes,
     ],
     observedAt,
   };
