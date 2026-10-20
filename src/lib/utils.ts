@@ -11,15 +11,32 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
-export function formatDate(value: string | Date, locale?: string): string {
+/**
+ * Formats an instant — when something was created, reviewed, or observed — as
+ * a date and time in the viewer's time zone.
+ *
+ * Locale and zone are both required. Left to the runtime, the server (UTC on
+ * Vercel) and the browser (the viewer's zone) print different text for the
+ * same instant, which is a hydration mismatch, and a timestamp from 01:00 in
+ * Hong Kong reads as the previous day.
+ */
+export function formatDate(value: string | Date, locale: string, timeZone: string): string {
   return new Date(value).toLocaleString(locale, {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   });
 }
 
+/** The calendar day an instant fell on, for the viewer. See `formatDate`. */
+export function formatInstantDay(value: string | Date, locale: string, timeZone: string): string {
+  return new Date(value).toLocaleDateString(locale, { dateStyle: "medium", timeZone });
+}
+
 /**
- * Formats a date-only value — a task due date or milestone target date.
+ * Formats a date-only value — a task due date or milestone target date. For an
+ * instant (createdAt and the like) use `formatInstantDay` instead: this pins
+ * UTC, which is right for a date and wrong for a moment.
  *
  * These are stored at UTC midnight (see src/lib/pm/rules.ts), so rendering them
  * in the viewer's local zone would show the previous day for anyone west of UTC

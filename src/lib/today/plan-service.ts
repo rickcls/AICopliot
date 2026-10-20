@@ -92,7 +92,7 @@ export async function planMyDay(
         title: task.title,
         project: task.project.name,
         status: task.status.category,
-        due: describeDue(task.dueDate, today),
+        due: describeDue(task.dueDate, today, language),
         priority: task.priority,
         estimateMinutes: task.estimatedHours ? Math.round(task.estimatedHours * 60) : null,
         quietDays: daysSinceActivity(activityOf(task), today),

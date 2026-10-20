@@ -10,6 +10,7 @@ import { buildPack, parsePackKind } from "@/lib/pm/requirements-export";
 import { getScopedProject } from "@/lib/pm/project";
 import { requirementSelect } from "@/lib/pm/select";
 import { formatDay } from "@/lib/utils";
+import { getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,9 @@ export default async function RequirementsPackPage({
     select: requirementSelect,
   });
   const groups = buildPack(kind, requirements, t);
+  // The viewer's date, not the server's UTC one: printed at 01:00 in Hong
+  // Kong, a pack would otherwise be dated the day before.
+  const today = await getViewerToday();
   const count = groups.reduce((total, group) => total + group.items.length, 0);
 
   return (
@@ -87,7 +91,7 @@ export default async function RequirementsPackPage({
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {t("requirementsPack.summary", {
-              date: formatDay(new Date(), intlLocale(locale)),
+              date: formatDay(today, intlLocale(locale)),
               count,
             })}
           </p>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Avatar, Button, Spinner } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useDateLocale, useT } from "@/components/i18n-provider";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import type { TaskCommentRow } from "@/components/task-types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -38,6 +38,7 @@ export function TaskComments({
   const confirm = useConfirm();
   const t = useT();
   const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -167,7 +168,7 @@ export function TaskComments({
                       dateTime={comment.createdAt}
                       className="text-[11px] text-slate-400"
                     >
-                      {formatDate(comment.createdAt, dateLocale)}
+                      {formatDate(comment.createdAt, dateLocale, timeZone)}
                     </time>
                     {mine ? (
                       <button

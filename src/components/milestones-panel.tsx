@@ -18,9 +18,9 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useDateLocale, useT } from "@/components/i18n-provider";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
-import { cn, formatDay } from "@/lib/utils";
+import { cn, formatDay, formatInstantDay } from "@/lib/utils";
 import { TracedRequirements } from "@/components/traced-requirements";
 
 export type MilestoneStatus =
@@ -102,6 +102,7 @@ export function MilestonesPanel({
   const toast = useToast();
   const t = useT();
   const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
 
   function toggleExpanded(id: string) {
     setExpanded((previous) => {
@@ -425,7 +426,7 @@ export function MilestonesPanel({
                       {milestone.completedAt ? (
                         <Field name={t("milestones.completed")}>
                           <span className="text-slate-600">
-                            {formatDay(milestone.completedAt, dateLocale)}
+                            {formatInstantDay(milestone.completedAt, dateLocale, timeZone)}
                           </span>
                         </Field>
                       ) : null}

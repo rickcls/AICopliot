@@ -3,9 +3,11 @@
 import { createContext, useContext, useMemo } from "react";
 import { DICTIONARIES } from "@/lib/i18n/dictionaries";
 import { DEFAULT_LOCALE, intlLocale, type Locale } from "@/lib/i18n/locales";
+import { DEFAULT_TIME_ZONE } from "@/lib/time";
 import { createTranslator, type Translate } from "@/lib/i18n/translate";
 
 const LocaleContext = createContext<Locale>(DEFAULT_LOCALE);
+const TimeZoneContext = createContext<string>(DEFAULT_TIME_ZONE);
 
 /**
  * Hands the server-resolved locale to client components. The locale comes in
@@ -14,12 +16,19 @@ const LocaleContext = createContext<Locale>(DEFAULT_LOCALE);
  */
 export function I18nProvider({
   locale,
+  timeZone,
   children,
 }: {
   locale: Locale;
+  /** The viewer's zone, so timestamps render the same on server and client. */
+  timeZone: string;
   children: React.ReactNode;
 }) {
-  return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
+  return (
+    <LocaleContext.Provider value={locale}>
+      <TimeZoneContext.Provider value={timeZone}>{children}</TimeZoneContext.Provider>
+    </LocaleContext.Provider>
+  );
 }
 
 export function useLocale(): Locale {
@@ -32,6 +41,11 @@ export function useT(): Translate {
     () => createTranslator(locale, DICTIONARIES[locale], DICTIONARIES.en),
     [locale],
   );
+}
+
+/** The viewer's time zone, for formatting instants. */
+export function useTimeZone(): string {
+  return useContext(TimeZoneContext);
 }
 
 /** The `Intl` locale for dates and lists, e.g. `zh-HK` for `zh-Hant`. */

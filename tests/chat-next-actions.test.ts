@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { nextActionsFor } from "@/lib/chat/next-actions";
+import { nextActionsFor as nextActionsWith } from "@/lib/chat/next-actions";
+import { translatorFor } from "@/lib/i18n/dictionaries";
 import type { Citation, ProjectCitation } from "@/lib/schemas";
 
 /**
@@ -36,6 +37,9 @@ function projectCitation(
     snapshot: {},
   };
 }
+
+const en = translatorFor("en");
+const nextActionsFor = (citations: Citation[]) => nextActionsWith(citations, en);
 
 describe("nextActionsFor", () => {
   it("sends a document citation to that document", () => {
@@ -133,5 +137,11 @@ describe("nextActionsFor", () => {
     // Every project href comes off the citation; document hrefs are built from
     // the document id. There is no projectId argument to forget to pass.
     expect(nextActionsFor([documentCitation("doc-1", "runbook.md")])).toHaveLength(1);
+  });
+
+  it("speaks the viewer's language", () => {
+    expect(
+      nextActionsWith([documentCitation("doc-1", "runbook.md")], translatorFor("zh-Hant")),
+    ).toEqual([{ label: "開啟 runbook.md", href: "/documents/doc-1" }]);
   });
 });

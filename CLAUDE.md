@@ -499,10 +499,12 @@ strict — a fuzzy one would silently drop a genuinely new obligation, and a mis
 requirement costs more than a duplicate someone rejects in one click. A run with
 nothing new fails with that explanation, not "no supported requirements".
 
-**Status labels are written for the job, not the model.** `src/lib/pm/labels.ts`
-is the only place they live: `draft` → *To review*, `needs_clarification` → *Ask
-client*, `validated` → *Validated*, `approved` → *Agreed*, `rejected` →
-*Rejected*. Change copy there; never rename an enum value for wording. The
+**Status labels are written for the job, not the model.** They live in the
+dictionaries under `requirementStatus` (read through `requirementStatusLabel()`
+in `src/lib/pm/labels.ts`): `draft` → *To review* / 待審閱, `needs_clarification`
+→ *Ask client* / 要問客戶, `validated` → *Validated* / 已核對, `approved` →
+*Agreed* / 已議定, `rejected` → *Rejected* / 已否決. Change copy there; never
+rename an enum value for wording. The
 Overview's single "Next step" comes from the pure `nextDiscoveryStep()` in
 `src/lib/pm/discovery.ts` (upload → wait for indexing → extract → review →
 clarify → agree → sign off); earlier steps win, because reviewing drafts is what
@@ -674,13 +676,37 @@ session user's row and mirrors the language into a cookie for signed-out pages.
 `getUserPreferences()` rides on the same cached user lookup `getSessionUser()`
 already makes, so pages pay no extra query for it.
 
-**i18n is being applied page by page.** The shell, Today, Settings, the project
-tabs and layout, the error pages, and the landing page read `t()`; older panels
-still render English until they are migrated. New UI must use the dictionaries
-from the start. Seeded task-column labels are data and are translated only when
-untouched (`displayStatusLabel`); a renamed column is shown as typed. Date-only
-values are formatted with `formatDay(value, intlLocale(locale))` so the server
-and the browser cannot pick different formats.
+**Every page reads `t()`; new UI must too.** The dictionaries are split by
+area — `src/lib/i18n/dictionaries/areas/<area>.en.ts` and its `.zh-Hant.ts`
+twin, spread into the root `en.ts` / `zh-Hant.ts` — so one `Dictionary` type
+still checks every key. Labels for stored values (statuses, levels, MoSCoW,
+categories, delivery and run states, report health) are shared keys, never
+English maps in `lib/`; pure modules that render text (`requirements-export`,
+`next-actions`, `relative-time`, the report Markdown) take a `Translate`.
+`labelOr(t, key, fallback)` reads a stored value a dictionary may not know (a
+frozen snapshot's status) and falls back to the value rather than printing the
+dotted key. Seeded task-column labels are data and are translated only when
+untouched (`displayStatusLabel`); a renamed column is shown as typed. Text from
+the person's documents and records is never translated.
+
+**Dates and lists always get an explicit locale — and instants a time zone.**
+A date-only value (due, target, a capture's `localDate`) uses `formatDay(value,
+intlLocale(locale))`, pinned to UTC. An instant (`createdAt`, `reviewedAt`,
+`observedAt`) uses `formatDate(value, locale, timeZone)` or
+`formatInstantDay(…)` with the viewer's zone — `getViewerTimeZone()` on the
+server, `useTimeZone()` from the `I18nProvider` on the client. Formatting an
+instant with `formatDay` dated a 01:00 Hong Kong upload the day before, and
+leaving the zone to the runtime printed different text on Vercel's UTC server
+than in the browser. The Gantt axis and calendar labels take a locale too
+(`buildGantt(…, locale)`, `buildCalendarMonth(…, locale)`). Lists of words use
+`Intl.ListFormat`, which knows 「、」 from ", and".
+
+**Files that leave the app choose their own language.** Requirement exports and
+client packs follow the viewer's language unless `?lang=en|zh-Hant` asks for the
+other (`getFileLocale()`); the print page links to the other language, because
+a pack is written for the client. The global error page is bilingual, since the
+root layout that resolves the language is what failed. API error messages are
+still English.
 
 ## Capture notes
 

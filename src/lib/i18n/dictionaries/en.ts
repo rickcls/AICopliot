@@ -1,4 +1,6 @@
+import { chatEn } from "@/lib/i18n/dictionaries/areas/chat.en";
 import { deliveryEn } from "@/lib/i18n/dictionaries/areas/delivery.en";
+import { evaluationsEn } from "@/lib/i18n/dictionaries/areas/evaluations.en";
 import { overviewEn } from "@/lib/i18n/dictionaries/areas/overview.en";
 import { requirementsEn } from "@/lib/i18n/dictionaries/areas/requirements.en";
 import { sharedEn } from "@/lib/i18n/dictionaries/areas/shared.en";
@@ -19,6 +21,8 @@ export const en = {
   ...requirementsEn,
   ...overviewEn,
   ...deliveryEn,
+  ...chatEn,
+  ...evaluationsEn,
   app: {
     name: "ScopePilot",
     tagline: "AI work assistant",
@@ -648,6 +652,7 @@ export const en = {
   },
   project: {
     breadcrumb: "Projects",
+    breadcrumbLabel: "Breadcrumb",
     ask: "Ask this project",
     sections: "Project sections",
     tabs: {

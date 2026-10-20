@@ -1,5 +1,7 @@
 import type { Dictionary } from "@/lib/i18n/translate";
+import { chatZhHant } from "@/lib/i18n/dictionaries/areas/chat.zh-Hant";
 import { deliveryZhHant } from "@/lib/i18n/dictionaries/areas/delivery.zh-Hant";
+import { evaluationsZhHant } from "@/lib/i18n/dictionaries/areas/evaluations.zh-Hant";
 import { overviewZhHant } from "@/lib/i18n/dictionaries/areas/overview.zh-Hant";
 import { requirementsZhHant } from "@/lib/i18n/dictionaries/areas/requirements.zh-Hant";
 import { sharedZhHant } from "@/lib/i18n/dictionaries/areas/shared.zh-Hant";
@@ -16,6 +18,8 @@ export const zhHant = {
   ...requirementsZhHant,
   ...overviewZhHant,
   ...deliveryZhHant,
+  ...chatZhHant,
+  ...evaluationsZhHant,
   app: {
     name: "ScopePilot",
     tagline: "AI 工作助理",
@@ -645,6 +649,7 @@ export const zhHant = {
   },
   project: {
     breadcrumb: "專案",
+    breadcrumbLabel: "頁面路徑",
     ask: "就此專案提問",
     sections: "專案分頁",
     tabs: {

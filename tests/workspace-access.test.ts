@@ -24,6 +24,7 @@ const {
   AuthError,
   requireWorkspaceAccess,
   requireAdmin,
+  defaultWorkspaceName,
   getOrCreateDefaultWorkspace,
   getSessionUser,
 } = await import("@/lib/auth-guard");
@@ -150,6 +151,13 @@ describe("getOrCreateDefaultWorkspace", () => {
 
     expect(access.workspaceId).toBe("ws-own");
     expect(mockPrisma.workspace.create).not.toHaveBeenCalled();
+  });
+
+  it("names a first workspace in the person's language", () => {
+    expect(defaultWorkspaceName("Ada", "en")).toBe("Ada's Workspace");
+    expect(defaultWorkspaceName("陳大文", "zh-Hant")).toBe("陳大文的工作區");
+    expect(defaultWorkspaceName(null, "zh-Hant")).toBe("我的工作區");
+    expect(defaultWorkspaceName(null, "en")).toBe("My Workspace");
   });
 
   it("creates a workspace with the user as admin member on first use", async () => {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FileText } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
 import { Modal, ModalBody, ModalFooter } from "@/components/modal";
 import { Button, CHECKBOX, SearchField } from "@/components/ui";
 import { MAX_FOCUS_DOCUMENTS } from "@/lib/schemas";
@@ -27,6 +28,7 @@ export function DocumentChooser({
 }) {
   const [selected, setSelected] = useState(() => new Set(initial));
   const [query, setQuery] = useState("");
+  const t = useT();
 
   const needle = query.trim().toLocaleLowerCase();
   const visible = needle
@@ -47,21 +49,21 @@ export function DocumentChooser({
 
   return (
     <Modal
-      title="Ask about specific documents"
-      description="Answers come only from the documents you tick. This starts a new thread."
+      title={t("chat.chooser.title")}
+      description={t("chat.chooser.description")}
       onClose={onCancel}
       className="max-w-lg"
     >
       <ModalBody className="space-y-3">
         <SearchField
-          label="Filter documents"
-          placeholder="Filter by name…"
+          label={t("chat.chooser.filter")}
+          placeholder={t("chat.chooser.filterPlaceholder")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           data-autofocus
         />
         {documents.length === 0 ? (
-          <p className="text-sm text-slate-500">There are no indexed documents here yet.</p>
+          <p className="text-sm text-slate-500">{t("chat.chooser.empty")}</p>
         ) : (
           <ul className="max-h-80 space-y-0.5 overflow-y-auto">
             {visible.map((document) => {
@@ -83,24 +85,25 @@ export function DocumentChooser({
               );
             })}
             {visible.length === 0 ? (
-              <li className="px-2 py-1.5 text-sm text-slate-500">No document matches.</li>
+              <li className="px-2 py-1.5 text-sm text-slate-500">{t("chat.chooser.noMatch")}</li>
             ) : null}
           </ul>
         )}
       </ModalBody>
       <ModalFooter>
         <span className="mr-auto text-xs text-slate-500">
-          {selected.size} selected{atLimit ? ` (the limit is ${MAX_FOCUS_DOCUMENTS})` : ""}
+          {t("chat.chooser.selected", { count: selected.size })}
+          {atLimit ? ` ${t("chat.chooser.limit", { max: MAX_FOCUS_DOCUMENTS })}` : ""}
         </span>
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button
           type="button"
           disabled={selected.size === 0}
           onClick={() => onChoose([...selected])}
         >
-          Ask about {selected.size === 1 ? "this document" : "these documents"}
+          {selected.size === 1 ? t("chat.chooser.askOne") : t("chat.chooser.askMany")}
         </Button>
       </ModalFooter>
     </Modal>

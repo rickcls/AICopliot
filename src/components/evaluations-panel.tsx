@@ -14,6 +14,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import type { Metrics } from "@/lib/evaluation/scoring";
 import { formatDate } from "@/lib/utils";
@@ -50,32 +51,38 @@ function pct(value: number | null): string {
 }
 
 function MetricsSummary({ metrics }: { metrics: Metrics }) {
+  const t = useT();
   const tiles = [
     {
-      label: "Auto pass rate",
+      label: t("evaluations.metrics.autoPass"),
       value: pct(metrics.autoPassRate),
-      hint: `${metrics.scored} of ${metrics.total} auto-scored`,
+      hint: t("evaluations.metrics.autoPassHint", {
+        scored: metrics.scored,
+        total: metrics.total,
+      }),
     },
     {
-      label: "Refusal accuracy",
+      label: t("evaluations.metrics.refusal"),
       value: pct(metrics.refusalAccuracy),
-      hint: `${metrics.refusalCases} unanswerable case${metrics.refusalCases === 1 ? "" : "s"}`,
+      hint: t("evaluations.metrics.refusalHint", { count: metrics.refusalCases }),
     },
     {
-      label: "Citation rate",
+      label: t("evaluations.metrics.citation"),
       value: pct(metrics.citationRate),
-      hint: "answerable cases with ≥1 citation",
+      hint: t("evaluations.metrics.citationHint"),
     },
     {
-      label: "Latency p95",
+      label: t("evaluations.metrics.latency"),
       value:
         metrics.p95LatencyMs === null
           ? "—"
           : `${(metrics.p95LatencyMs / 1000).toFixed(1)}s`,
       hint:
         metrics.medianLatencyMs === null
-          ? "no runs yet"
-          : `median ${(metrics.medianLatencyMs / 1000).toFixed(1)}s`,
+          ? t("evaluations.metrics.noRuns")
+          : t("evaluations.metrics.median", {
+              seconds: (metrics.medianLatencyMs / 1000).toFixed(1),
+            }),
     },
   ];
 
@@ -112,12 +119,15 @@ export function EvaluationsPanel({
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
+  const t = useT();
+  const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
   const [projectId, setProjectId] = useState("");
 
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/evaluations");
-      if (!response.ok) throw new Error("Could not load evaluations");
+      if (!response.ok) throw new Error(t("evaluations.loadFailed"));
       const data = await response.json();
       setRows(data.evaluations);
       setMetrics(data.metrics);
@@ -125,7 +135,7 @@ export function EvaluationsPanel({
     } catch (err) {
       setError((err as Error).message);
     }
-  }, []);
+  }, [t]);
 
   async function handleRun(event: React.FormEvent) {
     event.preventDefault();
@@ -152,7 +162,7 @@ export function EvaluationsPanel({
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(data.error ?? "Could not run the evaluation.");
+        setError(data.error ?? t("evaluations.runFailed"));
         return;
       }
 
@@ -162,7 +172,7 @@ export function EvaluationsPanel({
       setShouldRefuse(false);
       await load();
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setRunning(false);
     }
@@ -171,9 +181,9 @@ export function EvaluationsPanel({
   async function handleRunAll() {
     if (runningAll || rows.length === 0) return;
     const confirmed = await confirm({
-      title: `Re-run all ${rows.length} case${rows.length === 1 ? "" : "s"}?`,
-      body: "Each case is scored against the current pipeline, which costs one model call per case.",
-      confirmLabel: "Run regression suite",
+      title: t("evaluations.rerunTitle", { count: rows.length }),
+      body: t("evaluations.rerunBody"),
+      confirmLabel: t("evaluations.rerunConfirm"),
     });
     if (!confirmed) return;
 
@@ -189,18 +199,18 @@ export function EvaluationsPanel({
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(data.error ?? "Regression run failed.");
+        setError(data.error ?? t("evaluations.rerunFailed"));
         return;
       }
 
       setRows(data.evaluations);
       setMetrics(data.metrics);
       toast.success(
-        `Re-ran ${data.evaluations.length} case${data.evaluations.length === 1 ? "" : "s"}`,
-        "Metrics below reflect the new run.",
+        t("evaluations.reran", { count: data.evaluations.length }),
+        t("evaluations.reranHint"),
       );
     } catch {
-      setError("Could not reach the server.");
+      setError(t("common.couldNotReach"));
     } finally {
       setRunningAll(false);
     }
@@ -216,15 +226,15 @@ export function EvaluationsPanel({
     if (response?.ok) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, result } : r)));
     } else {
-      setError("Could not save the review.");
+      setError(t("evaluations.reviewFailed"));
     }
   }
 
   async function remove(id: string) {
     const confirmed = await confirm({
-      title: "Delete this evaluation case?",
-      body: "Its recorded result leaves the suite, so aggregate metrics will change.",
-      confirmLabel: "Delete case",
+      title: t("evaluations.deleteTitle"),
+      body: t("evaluations.deleteBody"),
+      confirmLabel: t("evaluations.deleteConfirm"),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -235,9 +245,9 @@ export function EvaluationsPanel({
 
     if (response?.ok) {
       await load();
-      toast.success("Deleted evaluation case");
+      toast.success(t("evaluations.deleted"));
     } else {
-      setError("Could not delete that case.");
+      setError(t("evaluations.deleteFailed"));
     }
   }
 
@@ -249,7 +259,7 @@ export function EvaluationsPanel({
         <form onSubmit={handleRun} className="space-y-3">
           <div>
             <label htmlFor="eval-project" className="mb-1.5 block text-sm font-medium">
-              Project scope
+              {t("evaluations.scope")}
             </label>
             <Select
               id="eval-project"
@@ -258,23 +268,23 @@ export function EvaluationsPanel({
               disabled={running}
               className="w-full"
             >
-              <option value="">All documents (document grounding)</option>
+              <option value="">{t("evaluations.allDocuments")}</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
-                  {project.name} (documents + current records)
+                  {t("evaluations.projectScope", { name: project.name })}
                 </option>
               ))}
             </Select>
           </div>
           <div>
             <label htmlFor="eval-question" className="mb-1.5 block text-sm font-medium">
-              Question
+              {t("evaluations.question")}
             </label>
             <Input
               id="eval-question"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="What should the on-call engineer do first during a Sev-1?"
+              placeholder={t("evaluations.questionPlaceholder")}
               disabled={running}
             />
           </div>
@@ -282,23 +292,27 @@ export function EvaluationsPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="eval-keywords" className="mb-1.5 block text-sm font-medium">
-                Expected keywords{" "}
-                <span className="font-normal text-slate-500">(comma separated)</span>
+                {t("evaluations.keywords")}{" "}
+                <span className="font-normal text-slate-500">
+                  {t("evaluations.keywordsHint")}
+                </span>
               </label>
               <Input
                 id="eval-keywords"
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
-                placeholder="repmgr, pg_isready, 30 seconds"
+                placeholder={t("evaluations.keywordsPlaceholder")}
                 disabled={running || shouldRefuse}
               />
               <p className="mt-1.5 text-xs text-slate-500">
-                All must appear for an automatic pass.
+                {t("evaluations.keywordsRule")}
               </p>
             </div>
 
             <div>
-              <span className="mb-1.5 block text-sm font-medium">Expectation</span>
+              <span className="mb-1.5 block text-sm font-medium">
+                {t("evaluations.expectation")}
+              </span>
               <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
                 <input
                   type="checkbox"
@@ -307,24 +321,25 @@ export function EvaluationsPanel({
                   disabled={running}
                   className={CHECKBOX}
                 />
-                Should refuse (not in the selected evidence)
+                {t("evaluations.shouldRefuse")}
               </label>
               <p className="mt-1.5 text-xs text-slate-500">
-                Passes only if the assistant declines to answer.
+                {t("evaluations.shouldRefuseRule")}
               </p>
             </div>
           </div>
 
           <div>
             <label htmlFor="eval-notes" className="mb-1.5 block text-sm font-medium">
-              Notes <span className="font-normal text-slate-500">(optional)</span>
+              {t("evaluations.notes")}{" "}
+              <span className="font-normal text-slate-500">{t("evaluations.optional")}</span>
             </label>
             <Textarea
               id="eval-notes"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="What a correct answer should mention."
+              placeholder={t("evaluations.notesPlaceholder")}
               disabled={running}
             />
           </div>
@@ -339,20 +354,20 @@ export function EvaluationsPanel({
               {runningAll ? (
                 <>
                   <Spinner />
-                  Re-running {rows.length}…
+                  {t("evaluations.rerunning", { count: rows.length })}
                 </>
               ) : (
-                `Re-run all (${rows.length})`
+                t("evaluations.rerunAll", { count: rows.length })
               )}
             </Button>
             <Button type="submit" disabled={running || question.trim().length < 3}>
               {running ? (
                 <>
                   <Spinner className="border-white/40 border-t-white" />
-                  Running…
+                  {t("evaluations.running")}
                 </>
               ) : (
-                "Add & run case"
+                t("evaluations.addRun")
               )}
             </Button>
           </div>
@@ -363,8 +378,8 @@ export function EvaluationsPanel({
 
       {rows.length === 0 ? (
         <EmptyState
-          title="No evaluation cases yet"
-          description="Add a question with expected keywords, or mark it as one the selected evidence cannot answer. Cases are auto-scored and can be re-run as a regression suite."
+          title={t("evaluations.emptyTitle")}
+          description={t("evaluations.emptyBody")}
         />
       ) : (
         <div className="space-y-3">
@@ -374,38 +389,44 @@ export function EvaluationsPanel({
                 <p className="text-sm font-medium">{row.question}</p>
                 <div className="flex items-center gap-2">
                   {row.shouldRefuse ? (
-                    <Badge tone="info">expects refusal</Badge>
+                    <Badge tone="info">{t("evaluations.expectsRefusal")}</Badge>
                   ) : null}
                   {row.autoScore !== null ? (
                     <Badge tone={row.autoScore ? "success" : "danger"}>
-                      auto {row.autoScore ? "pass" : "fail"}
+                      {row.autoScore
+                        ? t("evaluations.autoPassBadge")
+                        : t("evaluations.autoFailBadge")}
                     </Badge>
                   ) : (
-                    <Badge tone={RESULT_TONE[row.result]}>{row.result}</Badge>
+                    <Badge tone={RESULT_TONE[row.result]}>
+                      {t(`evaluations.results.${row.result}`)}
+                    </Badge>
                   )}
                 </div>
               </div>
 
               <p className="mt-1 text-xs text-slate-500">
-                {formatDate(row.createdAt)}
-                {row.modelName ? ` · ${row.modelName}` : ""}
-                {` · ${row.project?.name ?? "All documents"}`}
-                {row.groundingScope === "project_combined"
-                  ? " · documents + current records"
-                  : " · document grounding"}
-                {row.latencyMs !== null
-                  ? ` · ${(row.latencyMs / 1000).toFixed(1)}s`
-                  : ""}
-                {row.confidence ? ` · ${row.confidence}` : ""}
-                {` · ${row.citationCount} citation${row.citationCount === 1 ? "" : "s"}`}
-                {row.retrievedChunkIds
-                  ? ` · ${row.retrievedChunkIds.length} chunks`
-                  : ""}
+                {[
+                  formatDate(row.createdAt, dateLocale, timeZone),
+                  row.modelName,
+                  row.project?.name ?? t("evaluations.allDocumentsShort"),
+                  row.groundingScope === "project_combined"
+                    ? t("evaluations.combined")
+                    : t("evaluations.documentGrounding"),
+                  row.latencyMs !== null ? `${(row.latencyMs / 1000).toFixed(1)}s` : null,
+                  row.confidence ? t(`confidence.${row.confidence}`) : null,
+                  t("evaluations.citations", { count: row.citationCount }),
+                  row.retrievedChunkIds
+                    ? t("evaluations.chunks", { count: row.retrievedChunkIds.length })
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
 
               {row.expectedKeywords.length > 0 ? (
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-slate-500">Expects:</span>
+                  <span className="text-xs text-slate-500">{t("evaluations.expects")}</span>
                   {row.expectedKeywords.map((keyword) => {
                     const found = (row.actualAnswer ?? "")
                       .toLowerCase()
@@ -422,7 +443,7 @@ export function EvaluationsPanel({
               {row.expectedAnswerNotes ? (
                 <div className="mt-3">
                   <h3 className="text-xs font-semibold text-slate-500 uppercase">
-                    Notes
+                    {t("evaluations.notesHeading")}
                   </h3>
                   <p className="mt-1 text-sm text-pretty text-slate-600">
                     {row.expectedAnswerNotes}
@@ -432,7 +453,7 @@ export function EvaluationsPanel({
 
               <div className="mt-3">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase">
-                  Actual
+                  {t("evaluations.actual")}
                 </h3>
                 <p className="mt-1 text-sm whitespace-pre-wrap text-pretty text-slate-700">
                   {row.actualAnswer ?? "—"}
@@ -441,7 +462,7 @@ export function EvaluationsPanel({
 
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
                 <span className="text-xs text-slate-500">
-                  {row.autoScore !== null ? "Override:" : "Mark as"}
+                  {row.autoScore !== null ? t("evaluations.override") : t("evaluations.markAs")}
                 </span>
                 <Button
                   size="sm"
@@ -449,7 +470,7 @@ export function EvaluationsPanel({
                   aria-pressed={row.result === "pass"}
                   onClick={() => review(row.id, "pass")}
                 >
-                  Pass
+                  {t("evaluations.pass")}
                 </Button>
                 <Button
                   size="sm"
@@ -457,7 +478,7 @@ export function EvaluationsPanel({
                   aria-pressed={row.result === "fail"}
                   onClick={() => review(row.id, "fail")}
                 >
-                  Fail
+                  {t("evaluations.fail")}
                 </Button>
                 <Button
                   size="sm"
@@ -465,7 +486,7 @@ export function EvaluationsPanel({
                   className="ml-auto text-red-600 hover:bg-red-50"
                   onClick={() => remove(row.id)}
                 >
-                  Delete
+                  {t("common.delete")}
                 </Button>
               </div>
             </Card>

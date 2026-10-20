@@ -12,7 +12,7 @@ import {
   SectionHeader,
   Spinner,
 } from "@/components/ui";
-import { useDateLocale, useT } from "@/components/i18n-provider";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import {
   reportItemStatus,
   statusReportToMarkdown,
@@ -88,6 +88,7 @@ function ReportView({ run }: { run: ReportRun }) {
   const [copied, setCopied] = useState(false);
   const t = useT();
   const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
   if (!run.report) return null;
   const report = run.report;
 
@@ -166,7 +167,7 @@ function ReportView({ run }: { run: ReportRun }) {
         </p>
         <p className="mt-3 text-xs text-slate-400">
           {t("reports.generatedMeta", {
-            date: formatDate(run.createdAt, dateLocale),
+            date: formatDate(run.createdAt, dateLocale, timeZone),
             model: run.model,
             latency:
               run.latencyMs === null
@@ -213,7 +214,7 @@ function ReportView({ run }: { run: ReportRun }) {
                   {citation.title}
                 </Link>
                 <span className="ml-auto text-xs text-slate-400">
-                  {t("reports.observed", { date: formatDate(citation.observedAt, dateLocale) })}
+                  {t("reports.observed", { date: formatDate(citation.observedAt, dateLocale, timeZone) })}
                 </span>
               </div>
               <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-slate-600 italic">
@@ -242,6 +243,7 @@ export function StatusReportsPanel({
   const [error, setError] = useState<string | null>(null);
   const t = useT();
   const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
   const selected = useMemo(
     () => runs.find((run) => run.id === selectedId && run.report) ?? null,
     [runs, selectedId],
@@ -318,7 +320,7 @@ export function StatusReportsPanel({
                 }`}
               >
                 <span className="block font-medium">
-                  {formatDate(run.createdAt, dateLocale)}
+                  {formatDate(run.createdAt, dateLocale, timeZone)}
                 </span>
                 <span className={selectedId === run.id ? "text-slate-300" : "text-slate-500"}>
                   {run.report

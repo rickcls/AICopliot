@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "@/components/ui";
 
 /**
@@ -18,6 +19,7 @@ export function FeedbackButtons({
 }) {
   const [rating, setRating] = useState<"up" | "down" | null>(initialRating);
   const [failed, setFailed] = useState(false);
+  const t = useT();
 
   async function send(value: "up" | "down") {
     const previous = rating;
@@ -38,12 +40,12 @@ export function FeedbackButtons({
 
   return (
     <div className="flex items-center gap-1">
-      <span className="mr-1 text-xs text-slate-500">Was this helpful?</span>
+      <span className="mr-1 text-xs text-slate-500">{t("chat.feedback.question")}</span>
       <Button
         variant={rating === "up" ? "secondary" : "ghost"}
         size="icon"
         aria-pressed={rating === "up"}
-        aria-label="Helpful"
+        aria-label={t("chat.feedback.helpful")}
         onClick={() => send("up")}
       >
         <ThumbsUp className="size-3.5" aria-hidden />
@@ -52,16 +54,16 @@ export function FeedbackButtons({
         variant={rating === "down" ? "secondary" : "ghost"}
         size="icon"
         aria-pressed={rating === "down"}
-        aria-label="Not helpful"
+        aria-label={t("chat.feedback.notHelpful")}
         onClick={() => send("down")}
       >
         <ThumbsDown className="size-3.5" aria-hidden />
       </Button>
       {rating && !failed ? (
-        <span className="text-xs text-slate-500">Thanks.</span>
+        <span className="text-xs text-slate-500">{t("chat.feedback.thanks")}</span>
       ) : null}
       {failed ? (
-        <span className="text-xs text-red-600">Could not save feedback.</span>
+        <span className="text-xs text-red-600">{t("chat.feedback.failed")}</span>
       ) : null}
     </div>
   );

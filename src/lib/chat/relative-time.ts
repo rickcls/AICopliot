@@ -6,9 +6,9 @@ import type { Translate } from "@/lib/i18n/translate";
  * Takes `now` as an argument rather than calling `Date.now()`, because the rail
  * renders inside a client component: computing "2h" from a different instant at
  * hydration than at server render is a mismatch, and one that only shows up
- * across a bucket boundary. Older entries use an explicit locale and UTC for the
- * same reason — `undefined` would resolve to the server's locale on one pass and
- * the browser's on the other.
+ * across a bucket boundary. Older entries use an explicit locale and the
+ * viewer's zone for the same reason — `undefined` would resolve to the server's
+ * on one pass and the browser's on the other.
  */
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -19,6 +19,7 @@ export function formatThreadTime(
   nowIso: string,
   t: Translate,
   dateLocale: string,
+  timeZone = "UTC",
 ): string {
   const elapsed = new Date(nowIso).getTime() - new Date(iso).getTime();
 
@@ -31,6 +32,6 @@ export function formatThreadTime(
   return new Date(iso).toLocaleDateString(dateLocale, {
     day: "numeric",
     month: "short",
-    timeZone: "UTC",
+    timeZone,
   });
 }

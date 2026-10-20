@@ -29,7 +29,7 @@ import {
 } from "@/lib/pm/rules";
 import { getLatestStatusReport } from "@/lib/reports/service";
 import { cn, formatDate, formatDay } from "@/lib/utils";
-import { getViewerToday } from "@/lib/viewer";
+import { getViewerTimeZone, getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +54,9 @@ function OverviewCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="flex flex-col p-5">
+    // min-w-0 for the same reason as the dashboard's lists: a grid item is
+    // otherwise as wide as its longest truncated title.
+    <Card className="flex min-w-0 flex-col p-5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
         {href ? (
@@ -187,7 +189,12 @@ export default async function ProjectOverviewPage({
   if (!project) notFound();
 
   // The viewer's day: every use below is a day comparison.
-  const [now, t, locale] = await Promise.all([getViewerToday(), getT(), getLocale()]);
+  const [now, t, locale, timeZone] = await Promise.all([
+    getViewerToday(),
+    getT(),
+    getLocale(),
+    getViewerTimeZone(),
+  ]);
   const dateLocale = intlLocale(locale);
   const [
     summary,
@@ -586,7 +593,7 @@ export default async function ProjectOverviewPage({
                     {t("overview.reportMeta", {
                       start: report.period.start,
                       end: report.period.end,
-                      date: formatDate(latestReport.createdAt, dateLocale),
+                      date: formatDate(latestReport.createdAt, dateLocale, timeZone),
                     })}
                   </div>
                   <p className="line-clamp-3 text-sm text-slate-700">

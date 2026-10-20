@@ -13,6 +13,7 @@ import {
   requirementsToMarkdown,
 } from "@/lib/pm/requirements-export";
 import { requirementSelect } from "@/lib/pm/select";
+import { getViewerToday } from "@/lib/viewer";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -54,7 +55,8 @@ export async function GET(request: Request, { params }: Params) {
     });
 
     const t = translatorFor(await getFileLocale(search.get("lang")));
-    const now = new Date();
+    // Only ever printed as a date, so it is the viewer's day (see the print page).
+    const now = await getViewerToday();
     const body = pack
       ? packToMarkdown(pack, project.name, buildPack(pack, requirements, t), now, t)
       : format === "csv"

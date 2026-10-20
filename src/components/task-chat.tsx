@@ -114,6 +114,7 @@ export function TaskChat({
           );
         },
       },
+      t,
     );
     if (outcome === "superseded") return;
     setPending(false);

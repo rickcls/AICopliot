@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TAGS, validateDocumentLabel, type ModelDocumentLabel } from "@/lib/documents/label";
+import {
+  MAX_TAGS,
+  stripSourceLabels,
+  validateDocumentLabel,
+  type ModelDocumentLabel,
+} from "@/lib/documents/label";
 import { snippetAround } from "@/lib/documents/snippet";
 
 const base: ModelDocumentLabel = {
@@ -66,6 +71,27 @@ describe("validateDocumentLabel", () => {
     expect(label.title).toBe("服務器升級報價");
     expect(label.summary).toBe("這是報價單。");
     expect(label.tags).toEqual(["報價"]);
+  });
+});
+
+describe("stripSourceLabels", () => {
+  it("removes labels written into the summary, which is shown as plain text", () => {
+    expect(stripSourceLabels("根據[S1]，此文件記錄 ABC 公司的報價需求。")).toBe("此文件記錄 ABC 公司的報價需求。");
+    expect(stripSourceLabels("報價須包括硬件（S1、S2）及培訓 [S3]。")).toBe("報價須包括硬件及培訓。");
+    expect(stripSourceLabels("According to S1, the quote is due on 30 October [S2].")).toBe(
+      "the quote is due on 30 October.",
+    );
+  });
+
+  it("leaves an S-number that is the document's own wording", () => {
+    expect(stripSourceLabels("Covers the S1 and S2 server classes.")).toBe(
+      "Covers the S1 and S2 server classes.",
+    );
+  });
+
+  it("is applied to validated summaries", () => {
+    const label = validateDocumentLabel({ ...base, summary: "A quotation from ABC Ltd [S1]." }, ctx);
+    expect(label.summary).toBe("A quotation from ABC Ltd.");
   });
 });
 

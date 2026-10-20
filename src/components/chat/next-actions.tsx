@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { nextActionsFor } from "@/lib/chat/next-actions";
+import { useT } from "@/components/i18n-provider";
 import { FOCUS_RING } from "@/components/ui";
 import type { Citation } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
@@ -19,13 +20,14 @@ export function NextActions({
 }: {
   citations: Citation[];
 }) {
-  const actions = nextActionsFor(citations);
+  const t = useT();
+  const actions = nextActionsFor(citations, t);
   if (actions.length === 0) return null;
 
   return (
     <div className="mt-4">
       <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-        Next
+        {t("chat.next.title")}
       </h3>
       <div className="mt-2 flex flex-wrap gap-2">
         {actions.map((action) => (

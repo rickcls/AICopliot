@@ -37,7 +37,9 @@ function WorkList({
   dateLocale: string;
 }) {
   return (
-    <Card id={id} className="scroll-mt-6 p-5">
+    // min-w-0: a grid item is otherwise at least as wide as its longest task
+    // title, truncated or not, which pushed the page sideways at phone width.
+    <Card id={id} className="min-w-0 scroll-mt-6 p-5">
       <h2 className="text-sm font-semibold">{title}</h2>
       {tasks.length === 0 ? (
         <p className="mt-2 text-sm text-slate-400">{empty}</p>

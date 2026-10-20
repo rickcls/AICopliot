@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/i18n-provider";
 import { parseAnswer, type Inline } from "@/lib/chat/markdown";
 import { FOCUS_RING } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -25,11 +26,12 @@ function CitationChip({
   label: string;
 }) {
   const targetId = sourceAnchorId(messageId, label);
+  const t = useT();
 
   return (
     <a
       href={`#${targetId}`}
-      aria-label={`Jump to source ${label}`}
+      aria-label={t("chat.source.jump", { label })}
       onClick={(event) => {
         // A bare hash link pushes a history entry and jumps abruptly; the back
         // button then walks through every citation the reader glanced at.

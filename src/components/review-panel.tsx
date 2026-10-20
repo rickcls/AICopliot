@@ -22,7 +22,7 @@ import {
 } from "@/components/ui";
 import { Check, ChevronRight, X } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useDateLocale, useT } from "@/components/i18n-provider";
+import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import type { MessageKey, Translate } from "@/lib/i18n/translate";
 import { worstRiskLevel } from "@/lib/pm/filters";
 import { cn, formatDate, formatDay } from "@/lib/utils";
@@ -389,6 +389,7 @@ function ProposalRow({
   const idPrefix = `proposal-${proposal.kind}-${proposal.id}`;
   const t = useT();
   const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
   const title = headline(proposal, t);
   const label = (family: string) => (value: string) => t(`${family}.${value}` as MessageKey);
 
@@ -809,7 +810,7 @@ function ProposalRow({
               ) : null}
               {proposal.reviewedAt ? (
                 <Field name={t("planReview.reviewed")}>
-                  {formatDate(proposal.reviewedAt, dateLocale)}
+                  {formatDate(proposal.reviewedAt, dateLocale, timeZone)}
                 </Field>
               ) : null}
             </DescriptionList>
@@ -849,6 +850,7 @@ export function ReviewPanel({
   const confirm = useConfirm();
   const t = useT();
   const dateLocale = useDateLocale();
+  const timeZone = useTimeZone();
 
   const run = initialRuns.find((candidate) => candidate.id === runId) ?? initialRuns[0];
   const proposals = useMemo<Proposal[]>(
@@ -1053,7 +1055,7 @@ export function ReviewPanel({
               >
                 {initialRuns.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
-                    {formatDate(candidate.createdAt, dateLocale)} ·{" "}
+                    {formatDate(candidate.createdAt, dateLocale, timeZone)} ·{" "}
                     {t(`runStatus.${candidate.status}`)}
                   </option>
                 ))}

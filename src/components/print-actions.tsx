@@ -1,11 +1,15 @@
 "use client";
 
 import { Download, Languages, Printer } from "lucide-react";
-import { Button, LinkButton } from "@/components/ui";
+import { Button, LinkButton, buttonClasses } from "@/components/ui";
 
 /**
  * Screen-only controls above a printable pack. The labels arrive from the
  * page, which knows the viewer's language even when the pack is in the other.
+ *
+ * The download is a plain `<a>`, not a `Link`: the router prefetched the
+ * export route as if it were a page, which logged 400s and kept the page from
+ * ever settling. The other two are real navigations and stay links.
  */
 export function PrintActions({
   backHref,
@@ -28,10 +32,10 @@ export function PrintActions({
         <Languages className="size-3.5" aria-hidden />
         {labels.otherLanguage}
       </LinkButton>
-      <LinkButton href={markdownHref} variant="secondary" size="sm" download>
+      <a href={markdownHref} download className={buttonClasses({ variant: "secondary", size: "sm" })}>
         <Download className="size-3.5" aria-hidden />
         {labels.markdown}
-      </LinkButton>
+      </a>
       <Button type="button" size="sm" onClick={() => window.print()}>
         <Printer className="size-3.5" aria-hidden />
         {labels.print}
