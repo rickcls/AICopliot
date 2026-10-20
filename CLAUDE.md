@@ -686,6 +686,14 @@ earliest rule first: overdue, due today, blocked, due in 7 days, later. A
 blocked task due today is "due today" — the deadline is the fact that needs
 attention — and the row still says it is blocked. Empty buckets are not drawn.
 
+**Undated work is listed, not guessed.** A task with no due date never reaches
+a dated bucket, so it used to be only the "N more" count at the foot of the
+page. `undatedToShow()` lists the five most important (then most recently
+touched) under "No due date", each with an inline date that saves through the
+ordinary task PATCH on submit — not on change, because a date field reports a
+value as each part is filled and typing a year would save 0002 first. The AI is
+never asked to fill a date in; this is where the person does.
+
 **Work that has gone quiet asks for a check-in.** `isStale()` in `rules.ts`
 is the only definition: open, and no task write or comment by anyone for
 `STALE_DAYS` (5) days, unless the viewer snoozed it through today.
@@ -1214,6 +1222,11 @@ competing objects with the description the smallest thing on screen.
   facts rather than a wall of inputs — same as the reference.
 - **Start and due share one row.** They describe one span, and separate rows
   spent two labels saying so.
+- **The start date shows only where it means something.** It draws a bar on
+  the timeline, which only delivery projects have, so elsewhere the row is the
+  due date alone. A task that already has a start date keeps the field, so it
+  can still be seen and cleared, and the timeline hint shows only with a
+  timeline.
 - **The timeline hint only renders once a date exists.** Explaining how dates
   draw on the timeline to someone who has entered none is a line earning
   nothing.

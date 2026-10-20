@@ -170,6 +170,7 @@ export function TaskForm({
   initialFill = null,
   saving,
   editing,
+  timeline,
   onChange,
   onDocumentChange,
   onCancel,
@@ -187,6 +188,8 @@ export function TaskForm({
   initialFill?: FillSummary | null;
   saving: boolean;
   editing: boolean;
+  /** Whether the project draws a timeline (delivery tools on). */
+  timeline: boolean;
   onChange: (draft: TaskDraft) => void;
   onDocumentChange: (document: ProjectDocumentOption) => void;
   onCancel: () => void;
@@ -197,6 +200,11 @@ export function TaskForm({
   const [priorityTouched, setPriorityTouched] = useState(
     () => initialFill?.filled.includes("priority") ?? false,
   );
+  // A start date only draws a bar on the timeline, which only delivery
+  // projects have; elsewhere it is one more field to skip. A task that already
+  // has one keeps it visible, so it can still be seen and cleared.
+  const [hadStart] = useState(() => draft.startDate !== "");
+  const showStart = timeline || hadStart || draft.startDate !== "";
   const [filling, setFilling] = useState(false);
   const [fillError, setFillError] = useState<string | null>(null);
   const [fillSummary, setFillSummary] = useState<FillSummary | null>(initialFill);
@@ -427,27 +435,31 @@ export function TaskForm({
 
             {/* Start and due share one row: they are one span, and splitting
                 them cost a whole row to say so twice. */}
-            <label htmlFor="task-start" className={ROW_LABEL}>
-              {t("tasks.fields.dates")}
+            <label htmlFor={showStart ? "task-start" : "task-due"} className={ROW_LABEL}>
+              {showStart ? t("tasks.fields.dates") : t("tasks.fields.dueDate")}
             </label>
             <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
               <span aria-hidden className={ROW_ICON} />
-              <Input
-                id="task-start"
-                type="date"
-                className={cn(QUIET_CONTROL, "max-w-none")}
-                value={draft.startDate}
-                onChange={(event) =>
-                  onChange({ ...draft, startDate: event.target.value })
-                }
-                disabled={busy}
-                aria-label={t("tasks.fields.startDate")}
-                aria-invalid={datesInverted || undefined}
-                aria-describedby={datesInverted ? "task-date-error" : undefined}
-              />
-              <span aria-hidden className="text-slate-300">
-                →
-              </span>
+              {showStart ? (
+                <>
+                  <Input
+                    id="task-start"
+                    type="date"
+                    className={cn(QUIET_CONTROL, "max-w-none")}
+                    value={draft.startDate}
+                    onChange={(event) =>
+                      onChange({ ...draft, startDate: event.target.value })
+                    }
+                    disabled={busy}
+                    aria-label={t("tasks.fields.startDate")}
+                    aria-invalid={datesInverted || undefined}
+                    aria-describedby={datesInverted ? "task-date-error" : undefined}
+                  />
+                  <span aria-hidden className="text-slate-300">
+                    →
+                  </span>
+                </>
+              ) : null}
               <Input
                 id="task-due"
                 type="date"
@@ -524,7 +536,7 @@ export function TaskForm({
             >
               {t("tasks.fields.datesInverted")}
             </p>
-          ) : draft.startDate || draft.dueDate ? (
+          ) : timeline && (draft.startDate || draft.dueDate) ? (
             // Only once a date exists. Explaining how dates draw on the
             // timeline to someone who has not entered one is a line of text
             // earning nothing.

@@ -4,7 +4,7 @@ import {
   officialRecordWhere,
   overdueTaskWhere,
 } from "@/lib/pm/rules";
-import { bucketMyTasks, type TodayTask } from "@/lib/pm/today";
+import { bucketMyTasks, undatedToShow, type TodayTask } from "@/lib/pm/today";
 
 const today = new Date("2026-10-16T00:00:00Z");
 
@@ -83,5 +83,30 @@ describe("assignedTo", () => {
     expect(where).toEqual({
       AND: [base, { OR: [{ assigneeId: "u1" }, { assigneeId: null }] }],
     });
+  });
+});
+
+describe("undatedToShow", () => {
+  const touched = (id: string, priority: TodayTask["priority"], updated: string) => ({
+    ...task(id, null, { priority }),
+    updatedAt: new Date(updated),
+  });
+
+  it("lists only undated work, most important first, then most recently touched", () => {
+    const later = [
+      touched("low-new", "low", "2026-10-15T09:00:00Z"),
+      touched("high-old", "high", "2026-10-01T09:00:00Z"),
+      touched("high-new", "high", "2026-10-15T09:00:00Z"),
+      { ...task("dated", "2026-11-30"), updatedAt: new Date("2026-10-15T09:00:00Z") },
+    ];
+
+    expect(undatedToShow(later).map((row) => row.id)).toEqual(["high-new", "high-old", "low-new"]);
+  });
+
+  it("shows a handful, leaving the rest to the later count", () => {
+    const later = Array.from({ length: 8 }, (_, index) =>
+      touched(`t${index}`, "medium", `2026-10-${String(index + 1).padStart(2, "0")}T00:00:00Z`),
+    );
+    expect(undatedToShow(later)).toHaveLength(5);
   });
 });

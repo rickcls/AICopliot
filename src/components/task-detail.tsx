@@ -90,6 +90,7 @@ export function TaskDetail({
   onTaskChange,
   onError,
   onOpenTask,
+  timeline,
 }: {
   task: TaskRow;
   todayIso: string;
@@ -112,9 +113,15 @@ export function TaskDetail({
   onError: (message: string | null) => void;
   /** Switches the panel to another task on the board. */
   onOpenTask: (taskId: string) => void;
+  /** Whether the project draws a timeline (delivery tools on). */
+  timeline: boolean;
 }) {
   const [draft, setDraft] = useState<TaskDraft>(() => draftFrom(task));
   const [saving, setSaving] = useState(false);
+  // Same rule as the form: the start date shows where there is a timeline,
+  // or where the task already has one.
+  const [hadStart] = useState(() => task.startDate !== null);
+  const showStart = timeline || hadStart || draft.startDate !== "";
   const [filling, setFilling] = useState(false);
   const t = useT();
   const [tab, setTab] = useState<"details" | "ai" | "approach">("details");
@@ -524,31 +531,35 @@ export function TaskDetail({
               </Select>
             </div>
 
-            <label htmlFor="detail-start" className={ROW_LABEL}>
-              {t("tasks.fields.dates")}
+            <label htmlFor={showStart ? "detail-start" : "detail-due"} className={ROW_LABEL}>
+              {showStart ? t("tasks.fields.dates") : t("tasks.fields.dueDate")}
             </label>
             <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
               <span aria-hidden className={ROW_ICON} />
-              <Input
-                id="detail-start"
-                type="date"
-                className={cn(QUIET_CONTROL, "max-w-none px-2")}
-                value={draft.startDate}
-                disabled={disabled}
-                aria-label={t("tasks.fields.startDate")}
-                aria-invalid={datesInverted || undefined}
-                onChange={(event) =>
-                  setDraft({ ...draft, startDate: event.target.value })
-                }
-                onBlur={(event) => {
-                  if (event.target.value === (task.startDate?.slice(0, 10) ?? ""))
-                    return;
-                  void save({ startDate: event.target.value });
-                }}
-              />
-              <span aria-hidden className="text-slate-300">
-                →
-              </span>
+              {showStart ? (
+                <>
+                  <Input
+                    id="detail-start"
+                    type="date"
+                    className={cn(QUIET_CONTROL, "max-w-none px-2")}
+                    value={draft.startDate}
+                    disabled={disabled}
+                    aria-label={t("tasks.fields.startDate")}
+                    aria-invalid={datesInverted || undefined}
+                    onChange={(event) =>
+                      setDraft({ ...draft, startDate: event.target.value })
+                    }
+                    onBlur={(event) => {
+                      if (event.target.value === (task.startDate?.slice(0, 10) ?? ""))
+                        return;
+                      void save({ startDate: event.target.value });
+                    }}
+                  />
+                  <span aria-hidden className="text-slate-300">
+                    →
+                  </span>
+                </>
+              ) : null}
               <Input
                 id="detail-due"
                 type="date"

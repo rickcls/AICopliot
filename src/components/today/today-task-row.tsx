@@ -39,7 +39,35 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<Action | null>(null);
+  const [due, setDue] = useState<string | null>(null);
+  const [savingDue, setSavingDue] = useState(false);
   const priority = t(`priority.${task.priority}`);
+
+  // Saved on submit, not on change: a date field reports a value as soon as
+  // each part is filled, so typing a year would save 0002-10-21 first.
+  async function saveDue(value: string) {
+    setSavingDue(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dueDate: value }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(t("today.dueSetFailed"), data.error);
+        return;
+      }
+      toast.success(t("today.dueSet"));
+      setDue(null);
+      // The task moves to the bucket its new date belongs in.
+      router.refresh();
+    } catch {
+      toast.error(t("common.couldNotReach"));
+    } finally {
+      setSavingDue(false);
+    }
+  }
 
   async function report(action: Action) {
     setBusy(action);
@@ -93,7 +121,41 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
             <span className={cn("tabular-nums", task.overdue ? "font-medium text-red-700" : undefined)}>
               {task.dueLabel}
             </span>
-          ) : null}
+          ) : due === null ? (
+            <button
+              type="button"
+              onClick={() => setDue("")}
+              className={cn(
+                "rounded-md bg-amber-50 px-2 py-0.5 font-medium text-amber-800 ring-1 ring-amber-200 ring-inset hover:bg-amber-100",
+                FOCUS_RING,
+              )}
+            >
+              {t("today.noDueDate")}
+            </button>
+          ) : (
+            <form
+              className="flex items-center gap-1"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (due) void saveDue(due);
+              }}
+            >
+              <Input
+                type="date"
+                value={due}
+                disabled={savingDue}
+                aria-label={t("today.setDueLabel", { title: task.title })}
+                onChange={(event) => setDue(event.target.value)}
+                className="h-7 w-auto px-2 text-xs"
+              />
+              <Button type="submit" size="sm" disabled={savingDue || !due}>
+                {t("today.setDue")}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" disabled={savingDue} onClick={() => setDue(null)}>
+                {t("common.cancel")}
+              </Button>
+            </form>
+          )}
         </span>
         <button
           type="button"

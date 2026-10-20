@@ -113,3 +113,22 @@ export function rankTasks<T extends RankableTask>(tasks: readonly T[], today: Da
     .sort((a, b) => b.score - a.score || byDueThenPriority(a.task, b.task))
     .map((entry) => entry.task);
 }
+
+/** How many undated tasks Today lists; the rest stay in the "later" count. */
+export const UNDATED_SHOWN = 5;
+
+/**
+ * Open tasks with no due date, most important first and then most recently
+ * touched — usually ones just written down from a note. Undated work never
+ * reaches a dated bucket, so without this list it was only ever a number at
+ * the bottom of the page, and the AI is never asked to guess a date for it.
+ */
+export function undatedToShow<T extends TodayTask & { updatedAt: Date }>(
+  later: readonly T[],
+  limit: number = UNDATED_SHOWN,
+): T[] {
+  return later
+    .filter((task) => task.dueDate === null)
+    .sort((a, b) => byPriority(a, b) || b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, limit);
+}
