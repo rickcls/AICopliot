@@ -20,7 +20,7 @@ import {
   Paperclip,
   Sparkles,
 } from "lucide-react";
-import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
+import { UPLOAD_EXTENSIONS, asUploadable, mailFileErrorKey } from "@/lib/mail/document";
 import { TraceabilityMatrix } from "@/components/traceability-matrix";
 import {
   Badge,
@@ -685,10 +685,20 @@ export function RequirementsPanel({
    * Labelling runs afterwards and is not waited on: extraction reads the
    * indexed text, not the label.
    */
-  async function uploadForExtraction(file: File) {
-    setUploading(file.name);
+  async function uploadForExtraction(chosen: File) {
+    setUploading(chosen.name);
     setError(null);
     try {
+      // A client's email is a common brief; it is read here and uploaded as
+      // its Markdown document, like every other uploader.
+      let file: File;
+      try {
+        file = await asUploadable(chosen);
+      } catch (caught) {
+        const key = mailFileErrorKey(caught);
+        setError(key ? t(key) : t("tasks.documents.uploadFailed"));
+        return;
+      }
       const formData = new FormData();
       formData.append("file", file);
       formData.append("projectId", projectId);
@@ -744,7 +754,7 @@ export function RequirementsPanel({
         {t("requirements.extract.upload")}
         <input
           type="file"
-          accept={SUPPORTED_EXTENSIONS.join(",")}
+          accept={UPLOAD_EXTENSIONS.join(",")}
           className="sr-only"
           disabled={uploading !== null || extracting}
           onChange={(event) => {

@@ -976,6 +976,17 @@ is never uploaded; the email's text becomes a document only when a task is
 applied from it (see Capture notes). The capture box accepts a drop of any file
 it can read.
 
+**Every uploader takes email too** — the task panel and form, the Documents
+pages, and the requirements source upload — and the server still never sees
+an email file. `asUploadable()` (`src/lib/mail/document.ts`) reads a chosen
+`.eml`/`.msg` in the browser and uploads it as the Markdown document
+`mailDocument()` writes: named by the subject, sender and date above the
+message, quoted thread kept (a capture cuts it; a kept email is read later for
+its context). So the upload route's three-way check (invariant 6) and
+indexing are unchanged, and the parsers load only when an email is chosen.
+Attachments inside the email are not kept. A capture's email is saved through
+the same `mailDocument()`, so the two cannot name an email differently.
+
 **WhatsApp** (`src/lib/whatsapp/parse.ts`, pure) reads an exported chat — an
 iPhone's `.zip` holding `_chat.txt`, opened in the browser with `fflate` and
 never uploaded, or an Android `.txt` — or messages pasted into the capture box.
