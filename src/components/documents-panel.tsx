@@ -20,7 +20,7 @@ import {
 import type { DocumentRow } from "@/lib/documents/select";
 import { intlLocale } from "@/lib/i18n/locales";
 import type { MessageKey } from "@/lib/i18n/translate";
-import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
+import { UPLOAD_EXTENSIONS, asUploadable, mailFileErrorKey } from "@/lib/mail/document";
 import { matchesQuery } from "@/lib/pm/filters";
 import { cn, formatBytes, formatInstantDay } from "@/lib/utils";
 
@@ -151,8 +151,18 @@ export function DocumentsPanel({
     }
   }
 
-  /** Upload → index → label, for one file. Errors are collected, not thrown. */
-  async function uploadOne(file: File): Promise<string | null> {
+  /**
+   * Upload → index → label, for one file. Errors are collected, not thrown.
+   * An email is read here and uploaded as its Markdown document.
+   */
+  async function uploadOne(chosen: File): Promise<string | null> {
+    let file: File;
+    try {
+      file = await asUploadable(chosen);
+    } catch (caught) {
+      const key = mailFileErrorKey(caught);
+      return t("documents.uploadFailed", { name: chosen.name, error: key ? t(key) : t("common.couldNotReach") });
+    }
     const formData = new FormData();
     formData.append("file", file);
     if (uploadProjectId) formData.append("projectId", uploadProjectId);
@@ -316,7 +326,7 @@ export function DocumentsPanel({
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             {t("documents.uploadHint", {
-              types: SUPPORTED_EXTENSIONS.join(", "),
+              types: UPLOAD_EXTENSIONS.join(", "),
               size: MAX_UPLOAD_MB,
             })}
           </p>
@@ -348,7 +358,7 @@ export function DocumentsPanel({
             multiple
             className="sr-only"
             tabIndex={-1}
-            accept={SUPPORTED_EXTENSIONS.join(",")}
+            accept={UPLOAD_EXTENSIONS.join(",")}
             onChange={(event) => void uploadAll([...(event.target.files ?? [])])}
             disabled={progress !== null}
           />

@@ -5,7 +5,7 @@ import { FileText, Paperclip, X } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { Badge, QUIET_CONTROL, Select, Spinner, buttonClasses } from "@/components/ui";
 import type { ProjectDocumentOption } from "@/components/task-types";
-import { SUPPORTED_EXTENSIONS } from "@/lib/ingest/validate-upload";
+import { UPLOAD_EXTENSIONS, asUploadable, mailFileErrorKey } from "@/lib/mail/document";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
  * An upload here is an ordinary project upload — the same `/api/documents`
  * route, the same three-way validation, the same indexing — so the file
  * appears in the Documents tab and is searchable by chat like any other. The
- * task only holds a link to it.
+ * task only holds a link to it. An email (`.eml`, `.msg`) is read in the
+ * browser and uploaded as its Markdown document (`asUploadable`).
  *
  * The component never decides *when* a link is saved. The task form keeps ids
  * in its draft until Save; the detail panel saves each change at once.
@@ -47,10 +48,18 @@ export function TaskDocumentsField({
   const linkedIds = new Set(linked.map((document) => document.id));
   const unlinked = available.filter((document) => !linkedIds.has(document.id));
 
-  async function upload(file: File) {
+  async function upload(chosen: File) {
     setUploading(true);
     setError(null);
     try {
+      let file: File;
+      try {
+        file = await asUploadable(chosen);
+      } catch (caught) {
+        const key = mailFileErrorKey(caught);
+        setError(key ? t(key) : t("tasks.documents.uploadFailed"));
+        return;
+      }
       const formData = new FormData();
       formData.append("file", file);
       formData.append("projectId", projectId);
@@ -187,7 +196,7 @@ export function TaskDocumentsField({
           <input
             ref={fileInput}
             type="file"
-            accept={SUPPORTED_EXTENSIONS.join(",")}
+            accept={UPLOAD_EXTENSIONS.join(",")}
             className="sr-only"
             disabled={disabled || uploading}
             onChange={(event) => {
