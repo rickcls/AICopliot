@@ -596,6 +596,8 @@ export const checkInSchema = z.object({
 export const dayPlanRequestSchema = z.object({
   availableHours: z.number().min(0.5).max(14),
   note: z.string().trim().max(500).optional(),
+  /** Add a next batch to today's plan instead of replacing it. */
+  append: z.boolean().optional(),
 });
 
 export const createTasksFromStepsSchema = z.object({

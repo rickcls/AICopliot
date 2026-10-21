@@ -6,7 +6,10 @@ import { DayPlanError, planMyDay } from "@/lib/today/plan-service";
 
 export const maxDuration = 60;
 
-/** Suggests an order for today's work within the hours given. Changes no task. */
+/**
+ * Suggests an order for today's work within the hours given, or — with
+ * `append` — a next batch from the tasks not yet in today's plan. Changes no task.
+ */
 export async function POST(request: Request) {
   try {
     const access = await requireWorkspace();
@@ -22,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ plan });
   } catch (error) {
     if (error instanceof DayPlanError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     return handleRouteError(error, "POST /api/today/plan");
   }

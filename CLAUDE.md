@@ -723,6 +723,18 @@ stored per person per local day (`DailyPlan`, re-planning replaces it) and read
 back joined with each task's live status, so a finished task is ticked without
 the plan remembering anything.
 
+**A planned item is checked in where it is listed.** Each item has the same
+Update strip as a Today row (`CheckInStrip`, shared, snooze left out), and its
+mark comes from `planItemState()`: done, or *updated* once the task was written
+to or noted on after the item's `plannedAt`, else pending. Items carry
+`batch` and `plannedAt` inside the plan's JSON, so no column was added. When
+nothing is pending, the card offers **the next batch**: `append: true` leaves
+out every task already in today's plan, adds the new items after the old with
+the next batch number, and adds the hours — so a task is never planned twice in
+a day and the earlier batch stays visible as what was done. Re-planning still
+replaces the whole day. The Today page keys the card on its items' marks, so a
+check-in made on a Today row below also brings the plan's marks up to date.
+
 **"Mine" depends on the workspace.** In a workspace of one, every task is that
 person's, set assignee or not (`isSoloWorkspace`), so unassigned tasks are
 included. With colleagues, only tasks assigned to the viewer count.
