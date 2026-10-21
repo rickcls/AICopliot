@@ -9,6 +9,7 @@ import {
   Flag,
   ListPlus,
   MessageSquareText,
+  Paperclip,
   RefreshCw,
   Sparkles,
   Undo2,
@@ -119,6 +120,8 @@ export function ProposalList({
   readProposals,
   onChange,
   onRevise,
+  notice,
+  onApplied,
 }: {
   proposals: CaptureProposalView[];
   projects: ProjectOption[];
@@ -131,6 +134,10 @@ export function ProposalList({
   onChange: (proposals: CaptureProposalView[]) => void;
   /** Redoes one suggestion from what the person says is wrong; true once replaced. */
   onRevise?: (proposalId: string, instruction: string) => Promise<boolean>;
+  /** Something Apply does besides writing the task, said before it is pressed. */
+  notice?: string | null;
+  /** The whole apply response, for a parent that shows more than the list. */
+  onApplied?: (data: unknown) => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -168,6 +175,7 @@ export function ProposalList({
       }
       const updated = readProposals(data);
       if (updated) onChange(updated);
+      onApplied?.(data);
 
       const results = (data.results ?? []) as { proposalId: string; ok: boolean; error?: string }[];
       const failed = results.filter((result) => !result.ok);
@@ -224,6 +232,12 @@ export function ProposalList({
             {t("capture.applyAll", { count: unflagged.length })}
           </Button>
         </div>
+      ) : null}
+      {notice ? (
+        <p className="flex items-start gap-1.5 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+          <Paperclip className="mt-0.5 size-3.5 shrink-0 text-slate-400" aria-hidden />
+          {notice}
+        </p>
       ) : null}
       <ul className="divide-y divide-slate-100">
         {proposals.map((proposal) => (

@@ -260,6 +260,7 @@ export const zhHant = {
     saveBody: "文件會放入你的個人專案，工作區所有成員都可以搜尋和就此提問。記錄本身仍然只有你看到。",
     savedToast: "已另存為文件",
     openDocument: "打開文件",
+    emailAttachNotice: "套用新工作時，這封電郵會存成文件（放在你的個人專案）並附在工作上；能打開這項工作的人都可以打開這封電郵。",
     saveDocumentFailed: "無法另存為文件。",
     replyToEmail: "回覆此電郵",
     showNote: "顯示原文",

@@ -29,7 +29,9 @@ import { STALE_RUN_MESSAGE, STALE_RUN_MS } from "@/lib/generation/stale-runs";
 import { detectReplyLanguage } from "@/lib/language";
 import { getOrCreatePersonalProject } from "@/lib/pm/personal-project";
 import { getAssignableMembers } from "@/lib/pm/project";
+import { captureDocument } from "@/lib/capture/document";
 import { storeDocument } from "@/lib/documents/store";
+import { getStorage } from "@/lib/storage";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
 import { getChatProvider, type ChatProvider } from "@/lib/providers";
 import type { ChatMessageInput } from "@/lib/providers/types";
@@ -555,7 +557,14 @@ export async function decideProposal(
 // --- Apply ------------------------------------------------------------------
 
 export type ApplyResult =
-  | { proposalId: string; ok: true; taskId: string | null; commentId: string | null }
+  | {
+      proposalId: string;
+      ok: true;
+      taskId: string | null;
+      commentId: string | null;
+      /** An email saved as a document by this Apply, which the route then indexes. */
+      savedDocumentId?: string;
+    }
   | { proposalId: string; ok: false; status: number; error: string };
 
 function fail(proposalId: string, status: number, error: string): ApplyResult {
@@ -582,12 +591,25 @@ export async function applyProposal(
       state: true,
       payload: true,
       taskId: true,
-      capture: { select: { documentId: true } },
+      capture: {
+        select: { id: true, body: true, source: true, localDate: true, documentId: true },
+      },
     },
   });
   if (!proposal) return fail(proposalId, 404, "Suggestion not found");
   if (proposal.state !== "pending") {
     return fail(proposalId, 409, "This suggestion was already applied or dismissed");
+  }
+
+  // A task made from an email carries the email: it is saved as a document the
+  // first time one is applied (the list says so beside Apply) and linked to
+  // every task applied from it after. Failing to save it does not stop the task.
+  let documentId = proposal.capture.documentId;
+  let savedDocumentId: string | undefined;
+  if (!documentId && proposal.kind === "create_task" && proposal.capture.source === "email") {
+    const saved = await keepCaptureAsDocument(access, proposal.capture).catch(() => null);
+    documentId = saved?.documentId ?? null;
+    if (saved?.created) savedDocumentId = saved.documentId;
   }
 
   const result = await applyChange(
@@ -596,7 +618,7 @@ export async function applyProposal(
       kind: proposal.kind,
       payload: proposal.payload,
       taskId: proposal.taskId,
-      document: proposal.capture.documentId ? { id: proposal.capture.documentId } : null,
+      document: documentId ? { id: documentId } : null,
     },
     overrides,
     {
@@ -617,7 +639,13 @@ export async function applyProposal(
     now,
   );
   return result.ok
-    ? { proposalId, ok: true, taskId: result.taskId, commentId: result.commentId }
+    ? {
+        proposalId,
+        ok: true,
+        taskId: result.taskId,
+        commentId: result.commentId,
+        ...(savedDocumentId ? { savedDocumentId } : {}),
+      }
     : { proposalId, ...result };
 }
 
@@ -675,11 +703,57 @@ export async function getCaptureProjectOptions(access: CaptureAccess) {
 }
 
 /**
+ * Stores a capture as an ordinary document in the person's personal project
+ * and records it on the capture, so it is saved once. Two Applies racing on
+ * one email both store a file; the one that records second removes its own
+ * and links the first.
+ */
+async function keepCaptureAsDocument(
+  access: CaptureAccess,
+  capture: { id: string; body: string; source: string; localDate: Date },
+): Promise<{ documentId: string; created: boolean }> {
+  const personal = await getOrCreatePersonalProject(
+    access.workspaceId,
+    access.user,
+    (await getUserPreferences(access.userId))?.locale === "en" ? "en" : "zh-Hant",
+  );
+  const { filename, markdown } = captureDocument(capture);
+  const stored = await storeDocument({
+    workspaceId: access.workspaceId,
+    projectId: personal.id,
+    filename,
+    mimeType: "text/markdown",
+    buffer: Buffer.from(markdown, "utf8"),
+  });
+  if (!stored.ok) throw new CaptureError(stored.error, 422);
+
+  const { count } = await prisma.capture.updateMany({
+    where: { id: capture.id, ...scope(access), documentId: null },
+    data: { documentId: stored.id },
+  });
+  if (count === 1) return { documentId: stored.id, created: true };
+
+  const orphan = await prisma.document.findFirst({
+    where: { id: stored.id, workspaceId: access.workspaceId },
+    select: { storageKey: true },
+  });
+  await prisma.document.deleteMany({ where: { id: stored.id, workspaceId: access.workspaceId } });
+  if (orphan) await getStorage().delete(orphan.storageKey).catch(() => undefined);
+  const winner = await prisma.capture.findFirst({
+    where: { id: capture.id, ...scope(access) },
+    select: { documentId: true },
+  });
+  if (!winner?.documentId) throw new CaptureError("Capture not found", 404);
+  return { documentId: winner.documentId, created: false };
+}
+
+/**
  * Keeps a note as an ordinary document in the person's personal project, so it
- * is searchable and can ground answers. This is the one deliberate way a
+ * is searchable and can ground answers. One of the two deliberate ways a
  * private capture becomes workspace-visible — the person is told so before
- * they confirm — and it goes through `storeDocument`, the same validated path
- * as an upload. The capture remembers the document, so it is saved once.
+ * they confirm; the other is applying a task from an email, which says so
+ * beside Apply. It goes through `storeDocument`, the same validated path as an
+ * upload.
  */
 export async function saveCaptureAsDocument(access: CaptureAccess, captureId: string) {
   const capture = await prisma.capture.findFirst({
@@ -690,25 +764,6 @@ export async function saveCaptureAsDocument(access: CaptureAccess, captureId: st
   if (capture.documentId) {
     throw new CaptureError("This note already has a document", 409);
   }
-
-  const personal = await getOrCreatePersonalProject(
-    access.workspaceId,
-    access.user,
-    (await getUserPreferences(access.userId))?.locale === "en" ? "en" : "zh-Hant",
-  );
-  const day = capture.localDate.toISOString().slice(0, 10);
-  const stored = await storeDocument({
-    workspaceId: access.workspaceId,
-    projectId: personal.id,
-    filename: `note-${day}.md`,
-    mimeType: "text/markdown",
-    buffer: Buffer.from(`# ${day}\n\n${capture.body}\n`, "utf8"),
-  });
-  if (!stored.ok) throw new CaptureError(stored.error, 422);
-
-  await prisma.capture.updateMany({
-    where: { id: capture.id, ...scope(access), documentId: null },
-    data: { documentId: stored.id },
-  });
-  return { documentId: stored.id };
+  const { documentId } = await keepCaptureAsDocument(access, capture);
+  return { documentId };
 }

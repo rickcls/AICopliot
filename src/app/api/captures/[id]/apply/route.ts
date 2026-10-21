@@ -4,6 +4,10 @@ import { requireWorkspace } from "@/lib/auth-guard";
 import { applyCaptureSchema } from "@/lib/capture/schemas";
 import { applyProposals, getCapture } from "@/lib/capture/service";
 import { toCaptureView } from "@/lib/capture/view";
+import { runIngestion } from "@/lib/ingest/pipeline";
+
+// Applying a task from an email indexes the email it saves as a document.
+export const maxDuration = 60;
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -34,6 +38,13 @@ export async function POST(request: Request, { params }: Params) {
     const own = new Set(capture.proposals.map((proposal) => proposal.id));
     const items = parsed.data.items.filter((item) => own.has(item.proposalId));
     const results = await applyProposals(access, items);
+    // An email is short, so it is indexed here and is searchable at once, as
+    // "Save as document" does; a failure leaves it to the Retry on its page.
+    for (const result of results) {
+      if (result.ok && result.savedDocumentId) {
+        await runIngestion(result.savedDocumentId).catch(() => undefined);
+      }
+    }
 
     const updated = await getCapture(access, id);
     return NextResponse.json({
