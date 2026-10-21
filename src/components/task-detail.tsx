@@ -425,10 +425,9 @@ export function TaskDetail({
         >
           {error ? <ErrorState message={error} /> : null}
 
-          {/* A narrower label column than the create modal's: the panel is
-              448px wide, and 6rem of label left the two date inputs wrapping
-              onto separate lines with the arrow orphaned between them. Same
-              icon gutter as the create form so the controls share one edge. */}
+          {/* Narrower than the create modal's 6rem: the panel is 448px.
+              Each date is its own row, so the column only has to fit the
+              label. Same icon gutter as the form so the controls share one edge. */}
           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
             <label htmlFor="detail-status" className={ROW_LABEL}>
               {t("tasks.fields.status")}
@@ -531,21 +530,21 @@ export function TaskDetail({
               </Select>
             </div>
 
-            <label htmlFor={showStart ? "detail-start" : "detail-due"} className={ROW_LABEL}>
-              {showStart ? t("tasks.fields.dates") : t("tasks.fields.dueDate")}
-            </label>
-            <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
-              <span aria-hidden className={ROW_ICON} />
-              {showStart ? (
-                <>
+            {showStart ? (
+              <>
+                <label htmlFor="detail-start" className={ROW_LABEL}>
+                  {t("tasks.fields.startDate")}
+                </label>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden className={ROW_ICON} />
                   <Input
                     id="detail-start"
                     type="date"
-                    className={cn(QUIET_CONTROL, "max-w-none px-2")}
+                    className={QUIET_CONTROL}
                     value={draft.startDate}
                     disabled={disabled}
-                    aria-label={t("tasks.fields.startDate")}
                     aria-invalid={datesInverted || undefined}
+                    aria-describedby={datesInverted ? "detail-date-error" : undefined}
                     onChange={(event) =>
                       setDraft({ ...draft, startDate: event.target.value })
                     }
@@ -555,24 +554,27 @@ export function TaskDetail({
                       void save({ startDate: event.target.value });
                     }}
                   />
-                  <span aria-hidden className="text-slate-300">
-                    →
-                  </span>
-                </>
-              ) : null}
+                </div>
+              </>
+            ) : null}
+
+            <label htmlFor="detail-due" className={ROW_LABEL}>
+              {t("tasks.fields.dueDate")}
+            </label>
+            <div className="flex min-w-0 items-center gap-2">
+              <span aria-hidden className={ROW_ICON} />
               <Input
                 id="detail-due"
                 type="date"
                 className={cn(
                   QUIET_CONTROL,
-                  "max-w-none px-2",
                   isTaskOverdue(task, todayIso) &&
                     "bg-red-50 text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
                 )}
                 value={draft.dueDate}
                 disabled={disabled}
-                aria-label={t("tasks.fields.dueDate")}
                 aria-invalid={datesInverted || undefined}
+                aria-describedby={datesInverted ? "detail-date-error" : undefined}
                 onChange={(event) =>
                   setDraft({ ...draft, dueDate: event.target.value })
                 }
@@ -628,7 +630,7 @@ export function TaskDetail({
           </div>
 
           {datesInverted ? (
-            <p role="alert" className="text-xs font-medium text-red-700">
+            <p id="detail-date-error" role="alert" className="text-xs font-medium text-red-700">
               {t("tasks.fields.datesInverted")}
             </p>
           ) : null}
