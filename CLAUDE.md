@@ -844,7 +844,8 @@ assistant something — typed, pasted, dictated, or from a file. One model call
 - **Files:** `.txt`/`.md` are read in the browser into the box. PDF and Word go
   through the ordinary upload route into the personal project, are indexed,
   and are captured from `Document.extractedText` (first 12,000 characters); a
-  task applied into the same project links the document.
+  task applied from it links the document wherever the task is filed — the
+  file waits in the personal project, and its work usually belongs elsewhere.
 - **Dictation is the browser's Web Speech API** — no server of ours, but the
   browser sends audio to its vendor, and the button says so. Language tags
   differ by browser (`yue-Hant-HK` in Chrome, `zh-HK` in Safari), so each
@@ -1385,6 +1386,36 @@ the task's own project by `resolveTaskRelations()` in
 through `/api/tasks/[id]/documents`, and keeps its draft's `documentIds` in
 step so "expand to form" cannot save a stale set back.
 
+**A link can outlive its project; a new link cannot.** `resolveTaskRelations`
+takes `carriedDocumentIds` — documents the server vouches for although they
+may be filed in another project of the workspace: the links a task already
+has (`prepareTaskUpdate` reads them), and the file a capture was made from
+(`applyChange`). They never come from the request. So the picker still offers
+only the project's own documents, while a task moved between projects, or
+applied from a captured file into a client project, keeps its document — and
+the task chat (`answerFocusFor`, retrieval without the project filter for a
+task's links only), the AI fill, and "How to tackle it" read it there. A plan
+run's drafted tasks link the documents they cite, which are always the run's
+own project's.
+
+**Moving tasks between projects** is `POST /api/tasks/move`
+(`moveTasks()` in `src/lib/pm/task-move.ts`): official tasks only, into a
+project the viewer can see (`visibleProjectWhere`), all in one transaction.
+The column follows the task by key, then category, never preferring In
+progress (`pickStatusForMove`; blocked work falls to the default column where
+there is no blocked one, and the toast says so). What belongs to the old
+project is cleared — the milestone, requirement links, and dependencies on
+tasks that stay behind — while dependencies *between* tasks moved together
+survive, which is why it is one request rather than one per task. Fields,
+notes, sources, and document links come along; **the documents stay filed
+where they are**, because moving a file would take it from every other task
+and from the project chat it serves. The board's confirmation counts what
+will be cleared from its own rows. A task thread is held to the project it
+began in, so after a move the panel opens a fresh thread and the old one
+refuses to continue with a 409, as for a deleted task. Each update writes
+`updateMany` conditional on the old `projectId`, so two concurrent moves
+cannot both clear links.
+
 **"Fill blanks with AI" proposes; the user saves.** `POST
 /api/projects/[id]/task-fill` (`src/lib/generation/task-fill-*.ts`) is one
 user-initiated request and one model call (plus the usual single repair). It
@@ -1520,7 +1551,8 @@ its project or task, never re-point it.
   dependencies, milestone, and *approved* requirements — the same source
   builders as project chat, so a citation's snapshot has one shape. Retrieval
   reads the task's linked documents, fetched fresh each turn so linking one
-  takes effect on the next question, or the whole project when it has none.
+  takes effect on the next question and read wherever they are filed, or the
+  whole project when it has none.
   Official tasks only; the task's newest notes come along as `N` sources,
   because a question in a task thread is usually about its progress. `taskId` is `SET NULL`: a
   deleted task's thread stays readable, `focus` stays `task`, and the route

@@ -37,8 +37,12 @@ export interface ProposedChange {
   kind: "create_task" | "update_task" | "add_note";
   payload: unknown;
   taskId: string | null;
-  /** A document to link when a created task lands in that document's project. */
-  document: { id: string; projectId: string | null } | null;
+  /**
+   * The document the proposal was read from. A created task links it wherever
+   * the task lands: a file captured on Today waits in the personal project, and
+   * the work it produced is often filed in another.
+   */
+  document: { id: string } | null;
 }
 
 export interface ClaimHooks {
@@ -120,14 +124,16 @@ export async function applyChange(
         estimatedHours: payload.estimatedHours,
         dueDate: overrides.dueDate !== undefined ? overrides.dueDate : payload.dueDate,
         ...(column.statusId ? { statusId: column.statusId } : {}),
-        // A task can only link a document in its own project.
-        ...(change.document && change.document.projectId === project.id
-          ? { documentIds: [change.document.id] }
-          : {}),
+        ...(change.document ? { documentIds: [change.document.id] } : {}),
       });
       if (!parsed.success) return refuse(400, parsed.error.issues[0]?.message ?? "Invalid task");
 
-      const prepared = await prepareTaskCreate(access.workspaceId, project.id, parsed.data);
+      const prepared = await prepareTaskCreate(
+        access.workspaceId,
+        project.id,
+        parsed.data,
+        change.document ? [change.document.id] : [],
+      );
       if (!prepared.ok) return refuse(prepared.status, prepared.error);
 
       const task = await inTransaction(hooks, async (tx) => {

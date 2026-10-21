@@ -98,12 +98,14 @@ export interface PreparedTaskCreate {
 /**
  * Validates a new task inside an already-authorised project. An assignee from
  * outside the workspace throws `AuthError` (404), as `requireWorkspaceMember`
- * always has.
+ * always has. `carriedDocumentIds` is for a server-side caller only — the
+ * document a capture was made from, which may be filed in another project.
  */
 export async function prepareTaskCreate(
   workspaceId: string,
   projectId: string,
   input: CreateTaskInput,
+  carriedDocumentIds: readonly string[] = [],
 ): Promise<WriteCheck<PreparedTaskCreate>> {
   if (input.assigneeId) {
     await requireWorkspaceMember(workspaceId, input.assigneeId);
@@ -120,7 +122,12 @@ export async function prepareTaskCreate(
   const status = await resolveProjectStatus(workspaceId, projectId, input.statusId);
   if (!status) return refuse(404, "Status not found in this project");
 
-  const relations = await resolveTaskRelations(workspaceId, projectId, input);
+  const relations = await resolveTaskRelations(
+    workspaceId,
+    projectId,
+    input,
+    carriedDocumentIds,
+  );
   if (!relations.ok) return refuse(404, relations.error);
 
   return {
@@ -238,7 +245,24 @@ export async function prepareTaskUpdate(
     nextCategory = status.category;
   }
 
-  const relations = await resolveTaskRelations(workspaceId, existing.projectId, data);
+  // A link the task already has stays valid where its document lives, so a
+  // task moved from another project can still be saved with its documents.
+  const touchesDocuments =
+    data.documentIds !== undefined || (data.citations?.length ?? 0) > 0;
+  const carried = touchesDocuments
+    ? (
+        await prisma.taskDocument.findMany({
+          where: { workspaceId, taskId: existing.id },
+          select: { documentId: true },
+        })
+      ).map((link) => link.documentId)
+    : [];
+  const relations = await resolveTaskRelations(
+    workspaceId,
+    existing.projectId,
+    data,
+    carried,
+  );
   if (!relations.ok) return refuse(404, relations.error);
 
   const completedAt = completedAtOnStatusChange(

@@ -14,7 +14,9 @@ interface Params {
  *
  * Threads are per person, like every chat thread: two people asking about the
  * same task each have their own conversation. The task panel opens on the
- * latest one; older ones stay in the main chat's thread list.
+ * latest one in the task's current project — a thread is held to the project
+ * it began in, so after a move the panel starts afresh — and older ones stay
+ * in the main chat's thread list.
  */
 export async function GET(_request: Request, { params }: Params) {
   try {
@@ -23,14 +25,20 @@ export async function GET(_request: Request, { params }: Params) {
 
     const task = await prisma.task.findFirst({
       where: officialRecordWhere({ id, workspaceId }),
-      select: { id: true },
+      select: { id: true, projectId: true },
     });
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     const latest = await prisma.chatConversation.findFirst({
-      where: { workspaceId, userId: user.id, taskId: task.id, focus: "task" },
+      where: {
+        workspaceId,
+        userId: user.id,
+        taskId: task.id,
+        focus: "task",
+        projectId: task.projectId,
+      },
       orderBy: { lastMessageAt: "desc" },
       select: { id: true },
     });

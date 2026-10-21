@@ -106,15 +106,15 @@ async function selectEvidence(
   const { workspaceId, projectId, documentIds } = input;
 
   if (documentIds.length > 0) {
+    // A task's links may point outside its project — a task moved from another
+    // keeps them — so the workspace is the bound here; the form only offers
+    // new links from the project itself.
     const documents = await prisma.document.findMany({
-      where: { id: { in: documentIds }, workspaceId, projectId },
+      where: { id: { in: documentIds }, workspaceId },
       select: { id: true, originalFilename: true, status: true },
     });
     if (documents.length !== documentIds.length) {
-      throw new GenerationRequestError(
-        "Every linked document must belong to this project",
-        400,
-      );
+      throw new GenerationRequestError("A linked document was not found", 400);
     }
     const notReady = documents.filter((document) => document.status !== "ready");
     if (notReady.length > 0) {

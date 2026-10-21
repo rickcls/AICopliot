@@ -11,6 +11,7 @@ import {
 import { parseTaskQuickFilter } from "@/lib/pm/filters";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { taskSelect, taskStatusSelect } from "@/lib/pm/select";
+import { visibleProjectWhere } from "@/lib/pm/visibility";
 import { getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export default async function ProjectTasksPage({
   const project = await getScopedProject(workspaceId, id);
   if (!project) notFound();
 
-  const [tasks, statuses, members, milestones, documents] = await Promise.all([
+  const [tasks, statuses, members, milestones, documents, projectRows] = await Promise.all([
     prisma.task.findMany({
       where: officialRecordWhere({ workspaceId, projectId: project.id }),
       orderBy: { createdAt: "asc" },
@@ -51,7 +52,20 @@ export default async function ProjectTasksPage({
       orderBy: { createdAt: "desc" },
       select: { id: true, originalFilename: true, status: true },
     }),
+    prisma.project.findMany({
+      where: visibleProjectWhere(workspaceId, user.id),
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, personalOwnerId: true },
+    }),
   ]);
+  // Where a task can be moved to. The viewer's own project leads, as in the
+  // sidebar; the sort is stable, so the rest stay alphabetical.
+  const projects = [...projectRows]
+    .sort(
+      (a, b) =>
+        Number(b.personalOwnerId === user.id) - Number(a.personalOwnerId === user.id),
+    )
+    .map(({ id: projectId, name }) => ({ id: projectId, name }));
 
   const initialTasks: TaskRow[] = tasks.map((task) => ({
     ...task,
@@ -75,6 +89,7 @@ export default async function ProjectTasksPage({
       initialQuickFilter={parseTaskQuickFilter(filterParam)}
       nowIso={(await getViewerToday()).toISOString()}
       timeline={project.deliveryEnabled}
+      projects={projects}
     />
   );
 }

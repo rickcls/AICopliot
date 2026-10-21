@@ -90,7 +90,7 @@ beforeEach(() => {
 });
 
 describe("task-focused answers", () => {
-  it("reads the task's linked documents and always supplies the task as T1", async () => {
+  it("reads the task's linked documents, wherever they are filed, and always supplies the task as T1", async () => {
     const { chat, result } = askAboutTask({
       answer: "It is due 30 October 2026 [S1].",
       confidence: "high",
@@ -103,7 +103,8 @@ describe("task-focused answers", () => {
       [0.1, 0.2, 0.3],
       "When is it due?",
       8,
-      "p1",
+      // The links bound retrieval; a document filed in another project counts.
+      null,
       ["doc-1"],
     );
     expect(taskContext).toHaveBeenCalledWith("ws-1", "p1", "task-real-id", expect.any(Date));
@@ -131,6 +132,7 @@ describe("task-focused answers", () => {
       { answer: "Unknown.", confidence: "low", insufficientContext: true },
       [],
     ).result;
+    expect(retrieveChunks.mock.calls[0][4]).toBe("p1");
     expect(retrieveChunks.mock.calls[0][5]).toBeNull();
   });
 

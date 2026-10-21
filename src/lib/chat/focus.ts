@@ -107,7 +107,9 @@ export async function resolveNewThreadScope(
  *
  * A task's linked documents are read fresh every turn rather than frozen on
  * the thread: linking a document is how you give the task chat more to go on,
- * and it should take effect on the next question.
+ * and it should take effect on the next question. They are read wherever they
+ * are filed — a task moved between projects keeps its links, and a captured
+ * file stays in the personal project — and only the workspace bounds them.
  */
 export async function answerFocusFor(
   workspaceId: string,
@@ -118,7 +120,7 @@ export async function answerFocusFor(
       where: {
         workspaceId,
         taskId: scope.taskId,
-        document: { workspaceId, projectId: scope.projectId },
+        document: { workspaceId },
       },
       select: { documentId: true },
     });

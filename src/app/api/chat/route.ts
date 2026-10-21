@@ -91,6 +91,20 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
+      // A thread is held to the project it began in; a task moved since then
+      // is grounded on another project's records, so it gets a new thread.
+      if (existing.focus === "task" && existing.taskId) {
+        const stillHere = await prisma.task.findFirst({
+          where: { id: existing.taskId, workspaceId, projectId: existing.projectId ?? undefined },
+          select: { id: true },
+        });
+        if (!stillHere) {
+          return NextResponse.json(
+            { error: "The task this thread was about has moved to another project. Start a new thread." },
+            { status: 409 },
+          );
+        }
+      }
       conversationTitle = existing.title;
       scope = existing;
     } else {
