@@ -281,7 +281,10 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    pick is read in full, becoming a private capture (`externalId:
    gmail:{id}`, once per person). Email text is someone else's words: it
    reaches the model only as capture lines marked as data, and nothing it says
-   is applied without a click. The app never sends mail or writes to Gmail.
+   is applied without a click. Applying a new task from it keeps the email as
+   a document in the person's personal project, linked to the task — said
+   beside Apply before it is pressed — and from then on it is a document like
+   any other. The app never sends mail or writes to Gmail.
    **Outlook keeps the same contract** through Microsoft Graph, with
    `offline_access User.Read Mail.Read` and nothing more (`src/lib/outlook/`).
    **WhatsApp connects to nothing:** it has no API for personal chats, so a chat
@@ -850,11 +853,21 @@ assistant something — typed, pasted, dictated, or from a file. One model call
   browser sends audio to its vendor, and the button says so. Language tags
   differ by browser (`yue-Hant-HK` in Chrome, `zh-HK` in Safari), so each
   language lists fallbacks tried on `language-not-supported`.
-- **The capture is never evidence** unless the person chooses to keep it:
-  "Save as document" (`saveCaptureAsDocument`) writes the note as a Markdown
-  document into their personal project through `storeDocument` and indexes it.
-  That is the one deliberate path from private to workspace-visible, and the
-  confirmation says so; the capture records the document so it is saved once.
+- **The capture is never evidence** unless the person chooses to keep it.
+  There are two deliberate paths from private to workspace-visible, and each
+  says so before the click. "Save as document" (`saveCaptureAsDocument`)
+  writes the note as a Markdown document into their personal project through
+  `storeDocument` and indexes it, after a confirmation. **Applying a new task
+  from an email** (a dropped `.eml`/`.msg`, Gmail, or Outlook) does the same
+  for the email first, because the task should carry the message it came from;
+  the list says so beside Apply (`capture.emailAttachNotice`). Both go
+  through `keepCaptureAsDocument`, and `captureDocument()`
+  (`src/lib/capture/document.ts`, pure) names an email by its subject and keeps
+  its sender and date. The capture records the document, so it is saved once
+  and every later task from it links the same one; two Applies racing keep the
+  first and remove the second's file. The apply route indexes it in the same
+  request. Saving the email never blocks the task: if it fails, the task is
+  still created, without the link. Notes on existing tasks save nothing.
 
 ## Document filing notes
 
@@ -958,8 +971,9 @@ and share the mail-text helpers in `src/lib/mail/text.ts`.
 **Mail files are the way round a blocked company.** An `.eml` (Outlook on the
 web) or `.msg` (dragged out of Outlook for Windows) dropped on the capture box
 is read in the browser (`src/lib/mail/file.ts`: `postal-mime`, which honours
-Big5; `@kenjiuno/msgreader`) and captured as `source: email`. The file is never
-uploaded or stored as a document. The capture box accepts a drop of any file
+Big5; `@kenjiuno/msgreader`) and captured as `source: email`. The file itself
+is never uploaded; the email's text becomes a document only when a task is
+applied from it (see Capture notes). The capture box accepts a drop of any file
 it can read.
 
 **WhatsApp** (`src/lib/whatsapp/parse.ts`, pure) reads an exported chat — an

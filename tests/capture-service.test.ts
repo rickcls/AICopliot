@@ -14,7 +14,7 @@ const mockPrisma = {
   $queryRaw: vi.fn(),
   capture: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   captureProposal: { createMany: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
-  document: { findFirst: vi.fn() },
+  document: { findFirst: vi.fn(), deleteMany: vi.fn() },
   project: { findFirst: vi.fn(), findMany: vi.fn() },
   task: { findFirst: vi.fn() },
   projectTaskStatus: { findMany: vi.fn() },
@@ -50,6 +50,9 @@ vi.mock("@/lib/pm/personal-project", () => ({ getOrCreatePersonalProject: mockPe
 
 const mockStore = vi.fn();
 vi.mock("@/lib/documents/store", () => ({ storeDocument: mockStore }));
+
+const mockStorageDelete = vi.fn(async () => undefined);
+vi.mock("@/lib/storage", () => ({ getStorage: () => ({ delete: mockStorageDelete }) }));
 
 const service = await import("@/lib/capture/service");
 
@@ -341,6 +344,102 @@ describe("applyProposal", () => {
     expect(projectId).toBe("project-abc");
     expect(input.documentIds).toEqual(["doc-brief"]);
     expect(carried).toEqual(["doc-brief"]);
+  });
+
+  describe("a task from an email", () => {
+    const emailCapture = {
+      id: "cap-mail",
+      source: "email",
+      body: "From: Peter Chan <peter@abc.com>\nSubject: 報價：系統升級\nDate: 2026-10-15\n\n請於下星期五前報價。",
+      localDate: new Date("2026-10-16T00:00:00Z"),
+      documentId: null,
+    };
+
+    beforeEach(() => {
+      mockStore.mockResolvedValue({ ok: true, id: "doc-mail" });
+      mockPrisma.capture.updateMany.mockResolvedValue({ count: 1 });
+      tx.captureProposal.updateMany.mockResolvedValue({ count: 1 });
+    });
+
+    it("saves the email as a document named by its subject, links it, and says so", async () => {
+      mockPrisma.captureProposal.findFirst.mockResolvedValue({ ...createProposal, capture: emailCapture });
+
+      const result = await service.applyProposal(access, "prop-1", {}, NOW);
+
+      expect(mockStore.mock.calls[0][0]).toMatchObject({
+        workspaceId: "ws-1",
+        projectId: "personal-1",
+        filename: "報價：系統升級.md",
+        mimeType: "text/markdown",
+      });
+      expect(mockPrisma.capture.updateMany).toHaveBeenCalledWith({
+        where: { id: "cap-mail", workspaceId: "ws-1", userId: "u-1", documentId: null },
+        data: { documentId: "doc-mail" },
+      });
+      const [, , input, carried] = writes.prepareTaskCreate.mock.calls[0];
+      expect(input.documentIds).toEqual(["doc-mail"]);
+      expect(carried).toEqual(["doc-mail"]);
+      expect(result).toMatchObject({ ok: true, savedDocumentId: "doc-mail" });
+    });
+
+    it("links the document already saved, without saving another", async () => {
+      mockPrisma.captureProposal.findFirst.mockResolvedValue({
+        ...createProposal,
+        capture: { ...emailCapture, documentId: "doc-mail" },
+      });
+
+      const result = await service.applyProposal(access, "prop-1", {}, NOW);
+
+      expect(mockStore).not.toHaveBeenCalled();
+      expect(writes.prepareTaskCreate.mock.calls[0][2].documentIds).toEqual(["doc-mail"]);
+      expect(result).not.toHaveProperty("savedDocumentId");
+    });
+
+    it("keeps the first of two simultaneous saves and removes its own", async () => {
+      mockPrisma.captureProposal.findFirst.mockResolvedValue({ ...createProposal, capture: emailCapture });
+      mockPrisma.capture.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.document.findFirst.mockResolvedValue({ storageKey: "ws-1/doc-mail.md" });
+      mockPrisma.capture.findFirst.mockResolvedValue({ documentId: "doc-first" });
+
+      const result = await service.applyProposal(access, "prop-1", {}, NOW);
+
+      expect(mockPrisma.document.deleteMany).toHaveBeenCalledWith({ where: { id: "doc-mail", workspaceId: "ws-1" } });
+      expect(mockStorageDelete).toHaveBeenCalledWith("ws-1/doc-mail.md");
+      expect(writes.prepareTaskCreate.mock.calls[0][2].documentIds).toEqual(["doc-first"]);
+      expect(result).not.toHaveProperty("savedDocumentId");
+    });
+
+    it("still creates the task when the email cannot be saved", async () => {
+      mockPrisma.captureProposal.findFirst.mockResolvedValue({ ...createProposal, capture: emailCapture });
+      mockStore.mockResolvedValue({ ok: false, error: "File exceeds the limit", status: 413 });
+
+      const result = await service.applyProposal(access, "prop-1", {}, NOW);
+
+      expect(result).toMatchObject({ ok: true, taskId: "task-new" });
+      expect(writes.prepareTaskCreate.mock.calls[0][2]).not.toHaveProperty("documentIds");
+    });
+
+    it("saves nothing for a typed note, or for an email's note on an existing task", async () => {
+      mockPrisma.captureProposal.findFirst.mockResolvedValue({
+        ...createProposal,
+        capture: { ...emailCapture, source: "text" },
+      });
+      await service.applyProposal(access, "prop-1", {}, NOW);
+
+      mockPrisma.captureProposal.findFirst.mockResolvedValue({
+        id: "prop-note",
+        kind: "add_note",
+        state: "pending",
+        taskId: "task-1",
+        payload: { note: "Peter 要求下星期五前報價" },
+        capture: emailCapture,
+      });
+      writes.findCommentableTask.mockResolvedValue({ id: "task-1" });
+      writes.createTaskCommentRecord.mockResolvedValue({ id: "comment-1" });
+      await service.applyProposal(access, "prop-note", {}, NOW);
+
+      expect(mockStore).not.toHaveBeenCalled();
+    });
   });
 
   it("creates a waiting task in the project's blocked column", async () => {
@@ -646,7 +745,21 @@ describe("saveCaptureAsDocument", () => {
     mockPrisma.project.findMany.mockResolvedValue([
       { id: "personal-1", name: "Rick的個人工作", personalOwnerId: "u-1" },
     ]);
+    mockPersonal.mockResolvedValue({ id: "personal-1", name: "Rick的個人工作" });
     mockStore.mockResolvedValue({ ok: true, id: "doc-new" });
+    mockPrisma.capture.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("names an email by its subject", async () => {
+    mockPrisma.capture.findFirst.mockResolvedValue({
+      id: "cap-1",
+      body: "From: Peter\nSubject: Q4 budget review\nDate: Mon\n\nPlease send numbers.",
+      source: "email",
+      documentId: null,
+      localDate: new Date("2026-10-16T00:00:00Z"),
+    });
+    await service.saveCaptureAsDocument(access, "cap-1");
+    expect(mockStore.mock.calls[0][0].filename).toBe("Q4 budget review.md");
   });
 
   it("stores the note through the validated path, in the personal project", async () => {

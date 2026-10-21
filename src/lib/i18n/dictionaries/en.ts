@@ -263,6 +263,8 @@ export const en = {
     saveBody: "It goes into your personal project, where everyone in this workspace can search it and ask about it. The note itself stays private.",
     savedToast: "Saved as a document",
     openDocument: "Open document",
+    emailAttachNotice:
+      "Applying a new task saves this email as a document in your personal project and attaches it to the task. Anyone who can open the task can open the email.",
     saveDocumentFailed: "Could not save the document.",
     replyToEmail: "Reply to this email",
     showNote: "Show note",

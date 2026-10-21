@@ -222,6 +222,19 @@ export function CaptureCard({
           }
           onChange={(proposals) => onChange({ ...capture, proposals })}
           onRevise={revise}
+          notice={
+            capture.source === "email" &&
+            !capture.documentId &&
+            pending.some((proposal) => proposal.kind === "create_task")
+              ? t("capture.emailAttachNotice")
+              : null
+          }
+          // The capture as the server now has it — after the first task from an
+          // email, that includes the document the email was saved as.
+          onApplied={(data) => {
+            const next = (data as { capture?: CaptureView | null }).capture;
+            if (next) onChange(next);
+          }}
         />
       )}
     </Card>
