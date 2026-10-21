@@ -37,6 +37,7 @@ Each phase is one branch and PR, usable on its own.
 | P6 | Inputs | Read-only Gmail triage on request, voice-memo transcription | **Built on `feat/assistant-foundation`** |
 | P7 | More assistance — a supervised agent | One request may take several tool steps (search documents, read my tasks, draft an email, propose changes); every write is still a proposal the person applies. Bounded steps inside the request, no background runs, no sending. Also: Ask grounded on the asker's own tasks, a labelled general-knowledge mode, remaining pages translated. Requires deliberately revising the "not an agent" rule in CLAUDE.md. | **Agent built on `feat/assistant-foundation`**; the remaining-page translation moves to P8 |
 | P8 | Finish the Chinese UI | Translate the older panels still in English (task board and detail, requirements, timeline, risks, plan review, reports, chat, projects, dashboard), and the status labels in `labels.ts` | **Built on `feat/translate-remaining`.** API error messages and the language of generated plans, extractions, and weekly-report narratives remain English — next candidates |
+| P9 | Where Hong Kong work happens | WhatsApp chats (export or paste, read in the browser) and Outlook mail (Microsoft Graph, read-only, company and personal accounts; `.eml`/`.msg` drop as the fallback when IT blocks the app) become captures | **WhatsApp built on `feat/whatsapp-capture`**; Outlook next |
 
 ---
 
@@ -65,6 +66,32 @@ Two things worth remembering from that pass:
 2. **The rewrite length guard was initially too loose.** `question.length + 400`
    let a 17-character follow-up expand into a 290-character answer. Now
    `max(240, question.length * 3)`. Caught by a test, not by inspection.
+
+---
+
+## Positioning: how this differs from ClickUp AI
+
+The feature categories overlap — answers from your files, status and reports,
+drafting, an agent — and on breadth this app does not compete: ClickUp has the
+integrations, the team features, the mobile apps, and model choice. It is aimed
+instead at **Hong Kong professionals working alone or in a small team** who will
+not run a project-management tool, and it is different in four ways:
+
+1. **Nothing to maintain.** Say what happened — typed, pasted, Cantonese voice,
+   a forwarded email or WhatsApp chat — and the assistant proposes the tasks and
+   updates; one click applies them. ClickUp assumes you live inside ClickUp and
+   keep it current.
+2. **Every claim has a source, and the AI never acts alone.** Answers cite the
+   passage or record, refuse without evidence, and nothing is written without a
+   person's click. ClickUp's Super Agents act on their own, around the clock.
+3. **Hong Kong language.** Cantonese and code-mixed input become clean written
+   Chinese tasks, Traditional characters only, with "聽日" and "下星期五"
+   resolved by code.
+4. **Inputs from where the work actually is** — WhatsApp and Outlook (P9) —
+   rather than from a tool the person has to adopt first.
+
+Gaps that matter to that user and remain open: meeting recording and minutes,
+a mobile-first capture, and a measured baseline for Chinese retrieval.
 
 ---
 

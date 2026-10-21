@@ -23,6 +23,7 @@ const SOURCE_KEY = {
   voice: "capture.sourceVoice",
   document: "capture.sourceDocument",
   email: "capture.sourceEmail",
+  whatsapp: "capture.sourceWhatsApp",
 } as const;
 
 /**

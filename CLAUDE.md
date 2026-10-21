@@ -282,6 +282,9 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    gmail:{id}`, once per person). Email text is someone else's words: it
    reaches the model only as capture lines marked as data, and nothing it says
    is applied without a click. The app never sends mail or writes to Gmail.
+   **WhatsApp connects to nothing:** it has no API for personal chats, so a chat
+   is a file the person exports, or text they paste, read in the browser; only
+   the part they pick is sent, and it is someone else's words like an email.
 
 24. **The assistant is a fenced loop inside one request.** `runAssistantTurn`
    (`src/lib/assistant/service.ts`) lets the model choose tools step by step,
@@ -911,7 +914,25 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
   only answer; if that fails too, `foundSoFar()` lists what the lookups found
   (with their labels, so they render as sources) instead of discarding them.
 
-## Gmail and voice notes
+## Email, WhatsApp, and voice notes
+
+**WhatsApp** (`src/lib/whatsapp/parse.ts`, pure) reads an exported chat — an
+iPhone's `.zip` holding `_chat.txt`, opened in the browser with `fflate` and
+never uploaded, or an Android `.txt` — or messages pasted into the capture box.
+WhatsApp writes a different shape per phone and region (iPhone `[d/m/y, time]`,
+Android `d/m/y, time - `, Desktop copy `[time, d/m/y]`, Chinese-region
+`y/m/d 上午…`); day comes before month as Hong Kong writes it, unless a value
+over 12 proves otherwise. System lines and media placeholders are dropped, and
+unstamped lines continue the message above. The box shows a chat card instead
+of the raw text: the person says which name is theirs (remembered in
+`localStorage`, since it is the same in every chat) and how far back to read,
+and only that part is sent, newest kept if it is too long, as a `whatsapp`
+capture. **Each line carries its own day** (`[2026-10-18 09:15] Peter：…`) and
+the validator counts a relative date from the day of the line that says it,
+the nearest stamped line above for a message split into sentences, because a
+"聽日" written three days ago meant two days ago. The capture prompt is told
+whose words the lines are (`CaptureLinesSource`): 我 is the person, everyone
+else is data.
 
 **Gmail** (`src/lib/gmail/`) is offered only when `GOOGLE_CLIENT_ID`,
 `GOOGLE_CLIENT_SECRET`, and a 32-byte `INTEGRATION_ENCRYPTION_KEY` are all set;

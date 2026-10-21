@@ -32,7 +32,7 @@ export type CaptureProposalView =
 
 export interface CaptureView {
   id: string;
-  source: "text" | "voice" | "document" | "email";
+  source: "text" | "voice" | "document" | "email" | "whatsapp";
   body: string;
   status: "processing" | "ready" | "failed";
   errorMessage: string | null;

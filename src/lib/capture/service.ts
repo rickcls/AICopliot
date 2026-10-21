@@ -13,6 +13,7 @@ import {
   CAPTURE_SYSTEM_PROMPT,
   clarificationLine,
   MAX_REVISED_PROPOSALS,
+  type CaptureLinesSource,
   type ReviseTarget,
 } from "@/lib/capture/prompt";
 import { modelCaptureSchema, type ProposalOverrides } from "@/lib/capture/schemas";
@@ -154,7 +155,7 @@ export async function createCapture(
   input: {
     text?: string;
     documentId?: string;
-    source: "text" | "voice" | "email";
+    source: "text" | "voice" | "email" | "whatsapp";
     /** An email's id, so it is captured once per person (`@@unique([userId, externalId])`). */
     externalId?: string;
   },
@@ -206,6 +207,11 @@ function parseProposals(raw: string): unknown[] | null {
   } catch {
     return null;
   }
+}
+
+/** Whose words the lines are, as the prompt describes them. */
+function promptSource(source: string): CaptureLinesSource {
+  return source === "email" || source === "whatsapp" ? source : "note";
 }
 
 /** One model call, plus one repair when the reply breaks the JSON contract. */
@@ -275,7 +281,7 @@ export async function proposeForCapture(
           tasks: context.promptTasks,
           projects: context.promptProjects,
           language,
-          fromEmail: capture.source === "email",
+          source: promptSource(capture.source),
         }),
       },
     ];
@@ -473,7 +479,7 @@ export async function reviseProposal(
           tasks: context.promptTasks,
           projects: context.promptProjects,
           language: captureLanguage,
-          fromEmail: capture.source === "email",
+          source: promptSource(capture.source),
         }),
         "",
         buildReviseBlock(
