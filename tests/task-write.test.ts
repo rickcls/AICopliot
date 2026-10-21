@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrisma = {
   task: { findFirst: vi.fn(), create: vi.fn() },
+  taskDocument: { findMany: vi.fn() },
   projectTaskStatus: { findFirst: vi.fn() },
   taskComment: { create: vi.fn() },
 };
@@ -23,6 +24,7 @@ vi.mock("@/lib/pm/task-relations", () => ({
 }));
 
 const write = await import("@/lib/pm/task-write");
+const { resolveTaskRelations } = await import("@/lib/pm/task-relations");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -84,6 +86,41 @@ describe("prepareTaskUpdate", () => {
       ok: false,
       status: 404,
     });
+  });
+});
+
+describe("linked documents across projects", () => {
+  const stored = {
+    id: "t1",
+    projectId: "p2",
+    statusId: "s-open",
+    status: { category: "open" },
+    startDate: null,
+    dueDate: null,
+  };
+
+  it("lets a moved task keep the links it already has when its documents are saved", async () => {
+    mockPrisma.task.findFirst.mockResolvedValue(stored);
+    mockPrisma.taskDocument.findMany.mockResolvedValue([{ documentId: "doc-in-p1" }]);
+
+    await write.prepareTaskUpdate("ws-1", "t1", { documentIds: ["doc-in-p1", "doc-in-p2"] });
+
+    expect(mockPrisma.taskDocument.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: "ws-1",
+      taskId: "t1",
+    });
+    expect(vi.mocked(resolveTaskRelations).mock.calls[0]).toEqual([
+      "ws-1",
+      "p2",
+      { documentIds: ["doc-in-p1", "doc-in-p2"] },
+      ["doc-in-p1"],
+    ]);
+  });
+
+  it("does not read the links for an edit that leaves documents alone", async () => {
+    mockPrisma.task.findFirst.mockResolvedValue(stored);
+    await write.prepareTaskUpdate("ws-1", "t1", { title: "Renamed" });
+    expect(mockPrisma.taskDocument.findMany).not.toHaveBeenCalled();
   });
 });
 

@@ -34,6 +34,7 @@ import {
   type MemberOption,
   type MilestoneOption,
   type ProjectDocumentOption,
+  type ProjectOption,
   type TaskRow,
   type TaskStatusCategory,
   type TaskStatusOption,
@@ -93,6 +94,7 @@ export function TaskBoard({
   initialQuickFilter = null,
   nowIso,
   timeline,
+  projects,
 }: {
   projectId: string;
   initialTasks: TaskRow[];
@@ -114,6 +116,8 @@ export function TaskBoard({
   nowIso: string;
   /** Whether the project draws a timeline (delivery tools on), which is what a start date is for. */
   timeline: boolean;
+  /** Projects the viewer sees, this one included — where a task can be moved. */
+  projects: ProjectOption[];
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [statuses, setStatuses] = useState(initialStatuses);
@@ -346,6 +350,105 @@ export function TaskBoard({
     }
 
     setBusyIds(new Set());
+  }
+
+  /**
+   * Files tasks in another project, in one request so dependencies between
+   * the tasks moved together survive. The confirmation names what stays
+   * behind, counted from the board's rows: milestones, requirement links, and
+   * dependencies on tasks that are not moving with them.
+   */
+  async function moveToProject(taskIds: string[], targetProjectId: string) {
+    const project = projects.find((item) => item.id === targetProjectId);
+    const targets = tasks.filter((task) => taskIds.includes(task.id));
+    if (!project || targetProjectId === projectId || targets.length === 0) return;
+
+    const moving = new Set(targets.map((task) => task.id));
+    const milestoneCount = targets.filter((task) => task.milestoneId).length;
+    const requirementCount = targets.reduce(
+      (sum, task) => sum + task.requirementLinks.length,
+      0,
+    );
+    const dependencyCount = tasks.reduce(
+      (sum, task) =>
+        sum +
+        task.dependencies.filter(
+          (dependency) => moving.has(task.id) !== moving.has(dependency.dependsOnTaskId),
+        ).length,
+      0,
+    );
+    const clears = [
+      milestoneCount ? t("tasks.move.milestones", { count: milestoneCount }) : null,
+      dependencyCount ? t("tasks.move.dependencies", { count: dependencyCount }) : null,
+      requirementCount ? t("tasks.move.requirements", { count: requirementCount }) : null,
+    ].filter((line): line is string => line !== null);
+
+    const confirmed = await confirm({
+      title:
+        targets.length === 1
+          ? t("tasks.move.titleOne", { title: targets[0].title, project: project.name })
+          : t("tasks.move.titleMany", { count: targets.length, project: project.name }),
+      body: (
+        <div className="space-y-2">
+          <p>{t("tasks.move.keeps")}</p>
+          {clears.length > 0 ? (
+            <div>
+              <p className="font-medium text-amber-800">{t("tasks.move.clears")}</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {clears.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ),
+      confirmLabel: t("tasks.move.confirm"),
+    });
+    if (!confirmed) return;
+
+    setBusyIds(moving);
+    setError(null);
+    try {
+      const response = await fetch("/api/tasks/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskIds: [...moving], projectId: targetProjectId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error ?? t("tasks.move.failed"));
+        return;
+      }
+      setTasks((previous) =>
+        previous
+          .filter((item) => !moving.has(item.id))
+          .map((item) => ({
+            ...item,
+            dependencies: item.dependencies.filter(
+              (dependency) => !moving.has(dependency.dependsOnTaskId),
+            ),
+          })),
+      );
+      setSelectedIds((previous) => {
+        const next = new Set(previous);
+        for (const id of moving) next.delete(id);
+        return next;
+      });
+      if (openTaskId && moving.has(openTaskId)) setOpenTaskId(null);
+      toast.success(
+        targets.length === 1
+          ? t("tasks.move.movedOne", { title: targets[0].title, project: project.name })
+          : t("tasks.move.movedMany", { count: targets.length, project: project.name }),
+        data.fellBack
+          ? t("tasks.move.fellBack", { count: data.fellBack, project: project.name })
+          : undefined,
+      );
+    } catch {
+      setError(t("common.couldNotReach"));
+    } finally {
+      setBusyIds(new Set());
+    }
   }
 
   async function deleteTask(task: TaskRow) {
@@ -980,6 +1083,31 @@ export function TaskBoard({
                   </option>
                 ))}
               </Select>
+              {projects.length > 1 ? (
+                <Select
+                  aria-label={t("tasks.board.moveSelectedToProject")}
+                  className="h-8 text-xs"
+                  defaultValue=""
+                  disabled={busyIds.size > 0}
+                  onChange={(event) => {
+                    const target = event.target.value;
+                    event.target.value = "";
+                    if (!target) return;
+                    void moveToProject([...selectedIds], target);
+                  }}
+                >
+                  <option value="" disabled>
+                    {t("tasks.board.moveToProject")}
+                  </option>
+                  {projects
+                    .filter((project) => project.id !== projectId)
+                    .map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                </Select>
+              ) : null}
               <Button
                 type="button"
                 size="sm"
@@ -1221,6 +1349,8 @@ export function TaskBoard({
           }}
           onDocumentChange={upsertDocument}
           onDelete={() => void deleteTask(openTask)}
+          projects={projects}
+          onMove={(target) => void moveToProject([openTask.id], target)}
           onTaskChange={upsert}
           onError={setError}
           onOpenTask={setOpenTaskId}

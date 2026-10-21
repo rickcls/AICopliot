@@ -582,7 +582,7 @@ export async function applyProposal(
       state: true,
       payload: true,
       taskId: true,
-      capture: { select: { documentId: true, document: { select: { projectId: true } } } },
+      capture: { select: { documentId: true } },
     },
   });
   if (!proposal) return fail(proposalId, 404, "Suggestion not found");
@@ -596,9 +596,7 @@ export async function applyProposal(
       kind: proposal.kind,
       payload: proposal.payload,
       taskId: proposal.taskId,
-      document: proposal.capture.documentId
-        ? { id: proposal.capture.documentId, projectId: proposal.capture.document?.projectId ?? null }
-        : null,
+      document: proposal.capture.documentId ? { id: proposal.capture.documentId } : null,
     },
     overrides,
     {

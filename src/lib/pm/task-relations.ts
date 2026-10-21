@@ -28,20 +28,30 @@ export type TaskRelationResult =
  * provenance rather than a request, so an unknown chunk is dropped, and the
  * excerpt is rebuilt from the stored chunk so it is always the document's own
  * words.
+ *
+ * `carriedDocumentIds` are documents the server vouches for although they may
+ * live in another project of the workspace: links the task already has (which
+ * survive a move between projects), or the document a capture was made from.
+ * They are never taken from the request.
  */
 export async function resolveTaskRelations(
   workspaceId: string,
   projectId: string,
   input: TaskRelationInput,
+  carriedDocumentIds: readonly string[] = [],
 ): Promise<TaskRelationResult> {
   const documentIds = input.documentIds;
   const requirementIds = input.requirementIds ?? [];
   const citations = input.citations ?? [];
+  const inReach =
+    carriedDocumentIds.length > 0
+      ? { OR: [{ projectId }, { id: { in: [...carriedDocumentIds] } }] }
+      : { projectId };
 
   const [documents, requirements, chunks] = await Promise.all([
     documentIds && documentIds.length > 0
       ? prisma.document.findMany({
-          where: { id: { in: documentIds }, workspaceId, projectId },
+          where: { id: { in: documentIds }, workspaceId, ...inReach },
           select: { id: true },
         })
       : [],
@@ -61,7 +71,7 @@ export async function resolveTaskRelations(
           where: {
             id: { in: citations.map((citation) => citation.chunkId) },
             workspaceId,
-            document: { workspaceId, projectId },
+            document: { workspaceId, ...inReach },
           },
           select: { id: true, content: true },
         })

@@ -325,6 +325,24 @@ describe("applyProposal", () => {
     expect(input).toMatchObject({ title: "Send the ABC quote", priority: "urgent", dueDate: null });
   });
 
+  it("links the captured document to the task even when the task is filed in another project", async () => {
+    // A file captured on Today waits in the personal project; the work it
+    // produced is filed wherever the person chooses.
+    mockPrisma.captureProposal.findFirst.mockResolvedValue({
+      ...createProposal,
+      capture: { documentId: "doc-brief" },
+    });
+    mockPrisma.project.findFirst.mockResolvedValue({ id: "project-abc" });
+    tx.captureProposal.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.applyProposal(access, "prop-1", { projectId: "project-abc" }, NOW);
+
+    const [, projectId, input, carried] = writes.prepareTaskCreate.mock.calls[0];
+    expect(projectId).toBe("project-abc");
+    expect(input.documentIds).toEqual(["doc-brief"]);
+    expect(carried).toEqual(["doc-brief"]);
+  });
+
   it("creates a waiting task in the project's blocked column", async () => {
     mockPrisma.captureProposal.findFirst.mockResolvedValue({
       ...createProposal,

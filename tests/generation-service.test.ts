@@ -186,6 +186,23 @@ describe("generateProjectPlan audit and isolation", () => {
     );
   });
 
+  it("links each drafted task to the documents it cites", async () => {
+    await generateProjectPlan(
+      {
+        workspaceId: "workspace-1",
+        projectId: "project-1",
+        userId: "user-1",
+        documentIds: ["doc-1"],
+      },
+      { chat: chatWith(validOutput), embeddings },
+    );
+
+    const created = fakes.tx.task.create.mock.calls[0][0].data;
+    expect(created.documents).toEqual({
+      create: [{ workspaceId: "workspace-1", documentId: "doc-1" }],
+    });
+  });
+
   it("strips audit-only IDs from existing validated output before Review UI", () => {
     const safe = sanitizeReviewSummary({
       scopeStatements: [

@@ -413,6 +413,12 @@ export const linkTaskDocumentSchema = z.object({
   documentId: z.string().trim().min(1, "Select a document"),
 });
 
+/** Moving tasks into another project the viewer can see; at most one board's worth. */
+export const moveTasksSchema = z.object({
+  taskIds: z.array(z.string().trim().min(1)).min(1, "Choose a task").max(100),
+  projectId: z.string().trim().min(1, "Choose a project"),
+});
+
 /**
  * An AI fill request. The title and any description typed so far are the
  * question; `documentIds` narrows the evidence to the task's own documents,

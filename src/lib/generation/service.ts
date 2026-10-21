@@ -326,6 +326,20 @@ async function persistDraftPlan(input: PersistDraftInput) {
         milestoneIds.set(proposal.ref, milestone.id);
       }
 
+      // A drafted task links the documents it cites, as a task written by hand
+      // would — so once approved it reads like any other task from that file.
+      const documentByChunk = new Map(
+        sourceLabels.map((source) => [source.chunkId, source.documentId]),
+      );
+      const citedDocuments = (citations: { chunkId: string }[]) => [
+        ...new Set(
+          citations.flatMap((citation) => {
+            const documentId = documentByChunk.get(citation.chunkId);
+            return documentId ? [documentId] : [];
+          }),
+        ),
+      ];
+
       const taskIds = new Map<string, string>();
       for (const proposal of validated.tasks) {
         const boardStatus =
@@ -348,6 +362,12 @@ async function persistDraftPlan(input: PersistDraftInput) {
             source: "ai_suggested",
             generationStatus: "draft",
             generationRunId,
+            documents: {
+              create: citedDocuments(proposal.citations).map((documentId) => ({
+                workspaceId,
+                documentId,
+              })),
+            },
             citations: {
               create: [
                 ...proposal.citations.map((citation) => ({

@@ -123,6 +123,12 @@ export interface MilestoneOption {
   title: string;
 }
 
+/** A project a task can be moved to: those the viewer sees, their own first. */
+export interface ProjectOption {
+  id: string;
+  name: string;
+}
+
 export const TASK_PRIORITIES: TaskPriority[] = [
   "low",
   "medium",

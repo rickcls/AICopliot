@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Flag,
+  Folder,
   Lightbulb,
   Maximize2,
   Sparkles,
@@ -45,6 +46,7 @@ import {
   type MemberOption,
   type MilestoneOption,
   type ProjectDocumentOption,
+  type ProjectOption,
   type TaskPriority,
   type TaskRow,
   type TaskStatusOption,
@@ -87,6 +89,8 @@ export function TaskDetail({
   onExpand,
   onDocumentChange,
   onDelete,
+  projects,
+  onMove,
   onTaskChange,
   onError,
   onOpenTask,
@@ -109,6 +113,10 @@ export function TaskDetail({
   onExpand: (draft: TaskDraft, fill?: FillSummary) => void;
   onDocumentChange: (document: ProjectDocumentOption) => void;
   onDelete: () => void;
+  /** Projects the viewer sees, this one included. */
+  projects: ProjectOption[];
+  /** Asks to file the task in another project; the board confirms and moves it. */
+  onMove: (projectId: string) => void;
   onTaskChange: (task: TaskRow) => void;
   onError: (message: string | null) => void;
   /** Switches the panel to another task on the board. */
@@ -430,6 +438,34 @@ export function TaskDetail({
               onto separate lines with the arrow orphaned between them. Same
               icon gutter as the create form so the controls share one edge. */}
           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
+            {/* Bound to where the task is, not to a draft: picking another
+                project asks first, and a cancelled move leaves this as it was. */}
+            {projects.length > 1 ? (
+              <>
+                <label htmlFor="detail-project" className={ROW_LABEL}>
+                  {t("tasks.fields.project")}
+                </label>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden className={ROW_ICON}>
+                    <Folder className="size-3.5" />
+                  </span>
+                  <Select
+                    id="detail-project"
+                    className={QUIET_CONTROL}
+                    value={task.projectId}
+                    disabled={disabled}
+                    onChange={(event) => onMove(event.target.value)}
+                  >
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </>
+            ) : null}
+
             <label htmlFor="detail-status" className={ROW_LABEL}>
               {t("tasks.fields.status")}
             </label>

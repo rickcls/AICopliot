@@ -20,3 +20,33 @@ export function pickStatusForCategory<
   }
   return ordered[0] ?? null;
 }
+
+/**
+ * The column a task lands in when it moves to another project.
+ *
+ * The same key first (Backlog to Backlog), then the first column of the same
+ * category in board order — not "In progress", because moving a task is not
+ * a report that work started. A blocked task moving to a project that keeps
+ * no blocked column goes to that project's default column, and `fellBack`
+ * says so, so the person is told rather than finding it there.
+ */
+export function pickStatusForMove<
+  T extends {
+    id: string;
+    key: string;
+    category: TaskStatusCategory;
+    position: number;
+    isDefault: boolean;
+  },
+>(
+  statuses: readonly T[],
+  current: { key: string; category: TaskStatusCategory },
+): { status: T; fellBack: boolean } | null {
+  const ordered = [...statuses].sort((a, b) => a.position - b.position);
+  const same =
+    ordered.find((status) => status.key === current.key && status.category === current.category) ??
+    ordered.find((status) => status.category === current.category);
+  if (same) return { status: same, fellBack: false };
+  const fallback = ordered.find((status) => status.isDefault) ?? ordered[0];
+  return fallback ? { status: fallback, fellBack: true } : null;
+}

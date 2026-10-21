@@ -222,7 +222,9 @@ export async function answerQuestion(
         queryEmbedding,
         searchQuery,
         topK,
-        deps.projectId ?? null,
+        // A task's links are its own evidence wherever the document is filed
+        // (a moved task keeps them), so the project filter would only hide one.
+        focus?.kind === "task" && focusDocumentIds ? null : (deps.projectId ?? null),
         focusDocumentIds,
       ),
     ),

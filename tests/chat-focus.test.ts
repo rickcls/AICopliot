@@ -104,7 +104,7 @@ describe("resolveNewThreadScope", () => {
 });
 
 describe("answerFocusFor", () => {
-  it("reads a task's linked documents fresh, inside its project", async () => {
+  it("reads a task's linked documents fresh, wherever they are filed in the workspace", async () => {
     prisma.taskDocument.findMany.mockResolvedValue([{ documentId: "d1" }]);
     const focus = await answerFocusFor("ws-1", {
       projectId: "p1",
@@ -116,7 +116,7 @@ describe("answerFocusFor", () => {
     expect(prisma.taskDocument.findMany.mock.calls[0][0].where).toMatchObject({
       workspaceId: "ws-1",
       taskId: "t1",
-      document: { workspaceId: "ws-1", projectId: "p1" },
+      document: { workspaceId: "ws-1" },
     });
   });
 
