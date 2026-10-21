@@ -3,8 +3,7 @@ import {
   buildDayPlanUserMessage,
   describeDue,
   validateDayPlan,
-  type PlanCandidate,
-} from "@/lib/today/plan";
+  type PlanCandidate, planItemState } from "@/lib/today/plan";
 
 const candidate = (label: string, taskId: string, estimateMinutes: number | null = null): PlanCandidate => ({
   label,
@@ -135,5 +134,40 @@ describe("the planner's input", () => {
     expect(message).toContain("T1: Task T1");
     expect(message).toContain("AVAILABLE: 360 minutes");
     expect(message).not.toContain("task-1");
+  });
+});
+
+describe("planItemState", () => {
+  const plannedAt = new Date("2026-10-21T01:00:00Z");
+  const before = new Date("2026-10-20T00:00:00Z");
+  const after = new Date("2026-10-21T02:00:00Z");
+
+  it("is done once the task is done", () => {
+    expect(planItemState({ category: "done", updatedAt: before, lastNoteAt: null }, plannedAt)).toBe("done");
+  });
+
+  it("is updated once anything was said or changed after planning", () => {
+    expect(planItemState({ category: "open", updatedAt: after, lastNoteAt: null }, plannedAt)).toBe("updated");
+    expect(planItemState({ category: "blocked", updatedAt: before, lastNoteAt: after }, plannedAt)).toBe("updated");
+  });
+
+  it("is still waiting when nothing happened since planning", () => {
+    expect(planItemState({ category: "open", updatedAt: before, lastNoteAt: before }, plannedAt)).toBe("pending");
+  });
+});
+
+describe("validateDayPlan prose", () => {
+  it("names a task by its title where the model wrote its label", () => {
+    const candidates = new Map([
+      ["T1", { label: "T1", taskId: "t-quote", title: "準備報價", project: "Ops", status: "open", due: "明天到期", priority: "high", estimateMinutes: null, quietDays: 0 }],
+    ]);
+    const plan = validateDayPlan(
+      { summary: "T1 雖然明天到期，但今天先完成其他工作。", items: [{ task: "T1", minutes: 30, reason: "T1 最急。" }] },
+      candidates,
+      120,
+      "zh-Hant",
+    );
+    expect(plan.summary).toBe("「準備報價」雖然明天到期，但今天先完成其他工作。");
+    expect(plan.items[0].reason).toBe("「準備報價」最急。");
   });
 });

@@ -1,28 +1,44 @@
 "use client";
 
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, Check } from "lucide-react";
+import { CalendarClock, Check, RefreshCw } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { Button, Card, ErrorState, Input, Spinner } from "@/components/ui";
+import { CheckInStrip, type CheckInAction } from "@/components/today/check-in-strip";
+import { Badge, Button, Card, ErrorState, FOCUS_RING, Input, Spinner } from "@/components/ui";
+import type { PlanItemState } from "@/lib/today/plan";
 import type { DayPlanView } from "@/lib/today/plan-service";
 import { cn } from "@/lib/utils";
+
+type Mode = "replace" | "next";
+
+/** Half-hour steps between 0.5 and 14, the range the planner accepts. */
+function hoursFrom(minutes: number): number {
+  return Math.min(14, Math.max(0.5, Math.round(minutes / 30) / 2));
+}
 
 /**
  * The day's suggested order. It is a suggestion and nothing more — no task is
  * changed by making or remaking it — so it is shown as a numbered list with
- * the reason for each step, and finished tasks are ticked from their live
- * status rather than from anything the plan remembers.
+ * the reason for each step.
+ *
+ * Each item can be checked in from here, the same way as a Today row, and its
+ * mark comes from the task as it is now: ✓ once done, "updated" once anything
+ * was said about it since it was planned. When nothing in the plan is still
+ * waiting on the person, the card offers the next batch — the tasks not yet in
+ * today's plan, for the hours they give — instead of leaving a finished list.
  */
 export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }) {
   const t = useT();
   const ids = useId();
   const [plan, setPlan] = useState(initialPlan);
+  const [mode, setMode] = useState<Mode>("replace");
   const [editing, setEditing] = useState(initialPlan === null);
-  const [hours, setHours] = useState(initialPlan ? initialPlan.availableMinutes / 60 : 6);
+  const [hours, setHours] = useState(initialPlan ? hoursFrom(initialPlan.availableMinutes) : 6);
   const [note, setNote] = useState(initialPlan?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingIn, setCheckingIn] = useState<string | null>(null);
 
   async function make() {
     setBusy(true);
@@ -31,11 +47,15 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
       const response = await fetch("/api/today/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ availableHours: hours, ...(note.trim() ? { note: note.trim() } : {}) }),
+        body: JSON.stringify({
+          availableHours: hours,
+          ...(note.trim() ? { note: note.trim() } : {}),
+          ...(mode === "next" ? { append: true } : {}),
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.plan) {
-        setError(data.error ?? t("plan.failed"));
+        setError(data.code === "nothing_left" ? t("plan.nothingLeft") : (data.error ?? t("plan.failed")));
         return;
       }
       setPlan(data.plan as DayPlanView);
@@ -47,7 +67,31 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
     }
   }
 
+  function open(next: Mode) {
+    setMode(next);
+    setError(null);
+    if (next === "next" && plan) {
+      // Whatever is left of the day, or two hours when the plan filled it.
+      const left = plan.availableMinutes - used;
+      setHours(left >= 30 ? hoursFrom(left) : 2);
+      setNote("");
+    }
+    setEditing(true);
+  }
+
+  /** The mark moves at once; the page's refresh then brings the task's real state. */
+  function checkedIn(taskId: string, action: CheckInAction) {
+    setCheckingIn(null);
+    const state: PlanItemState = action === "done" ? "done" : "updated";
+    setPlan((current) =>
+      current
+        ? { ...current, items: current.items.map((item) => (item.taskId === taskId ? { ...item, state } : item)) }
+        : current,
+    );
+  }
+
   const used = plan ? plan.items.reduce((sum, item) => sum + item.minutes, 0) : 0;
+  const allHandled = plan !== null && plan.items.length > 0 && plan.items.every((item) => item.state !== "pending");
 
   return (
     <Card className="overflow-hidden">
@@ -60,11 +104,13 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
           <p className="mt-0.5 text-xs text-slate-500">
             {plan && !editing
               ? t("plan.total", { used, available: plan.availableMinutes })
-              : t("plan.lead")}
+              : mode === "next"
+                ? t("plan.nextLead")
+                : t("plan.lead")}
           </p>
         </div>
         {plan && !editing ? (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+          <Button type="button" size="sm" variant="ghost" onClick={() => open("replace")}>
             {t("plan.replan")}
           </Button>
         ) : null}
@@ -78,10 +124,10 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
           }}
           className="flex flex-wrap items-end gap-3 p-4"
         >
-          {plan ? <p className="w-full text-xs text-slate-500">{t("plan.replaces")}</p> : null}
+          {plan && mode === "replace" ? <p className="w-full text-xs text-slate-500">{t("plan.replaces")}</p> : null}
           <div>
             <label htmlFor={`${ids}-hours`} className="mb-1 block text-xs font-medium text-slate-500">
-              {t("plan.hours")}
+              {mode === "next" ? t("plan.nextHours") : t("plan.hours")}
             </label>
             <Input
               id={`${ids}-hours`}
@@ -107,10 +153,17 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
               className="h-9"
             />
           </div>
-          <Button type="submit" disabled={busy || !(hours >= 0.5 && hours <= 14)}>
-            {busy ? <Spinner className="border-white/40 border-t-white" /> : null}
-            {busy ? t("plan.making") : t("plan.make")}
-          </Button>
+          <div className="flex items-center gap-2">
+            {plan ? (
+              <Button type="button" variant="ghost" disabled={busy} onClick={() => setEditing(false)}>
+                {t("common.cancel")}
+              </Button>
+            ) : null}
+            <Button type="submit" disabled={busy || !(hours >= 0.5 && hours <= 14)}>
+              {busy ? <Spinner className="border-white/40 border-t-white" /> : null}
+              {busy ? t("plan.making") : mode === "next" ? t("plan.makeNext") : t("plan.make")}
+            </Button>
+          </div>
           {error ? (
             <div className="w-full">
               <ErrorState message={error} />
@@ -128,40 +181,103 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
             </div>
           ) : null}
           <ol className="space-y-2">
-            {plan.items.map((item, index) => (
-              <li key={item.taskId} className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold",
-                    item.done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600",
-                  )}
-                >
-                  {item.done ? <Check className="size-3" /> : index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <Link
-                      href={`/projects/${item.projectId}/tasks?task=${item.taskId}`}
-                      className={cn(
-                        "text-sm font-medium hover:underline",
-                        item.done ? "text-slate-400 line-through" : "text-slate-900",
-                      )}
-                    >
-                      {item.title}
-                    </Link>
-                    {item.done ? <span className="sr-only">{t("plan.done")}</span> : null}
-                    <span className="text-xs text-slate-500 tabular-nums">
-                      {t("plan.minutes", { count: item.minutes })} · {item.projectName}
-                    </span>
-                  </div>
-                  {item.reason ? <p className="text-xs text-slate-500">{item.reason}</p> : null}
-                </div>
-              </li>
-            ))}
+            {plan.items.map((item, index) => {
+              const firstOfBatch = item.batch > 1 && plan.items[index - 1]?.batch !== item.batch;
+              const stripId = `${ids}-check-${item.taskId}`;
+              return (
+                <Fragment key={item.taskId}>
+                  {firstOfBatch ? (
+                    <li aria-hidden className="pt-2 text-xs font-medium text-slate-400">
+                      {t("plan.batch", { count: item.batch })}
+                    </li>
+                  ) : null}
+                  <li>
+                    <div className="flex items-start gap-3">
+                      <StateMark state={item.state} index={index} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                          <Link
+                            href={`/projects/${item.projectId}/tasks?task=${item.taskId}`}
+                            className={cn(
+                              "text-sm font-medium hover:underline",
+                              item.state === "done" ? "text-slate-400 line-through" : "text-slate-900",
+                            )}
+                          >
+                            {item.title}
+                          </Link>
+                          {item.state === "done" ? <span className="sr-only">{t("plan.done")}</span> : null}
+                          {item.state === "updated" ? <Badge tone="info">{t("plan.updated")}</Badge> : null}
+                          <span className="text-xs text-slate-500 tabular-nums">
+                            {t("plan.minutes", { count: item.minutes })} · {item.projectName}
+                          </span>
+                        </div>
+                        {item.reason ? <p className="text-xs text-slate-500">{item.reason}</p> : null}
+                      </div>
+                      {item.state !== "done" ? (
+                        <button
+                          type="button"
+                          onClick={() => setCheckingIn(checkingIn === item.taskId ? null : item.taskId)}
+                          aria-expanded={checkingIn === item.taskId}
+                          aria-controls={stripId}
+                          aria-label={t("checkIn.actions", { title: item.title })}
+                          className={cn(
+                            "shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                            FOCUS_RING,
+                          )}
+                        >
+                          {checkingIn === item.taskId ? t("checkIn.close") : t("checkIn.open")}
+                        </button>
+                      ) : null}
+                    </div>
+                    {checkingIn === item.taskId ? (
+                      <CheckInStrip
+                        id={stripId}
+                        taskId={item.taskId}
+                        allowSnooze={false}
+                        onSaved={(action) => checkedIn(item.taskId, action)}
+                        className="mt-2 ml-8 rounded-lg bg-slate-50 px-3 py-2"
+                      />
+                    ) : null}
+                  </li>
+                </Fragment>
+              );
+            })}
           </ol>
+
+          {allHandled ? (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+              <p className="text-sm text-emerald-900">{t("plan.allHandled")}</p>
+              <Button type="button" size="sm" onClick={() => open("next")}>
+                {t("plan.nextBatch")}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </Card>
+  );
+}
+
+function StateMark({ state, index }: { state: PlanItemState; index: number }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold",
+        state === "done"
+          ? "bg-emerald-600 text-white"
+          : state === "updated"
+            ? "bg-blue-100 text-blue-700"
+            : "bg-slate-100 text-slate-600",
+      )}
+    >
+      {state === "done" ? (
+        <Check className="size-3" />
+      ) : state === "updated" ? (
+        <RefreshCw className="size-3" />
+      ) : (
+        index + 1
+      )}
+    </span>
   );
 }

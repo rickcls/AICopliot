@@ -320,6 +320,17 @@ export const en = {
     minutes: "{count} min",
     done: "Done",
     open: "Open task",
+    updated: "Updated",
+    allHandled: "Everything in this plan has been dealt with.",
+    nextBatch: "Plan the next batch",
+    nextLead: "Plans only the open tasks not already in today's plan.",
+    nextHours: "More hours today",
+    makeNext: "Plan the next batch",
+    nothingLeft: "Every open task is already in today's plan.",
+    batch: {
+      one: "Batch {count}",
+      other: "Batch {count}",
+    },
   },
   approach: {
     tab: "How to tackle it",

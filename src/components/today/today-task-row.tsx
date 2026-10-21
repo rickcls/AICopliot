@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Flag } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { PRIORITY_FLAG } from "@/components/task-types";
+import { CheckInStrip } from "@/components/today/check-in-strip";
 import { useToast } from "@/components/toast";
 import { Badge, Button, FOCUS_RING, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -23,8 +24,6 @@ export interface TodayRowTask {
   staleDays: number | null;
 }
 
-type Action = "done" | "progress" | "blocked" | "snooze";
-
 /**
  * One line per task on Today, with the check-in one click away: Update opens
  * a strip with an optional note and four answers. Every answer goes through
@@ -37,8 +36,6 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
   const router = useRouter();
   const ids = useId();
   const [open, setOpen] = useState(false);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState<Action | null>(null);
   const [due, setDue] = useState<string | null>(null);
   const [savingDue, setSavingDue] = useState(false);
   const priority = t(`priority.${task.priority}`);
@@ -66,33 +63,6 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
       toast.error(t("common.couldNotReach"));
     } finally {
       setSavingDue(false);
-    }
-  }
-
-  async function report(action: Action) {
-    setBusy(action);
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/check-in`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          ...(note.trim() && action !== "snooze" ? { note: note.trim() } : {}),
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(t("checkIn.failed"), data.error);
-        return;
-      }
-      toast.success(action === "snooze" ? t("checkIn.snoozed") : t("checkIn.saved"));
-      setOpen(false);
-      setNote("");
-      router.refresh();
-    } catch {
-      toast.error(t("common.couldNotReach"));
-    } finally {
-      setBusy(null);
     }
   }
 
@@ -173,36 +143,12 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
       </div>
 
       {open ? (
-        <div
+        <CheckInStrip
           id={`${ids}-actions`}
-          className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5"
-        >
-          <label htmlFor={`${ids}-note`} className="sr-only">
-            {t("checkIn.noteLabel")}
-          </label>
-          <Input
-            id={`${ids}-note`}
-            value={note}
-            maxLength={4000}
-            placeholder={t("checkIn.notePlaceholder")}
-            onChange={(event) => setNote(event.target.value)}
-            className="h-8 min-w-0 flex-1 basis-56 text-xs"
-          />
-          <Button type="button" size="sm" disabled={busy !== null} onClick={() => void report("done")}>
-            {t("checkIn.done")}
-          </Button>
-          <Button type="button" size="sm" variant="secondary" disabled={busy !== null} onClick={() => void report("progress")}>
-            {t("checkIn.progress")}
-          </Button>
-          <Button type="button" size="sm" variant="secondary" disabled={busy !== null} onClick={() => void report("blocked")}>
-            {t("checkIn.blocked")}
-          </Button>
-          {task.staleDays !== null ? (
-            <Button type="button" size="sm" variant="ghost" disabled={busy !== null} onClick={() => void report("snooze")}>
-              {t("checkIn.snooze")}
-            </Button>
-          ) : null}
-        </div>
+          taskId={task.id}
+          allowSnooze={task.staleDays !== null}
+          onSaved={() => setOpen(false)}
+        />
       ) : null}
     </li>
   );

@@ -105,7 +105,12 @@ export default async function TodayPage() {
         />
       ) : (
         <div className="space-y-6">
-          <DayPlanCard initialPlan={plan} />
+          {/* Keyed on the plan's marks: a check-in anywhere on the page refreshes
+              the server data, and the card then starts again from it. */}
+          <DayPlanCard
+            key={plan ? `${plan.updatedAt}:${plan.items.map((item) => item.state).join("")}` : "none"}
+            initialPlan={plan}
+          />
 
           {sections.length === 0 && quietLater.length === 0 && undatedRows.length === 0 ? (
             <Card className="p-5">

@@ -317,6 +317,17 @@ export const zhHant = {
     minutes: "{count} 分鐘",
     done: "已完成",
     open: "打開工作",
+    updated: "已更新",
+    allHandled: "這批工作已全部處理好。",
+    nextBatch: "排下一批",
+    nextLead: "只會安排今日計劃中還未出現的未完成工作。",
+    nextHours: "今日還有多少時數",
+    makeNext: "排下一批",
+    nothingLeft: "所有未完成的工作都已在今日的計劃中。",
+    batch: {
+      one: "第 {count} 批",
+      other: "第 {count} 批",
+    },
   },
   approach: {
     tab: "建議做法",
