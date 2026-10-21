@@ -135,7 +135,7 @@ export function ProjectTabs({
       // row: a two-row tab strip reads as two groups and hides which row the
       // active tab is on. `scrollbar-none` is deliberately not used — the bar is
       // the affordance telling you there is more to the right.
-      className="-mx-4 overflow-x-auto border-b border-sand-200 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+      className="-mx-4 overflow-x-auto border-b border-sand-200 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
     >
       <ul className="flex w-max min-w-full items-center gap-1">
         {sections.map((section) => {

@@ -73,7 +73,7 @@ export default async function AppLayout({
             whenever the page is scrolled. */}
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-sand-900 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-xl focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
         >
           {t("app.skipToContent")}
         </a>
@@ -85,12 +85,13 @@ export default async function AppLayout({
             workspaceId={workspace.workspaceId}
             workspaceName={workspace.workspaceName}
             workspaces={memberships}
+            userName={user.name}
             userEmail={user.email}
             isAdmin={workspace.role === "admin"}
           />
           <main
             id="main"
-            className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+            className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10"
           >
             {children}
           </main>

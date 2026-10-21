@@ -4,7 +4,7 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import { Square, Voicemail } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import type { DictationLanguage } from "@/components/capture/dictation-button";
-import { FOCUS_RING } from "@/components/ui";
+import { buttonClasses } from "@/components/ui";
 import {
   encodeWav,
   splitSamples,
@@ -148,12 +148,8 @@ export function VoiceRecorder({
         aria-pressed={state === "recording"}
         title={t("voice.maxLength")}
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
-          FOCUS_RING,
-          state === "recording"
-            ? "border-red-200 bg-red-50 text-red-700"
-            : "border-sand-200 bg-white text-sand-700 hover:bg-sand-50",
-          "disabled:cursor-not-allowed disabled:opacity-50",
+          buttonClasses({ variant: "secondary", size: "sm", className: "gap-1.5 px-2.5 text-xs" }),
+          state === "recording" && "border-red-200 bg-red-50 text-red-700 hover:border-red-200 hover:bg-red-50",
         )}
       >
         {state === "recording" ? (

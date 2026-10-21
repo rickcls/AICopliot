@@ -535,6 +535,27 @@ export const en = {
     title: "Today",
     lead: "Open tasks assigned to you, across every project.",
     soloLead: "Open tasks across every project — in a workspace of one, every task is yours.",
+    greeting: {
+      morning: "Good morning",
+      afternoon: "Good afternoon",
+      evening: "Good evening",
+    },
+    greetingNamed: "{greeting}, {name}",
+    summary: {
+      overdue: {
+        one: "{count} overdue task",
+        other: "{count} overdue tasks",
+      },
+      dueToday: {
+        one: "{count} due today",
+        other: "{count} due today",
+      },
+      blocked: {
+        one: "{count} blocked",
+        other: "{count} blocked",
+      },
+      sentence: "You have {items}.",
+    },
     overdue: "Overdue",
     dueToday: "Due today",
     blocked: "Blocked",

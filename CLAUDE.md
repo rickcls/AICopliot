@@ -672,6 +672,26 @@ Also there, and to be reused rather than re-typed:
 - `StatCard` (a zero renders neutral whatever its tone) and `ProgressBar` (fed
   by `percentOf` from `progress.ts`, never a raw `Math.round`).
 - `FilterChip` (`aria-pressed` carries the state), `SearchField`, and `CHECKBOX`.
+- `PageHeader` — a page's one `h1`, lead, and actions. Pages had written it
+  ten ways; new pages use it, and the rest move over page by page.
+- `SegmentedControl` + `Segment` — theme, language, board/list. Composed,
+  not driven by an options array, because segments hold an icon, a language
+  mark (with its own `lang`), or icon and text. Five copies existed.
+- `identityTone(seed)` — one colour per person or project, from its id or
+  email, so it is the same in every list (`Avatar`, the sidebar's project
+  marks).
+
+**The look is warm and quiet: paper, not a spreadsheet.** The neutral is
+`sand` (a warm grey whose lightness follows slate step for step, so contrast
+pairings held when it replaced slate), cards are `rounded-2xl` with the faint
+`shadow-soft` rather than a hard border, and copy sits a size up from the old
+`text-xs` default. **`brand` (terracotta) marks four things only: the primary
+action, the current selection (`bg-brand-50 text-brand-800` — a nav item, a
+pressed chip), focus, and the `BrandMark`.** It never carries a status: it
+sits close to overdue red and warning amber, so overdue keeps red *and* a
+glyph, and a status pill never borrows the brand. `BrandMark` is drawn with
+`currentColor` and `fill-white`, so the dark remap redraws it without a
+second version.
 
 **The Review page follows the same pattern.** Proposals were a card each with
 every field a live input; they are now one line (title, the facts that decide
@@ -1536,15 +1556,26 @@ value. Do not read it as precedent.
 Dark mode is a **palette remap, not `dark:` variants.** Every utility reads a
 `--color-*` variable, so the generated block between `/* dark-palette:start */`
 and `/* dark-palette:end */` in `src/app/globals.css` inverts each scale
-(50↔950, 100↔900, …) and the whole UI follows. Consequences:
+(50↔950, 100↔900, …; 500 stays put) and the whole UI follows. Consequences:
 
 - **Do not add `dark:` classes.** Write light-mode classes; they invert.
 - **White is a surface, not white.** It maps one step above the page so
-  `slate-100` hovers stay visible on a card. For something that must stay dark
+  `sand-100` hovers stay visible on a card. For something that must stay dark
   in both themes (a dialog backdrop), use `black`, which is not remapped.
-- **Regenerate the block rather than hand-editing it** if Tailwind's palette
-  changes or a new colour family comes into use. It is derived from
-  `node_modules/tailwindcss/theme.css`.
+- **The app's own families (`sand`, `brand`) live in a plain `@theme` block,
+  never `@theme inline`.** `inline` compiles a utility to the literal colour
+  instead of `var(--color-…)`, and the remap could no longer reach it.
+- **The neutral is `sand`, not `slate`.** No `slate-*` class is left. The word
+  `"slate"` survives only as a stored task-column colour key
+  (`ProjectTaskStatus.color`, the seeded Backlog) and the `STATUS_DOT` /
+  `STATUS_PILL` keys that read it — data, so it is never renamed; it maps to
+  `sand-*` classes.
+- **Regenerate the block rather than hand-editing it:**
+  `node scripts/generate-dark-palette.mjs`. It reads
+  `node_modules/tailwindcss/theme.css` plus the families declared in
+  `globals.css`, writes only families `src/` uses, and derives `white` from
+  `sand`. Rerun it whenever a colour family comes into or out of use; a
+  second run must change nothing.
 
 It follows the OS preference unless the viewer picks Light or Dark in the
 sidebar's `ThemeToggle`. The choice is stored in `localStorage` and applied to
