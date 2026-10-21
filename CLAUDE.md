@@ -310,9 +310,12 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    W and no workspace source still is, whatever the model claimed. Web
    results are not the person's files and are not general knowledge. Document
    Q&A is unchanged. Changes it suggests go through
-   `validateCaptureProposals` (citations, server-resolved dates) and are
-   applied only by Apply, through `applyChange` and a claim on
-   `AssistantProposal`. History carries wording only, with labels stripped.
+   `validateCaptureProposals` (citations, server-resolved dates). Sending the
+   message is the person asking, so a proposal with no flag is applied in
+   that same turn through `applyChange` and a claim on `AssistantProposal`.
+   A flagged one — the code disagrees with the date, or the new task may
+   repeat an open one — stays for Apply. History carries wording only, with
+   labels stripped.
 
 ## ⚠️ Prisma drops the pgvector index on every migration
 
@@ -914,6 +917,7 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
 - **Tools** (`tools.ts`): `search_documents` (the chat's hybrid retrieval at
   the same evidence bar, falling back to a literal match without
   embeddings), `list_my_tasks` (Today's buckets, staleness, and ranking),
+  `find_tasks` (open tasks whose titles share words with the query),
   `get_task` (description, recent notes, linked documents — by label only),
   `search_notes` (the caller's own captures), `draft_email` (saves a
   private draft through the email service; never sends), and `search_web`
@@ -932,6 +936,14 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
   (enough to link — passage, task, note, draft, project, web page), the tool
   trace shown as "What it looked up", the general flag, draft ids, and
   proposals.
+- **A typed instruction is carried out in the same turn.** Creating a task,
+  changing its priority, due date, or status, and adding a comment are
+  proposals through the capture validator. Tasks that share a word with the
+  question are already labelled `T` in the opening message, and `find_tasks`
+  covers a name that was not. A proposal with no flag is applied before the
+  reply is returned, through `applyChange`. A possible duplicate, or a date
+  the code disagrees with, stays pending for Apply. The tools themselves
+  still do not write a task.
 - **Proposals render through `ProposalList`** (`components/capture/
   proposal-list.tsx`), shared with captures; only the apply and decide
   endpoints differ. Applying both kinds goes through

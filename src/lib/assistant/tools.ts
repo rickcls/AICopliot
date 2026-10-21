@@ -12,6 +12,7 @@ import { getEmbeddingProvider, type ChatProvider, type EmbeddingProvider } from 
 import { hasGroundingEvidence } from "@/lib/rag/ranking";
 import { retrieveChunks } from "@/lib/rag/retrieve";
 import { SourceRegistry, TASK_FILTERS, type ToolName } from "@/lib/assistant/protocol";
+import { tasksMatchingText } from "@/lib/capture/candidates";
 
 /**
  * The assistant's tools. Every one reads inside the caller's workspace — and
@@ -49,6 +50,7 @@ const inputs = {
     project: z.string().trim().max(12).optional(),
   }),
   list_my_tasks: z.object({ filter: z.enum(TASK_FILTERS).catch("open") }),
+  find_tasks: z.object({ query: z.string().trim().min(1).max(200) }),
   get_task: z.object({ task: z.string().trim().min(1).max(12) }),
   search_notes: z.object({ query: z.string().trim().min(1).max(200) }),
   draft_email: z.object({
@@ -142,9 +144,22 @@ async function listMyTasks(ctx: ToolContext, input: z.infer<typeof inputs.list_m
   return { text: lines.join("\n"), summary: String(chosen.length) };
 }
 
+async function findTasks(ctx: ToolContext, input: z.infer<typeof inputs.find_tasks>): Promise<ToolOutcome> {
+  const tasks = await getMyOpenTasks(ctx.access.workspaceId, ctx.access.userId);
+  const matched = tasksMatchingText(tasks, input.query, ctx.today, 8);
+  if (matched.length === 0) {
+    return {
+      text: "No open task title shares those words. Do not invent a T label. Create a task if they asked for a new one.",
+      summary: "0",
+    };
+  }
+  const lines = matched.map((task) => `${registerTask(ctx, task).label}: ${taskFacts(task, ctx.today)}`);
+  return { text: lines.join("\n"), summary: String(matched.length) };
+}
+
 async function getTask(ctx: ToolContext, input: z.infer<typeof inputs.get_task>): Promise<ToolOutcome> {
   const source = ctx.registry.get(input.task);
-  if (source?.kind !== "task") return { text: `Unknown task label ${input.task}. List tasks first.`, summary: "unknown" };
+  if (source?.kind !== "task") return { text: `Unknown task label ${input.task}. Find or list tasks first.`, summary: "unknown" };
   const task = await prisma.task.findFirst({
     where: officialRecordWhere({ id: source.taskId, workspaceId: ctx.access.workspaceId }),
     select: {
@@ -320,6 +335,8 @@ export async function runTool(tool: ToolName, rawInput: Record<string, unknown>,
       return searchDocuments(ctx, parsed.data as z.infer<typeof inputs.search_documents>);
     case "list_my_tasks":
       return listMyTasks(ctx, parsed.data as z.infer<typeof inputs.list_my_tasks>);
+    case "find_tasks":
+      return findTasks(ctx, parsed.data as z.infer<typeof inputs.find_tasks>);
     case "get_task":
       return getTask(ctx, parsed.data as z.infer<typeof inputs.get_task>);
     case "search_notes":

@@ -84,6 +84,32 @@ describe("assistant tools", () => {
     expect(ctx.registry.get("T3")).toMatchObject({ taskId: "c" });
   });
 
+  it("finds a task by the words in its title and skips the rest", async () => {
+    mockMyTasks.mockResolvedValue([
+      { ...task("task-secret-a", "2026-10-20"), title: "提交月報" },
+      { ...task("b", "2026-10-16"), title: "Send quote" },
+    ]);
+    const ctx = context();
+    const outcome = await runTool("find_tasks", { query: "月報" }, ctx);
+
+    expect(outcome.summary).toBe("1");
+    expect(outcome.text).toContain("T1: 提交月報");
+    expect(outcome.text).not.toContain("Send quote");
+    expect(outcome.text).not.toContain("task-secret-a");
+    expect(ctx.registry.get("T1")).toMatchObject({ kind: "task", taskId: "task-secret-a" });
+
+    const again = await runTool("find_tasks", { query: "月報" }, ctx);
+    expect(again.text).toMatch(/^T1:/);
+    expect(ctx.registry.get("T2")).toBeUndefined();
+  });
+
+  it("does not invent a task label when nothing matches", async () => {
+    mockMyTasks.mockResolvedValue([task("a", "2026-10-20")]);
+    const outcome = await runTool("find_tasks", { query: "月報" }, context());
+    expect(outcome.summary).toBe("0");
+    expect(outcome.text).toContain("Do not invent a T label");
+  });
+
   it("will not read a task by a label it never issued", async () => {
     const outcome = await runTool("get_task", { task: "T9" }, context());
     expect(outcome.text).toContain("Unknown task label");

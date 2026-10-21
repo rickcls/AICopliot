@@ -24,6 +24,8 @@ import { getEnv } from "@/lib/env";
 import type { EmailDraftView } from "@/lib/email/service";
 import type { FactFlag } from "@/lib/email/facts";
 import { detectReplyLanguage } from "@/lib/language";
+import { tasksMatchingText } from "@/lib/capture/candidates";
+import { getMyOpenTasks } from "@/lib/pm/my-work";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
 import {
   getChatProvider,
@@ -39,10 +41,11 @@ import { DEFAULT_TIME_ZONE, localToday } from "@/lib/time";
  * The loop is the only place in the app where a model chooses its next step,
  * and it is fenced in three ways: it ends after `MAX_TOOL_STEPS` tools or
  * `DEADLINE_MS`, whichever comes first (then the model must answer with what
- * it has); its tools only read, or save a draft; and anything it would change
- * comes back as a proposal through the capture validator and the shared write
- * path, applied only when the person clicks. Threads are private to their
- * person, like chat threads.
+ * it has); its tools only read, or save a draft; and a task change comes back
+ * as a proposal through the capture validator. Sending the message is the
+ * person asking for that change, so one with no flag is written in this same
+ * turn. A flagged one stays for Apply. Threads are private to their person,
+ * like chat threads.
  */
 
 export type AssistantAccess = WorkspaceAccess & { user: SessionUser };
@@ -156,6 +159,26 @@ export async function runAssistantTurn(
     return { label: source.label, name: project.name, personal: project.personalOwnerId === access.userId };
   });
 
+  const openTasks = await getMyOpenTasks(access.workspaceId, access.userId);
+  // Labelled before the model speaks, so "set the monthly report to urgent"
+  // can name T1 in the same answer. A title with no word in common stays out.
+  const taskLines = tasksMatchingText(openTasks, input.question, today).map((task) => {
+    const due = task.dueDate ? task.dueDate.toISOString().slice(0, 10) : "none";
+    const line = `${task.title} | project ${task.project.name} | status ${task.status.category} | due ${due} | priority ${task.priority}`;
+    const source = registry.add("T", `task:${task.id}`, (label) => ({
+      label,
+      kind: "task" as const,
+      taskId: task.id,
+      projectId: task.project.id,
+      title: task.title,
+      category: task.status.category,
+      dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
+      priority: task.priority,
+      facts: line,
+    }));
+    return { label: source.label, line };
+  });
+
   const chat = deps.chat ?? getChatProvider();
   const anchor = today.toISOString().slice(0, 10);
   // The switch only counts when a key exists. Without one the turn runs as usual.
@@ -171,6 +194,7 @@ export async function runAssistantTurn(
         timeZone,
         language,
         projects: projectLabels,
+        tasks: taskLines,
         history: earlier.reverse().map((turn) => ({
           role: turn.role === "assistant" ? ("assistant" as const) : ("user" as const),
           content: stripLabels(turn.content).slice(0, 800),
@@ -287,6 +311,8 @@ export async function runAssistantTurn(
     return message;
   });
 
+  if (proposals.length > 0) await carryOutReadyProposals(access, saved.id, now);
+
   const [view] = await loadMessages(access, thread.id, [saved.id]);
   return { threadId: thread.id, message: view };
 }
@@ -388,6 +414,28 @@ async function loadMessages(access: WorkspaceAccess, threadId: string, ids?: str
 }
 
 // --- Applying what it proposed --------------------------------------------------
+
+/**
+ * Sending the message is the person asking for the change, so a proposal the
+ * validator accepted with no flag is written before the reply is shown. A
+ * flag means the date needs a look, or the new task may repeat an open one,
+ * and that one stays on the reply for Apply.
+ */
+async function carryOutReadyProposals(access: AssistantAccess, messageId: string, now: Date) {
+  const rows = await prisma.assistantProposal.findMany({
+    where: { messageId, ...scope(access), state: "pending" },
+    orderBy: { position: "asc" },
+    select: { id: true, flags: true },
+  });
+  const ready = rows.filter((row) => row.flags.length === 0);
+  if (ready.length === 0) return;
+  await applyAssistantProposals(
+    access,
+    messageId,
+    ready.map((row) => ({ proposalId: row.id })),
+    now,
+  );
+}
 
 export type AssistantApplyResult =
   | { proposalId: string; ok: true; taskId: string; commentId: string | null }

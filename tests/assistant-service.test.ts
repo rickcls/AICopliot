@@ -15,11 +15,15 @@ const tx = {
 const mockPrisma = {
   assistantThread: { findFirst: vi.fn(), create: vi.fn() },
   assistantMessage: { findMany: vi.fn(), create: vi.fn() },
-  assistantProposal: { findFirst: vi.fn() },
+  assistantProposal: { findFirst: vi.fn(), findMany: vi.fn() },
   project: { findMany: vi.fn() },
   emailDraft: { findMany: vi.fn() },
   $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
 };
+const mockMyTasks = vi.fn(async (_workspaceId: string, _userId: string) => [] as OpenTask[]);
+vi.mock("@/lib/pm/my-work", () => ({
+  getMyOpenTasks: (workspaceId: string, userId: string) => mockMyTasks(workspaceId, userId),
+}));
 const { mockEnv } = vi.hoisted(() => ({
   mockEnv: vi.fn(() => ({ TAVILY_API_KEY: undefined as string | undefined })),
 }));
@@ -59,9 +63,50 @@ function scriptedChat(...replies: string[]) {
   return { modelName: "fake", complete, seen };
 }
 
+interface OpenTask {
+  id: string;
+  title: string;
+  dueDate: Date | null;
+  priority: "low" | "medium" | "high" | "urgent";
+  estimatedHours: null;
+  updatedAt: Date;
+  status: { key: string; label: string; category: "open" | "blocked" | "done" };
+  project: { id: string; name: string };
+  comments: [];
+  snoozes: [];
+}
+
+function openTask(id: string, title: string, priority: OpenTask["priority"] = "medium"): OpenTask {
+  return {
+    id,
+    title,
+    dueDate: new Date("2026-10-20T00:00:00Z"),
+    priority,
+    estimatedHours: null,
+    updatedAt: new Date("2026-10-15T00:00:00Z"),
+    status: { key: "todo", label: "To do", category: "open" },
+    project: { id: "project-secret", name: "Sales" },
+    comments: [],
+    snoozes: [],
+  };
+}
+
+/** The rows just stored, which is what a later read of the same message sees. */
+function storedProposals() {
+  const data = (tx.assistantProposal.createMany.mock.calls[0]?.[0].data ?? []) as {
+    kind: string;
+    payload: unknown;
+    taskId: string | null;
+    flags: string[];
+  }[];
+  return data.map((row, index) => ({ id: `prop-${index}`, state: "pending" as const, ...row }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockEnv.mockReturnValue({ TAVILY_API_KEY: undefined });
+  mockMyTasks.mockResolvedValue([]);
+  mockPrisma.assistantProposal.findMany.mockResolvedValue([]);
   mockPrisma.assistantThread.create.mockResolvedValue({ id: "thread-1" });
   mockPrisma.assistantMessage.findMany.mockResolvedValue([]);
   mockPrisma.project.findMany.mockResolvedValue([{ id: "project-secret", name: "Sales", personalOwnerId: null }]);
@@ -277,6 +322,103 @@ describe("runAssistantTurn", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ kind: "create_task", userId: "u-1", messageId: "msg-1" });
     expect(rows[0].payload.projectId).toBe("project-secret");
+    expect(mockApplyChange).not.toHaveBeenCalled();
+  });
+
+  it("names a matching open task in the prompt, and never its id", async () => {
+    mockMyTasks.mockResolvedValue([openTask("task-secret", "Send quote")]);
+    const chat = scriptedChat(
+      '{"action":"answer","answer":"Send quote is open [T1].","citations":["T1"],"proposals":[]}',
+    );
+
+    await service.runAssistantTurn(access, { question: "What is the status of Send quote?" }, { chat, now: NOW });
+
+    const opening = chat.seen[0][1].content;
+    expect(opening).toContain("T1: Send quote");
+    expect(opening).toContain("priority medium");
+    expect(opening).not.toContain("task-secret");
+    expect(mockMyTasks).toHaveBeenCalledWith("ws-1", "u-1");
+  });
+
+  it("writes an unflagged priority, due date, and comment in the same turn", async () => {
+    mockMyTasks.mockResolvedValue([openTask("task-secret", "Send quote")]);
+    mockPrisma.assistantProposal.findMany.mockImplementation(async () =>
+      storedProposals().map((row) => ({ id: row.id, flags: row.flags })),
+    );
+    mockPrisma.assistantProposal.findFirst.mockImplementation(
+      async ({ where }: { where: { id: string } }) => storedProposals().find((row) => row.id === where.id),
+    );
+    mockApplyChange.mockResolvedValue({ ok: true, taskId: "task-secret", commentId: "c-1" });
+    const chat = scriptedChat(
+      JSON.stringify({
+        action: "answer",
+        answer: "I'll set Send quote to urgent, due next Friday, and add your comment [T1].",
+        citations: ["T1"],
+        proposals: [
+          {
+            kind: "update_task",
+            task: "T1",
+            status: null,
+            priority: "urgent",
+            due: { phrase: "next Friday", date: "2026-10-23" },
+            citations: ["U1"],
+          },
+          { kind: "add_note", task: "T1", note: "Chased ABC", citations: ["U1"] },
+        ],
+      }),
+    );
+
+    await service.runAssistantTurn(
+      access,
+      { question: "Set Send quote to urgent, due next Friday, and add a comment: Chased ABC" },
+      { chat, now: NOW },
+    );
+
+    expect(chat.seen[0][0].content).toContain("find_tasks");
+    expect(chat.seen[0][0].content).not.toContain("You cannot change anything");
+    const rows = tx.assistantProposal.createMany.mock.calls[0][0].data;
+    expect(rows[0]).toMatchObject({
+      kind: "update_task",
+      taskId: "task-secret",
+      flags: [],
+      payload: { priority: "urgent", dueDate: "2026-10-23" },
+    });
+    expect(rows[1]).toMatchObject({ kind: "add_note", payload: { note: "Chased ABC" } });
+    expect(mockApplyChange).toHaveBeenCalledTimes(2);
+    expect(mockApplyChange.mock.calls[0][1]).toMatchObject({ kind: "update_task", taskId: "task-secret" });
+    expect(mockApplyChange.mock.calls[1][1]).toMatchObject({ kind: "add_note", taskId: "task-secret" });
+  });
+
+  it("leaves a possible duplicate for Apply", async () => {
+    mockMyTasks.mockResolvedValue([openTask("task-secret", "Send quote")]);
+    mockPrisma.assistantProposal.findMany.mockImplementation(async () =>
+      storedProposals().map((row) => ({ id: row.id, flags: row.flags })),
+    );
+    const chat = scriptedChat(
+      JSON.stringify({
+        action: "answer",
+        answer: "That looks like the quote task you already have [T1].",
+        citations: ["T1"],
+        proposals: [
+          {
+            kind: "create_task",
+            title: "Send quote",
+            description: null,
+            project: null,
+            priority: null,
+            status: null,
+            due: null,
+            estimatedHours: null,
+            citations: ["U1"],
+          },
+        ],
+      }),
+    );
+
+    await service.runAssistantTurn(access, { question: "Add a task: Send quote" }, { chat, now: NOW });
+
+    expect(tx.assistantProposal.createMany.mock.calls[0][0].data[0].flags).toContain("possible_duplicate");
+    expect(mockApplyChange).not.toHaveBeenCalled();
   });
 });
 

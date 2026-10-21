@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { overlapTokens, rankTaskCandidates } from "@/lib/capture/candidates";
+import { overlapTokens, rankTaskCandidates, tasksMatchingText } from "@/lib/capture/candidates";
 import { pickStatusForCategory } from "@/lib/pm/status-pick";
 
 const today = new Date("2026-10-16T00:00:00Z");
@@ -39,6 +39,17 @@ describe("rankTaskCandidates", () => {
 
   it("caps the list", () => {
     expect(rankTaskCandidates([task("a"), task("b"), task("c")], "", today, 2)).toHaveLength(2);
+  });
+});
+
+describe("tasksMatchingText", () => {
+  it("drops titles that share no word, which the unfiltered ranking would still return", () => {
+    const matched = tasksMatchingText([task("提交月報"), task("準備季度預算")], "月報改成緊急", today);
+    expect(matched.map((row) => row.title)).toEqual(["提交月報"]);
+  });
+
+  it("returns nothing when the text has no usable word", () => {
+    expect(tasksMatchingText([task("提交月報")], "急", today)).toEqual([]);
   });
 });
 

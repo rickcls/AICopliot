@@ -66,6 +66,9 @@ describe("parseStep", () => {
     expect(parseStep(call, toolsForTurn(true))).toMatchObject({ kind: "tool", tool: "search_web" });
     expect(assistantSystemPrompt(false)).not.toContain("search_web");
     expect(assistantSystemPrompt(true)).toContain("search_web");
+    expect(assistantSystemPrompt(false)).toContain("find_tasks");
+    expect(assistantSystemPrompt(false)).toContain("Do not tell the person you are unable");
+    expect(assistantSystemPrompt(false)).not.toContain("You cannot change anything");
   });
 
   it("returns null for anything that is not one valid step", () => {
@@ -181,5 +184,51 @@ describe("validateAssistantProposals", () => {
     );
     expect(proposals).toHaveLength(1);
     expect(proposals[0]).toMatchObject({ kind: "update_task", taskId: "t1", payload: { status: "done" } });
+  });
+
+  it("keeps a priority, a due date, and a comment taken from the person's own words", () => {
+    const r = new SourceRegistry();
+    r.add("U", "question", (label) => ({
+      label,
+      kind: "question" as const,
+      content: "把提交月報改成緊急，下星期五前要交，備註：已跟進 Peter",
+    }));
+    r.add("T", "task:report", (label) => ({
+      label,
+      kind: "task" as const,
+      taskId: "task-report",
+      projectId: "p1",
+      title: "提交月報",
+      category: "open" as const,
+      dueDate: null,
+      priority: "medium" as const,
+      facts: "提交月報 | status open | due none | priority medium",
+    }));
+
+    const proposals = validateAssistantProposals(
+      [
+        {
+          kind: "update_task",
+          task: "T1",
+          status: null,
+          priority: "urgent",
+          due: { phrase: "下星期五", date: "2026-10-23" },
+          citations: ["U1"],
+        },
+        { kind: "add_note", task: "T1", note: "已跟進 Peter", citations: ["U1"] },
+      ],
+      r,
+      "2026-10-16",
+      "zh-Hant",
+    );
+
+    expect(proposals).toHaveLength(2);
+    expect(proposals[0]).toMatchObject({
+      kind: "update_task",
+      taskId: "task-report",
+      payload: { priority: "urgent", dueDate: "2026-10-23", duePhrase: "下星期五" },
+      flags: [],
+    });
+    expect(proposals[1]).toMatchObject({ kind: "add_note", taskId: "task-report", payload: { note: "已跟進 Peter" } });
   });
 });

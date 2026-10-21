@@ -29,6 +29,30 @@ export interface CandidateTask {
   updatedAt: Date;
 }
 
+/**
+ * Tasks whose titles share a word with `text`, best match first.
+ *
+ * Unlike `rankTaskCandidates`, a title with nothing in common is left out.
+ * That is what makes it safe to hand the matches to the assistant as update
+ * targets: a question about one task must not offer every other open task.
+ */
+export function tasksMatchingText<T extends CandidateTask>(
+  tasks: readonly T[],
+  text: string,
+  today: Date,
+  limit = 12,
+): T[] {
+  const wanted = overlapTokens(text);
+  if (wanted.size === 0) return [];
+  const matched = tasks.filter((task) => {
+    for (const token of overlapTokens(task.title)) {
+      if (wanted.has(token)) return true;
+    }
+    return false;
+  });
+  return rankTaskCandidates(matched, text, today, limit);
+}
+
 export function rankTaskCandidates<T extends CandidateTask>(
   tasks: readonly T[],
   captureText: string,
