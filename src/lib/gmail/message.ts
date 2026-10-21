@@ -7,6 +7,10 @@
  * messages would otherwise be proposed as tasks all over again.
  */
 
+import { htmlToText, mailCaptureBody, stripQuotedReply } from "@/lib/mail/text";
+
+export { htmlToText, stripQuotedReply } from "@/lib/mail/text";
+
 export interface GmailPart {
   mimeType?: string;
   body?: { data?: string; size?: number };
@@ -32,52 +36,6 @@ function findPart(part: GmailPart, mimeType: string): GmailPart | null {
   return null;
 }
 
-const ENTITIES: Record<string, string> = {
-  "&nbsp;": " ",
-  "&amp;": "&",
-  "&lt;": "<",
-  "&gt;": ">",
-  "&quot;": '"',
-  "&#39;": "'",
-};
-
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity)
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-/** Lines that start the quoted history below a reply. */
-const QUOTE_MARKERS = [
-  /^On .{4,200} wrote:\s*$/m,
-  /^-{2,}\s*Original Message\s*-{2,}\s*$/im,
-  /^-{2,}\s*Forwarded message\s*-{2,}\s*$/im,
-  /^From: .+\n(?:Sent|Date): .+$/m,
-  /^寄件者[：:].+$/m,
-  /^於 .{4,200} 寫道[：:]\s*$/m,
-  /^在 .{4,200} 寫道[：:]\s*$/m,
-];
-
-export function stripQuotedReply(text: string): string {
-  let cut = text.length;
-  for (const marker of QUOTE_MARKERS) {
-    const match = marker.exec(text);
-    if (match && match.index > 0 && match.index < cut) cut = match.index;
-  }
-  return text
-    .slice(0, cut)
-    .split("\n")
-    .filter((line) => !line.startsWith(">"))
-    .join("\n")
-    .trim();
-}
-
 export function extractEmailText(payload: GmailPart): string {
   const plain = findPart(payload, "text/plain");
   if (plain?.body?.data) return stripQuotedReply(decodeBase64Url(plain.body.data));
@@ -88,16 +46,14 @@ export function extractEmailText(payload: GmailPart): string {
 }
 
 /** The capture body for one email: who, what, when, then the message. */
-export function emailCaptureBody(
-  payload: GmailPart,
-  maxChars = 8000,
-): string {
-  const lines = [
-    `From: ${header(payload, "From") ?? ""}`,
-    `Subject: ${header(payload, "Subject") ?? ""}`,
-    `Date: ${header(payload, "Date") ?? ""}`,
-    "",
-    extractEmailText(payload),
-  ];
-  return lines.join("\n").slice(0, maxChars);
+export function emailCaptureBody(payload: GmailPart, maxChars = 8000): string {
+  return mailCaptureBody(
+    {
+      from: header(payload, "From") ?? "",
+      subject: header(payload, "Subject") ?? "",
+      date: header(payload, "Date") ?? "",
+      text: extractEmailText(payload),
+    },
+    maxChars,
+  );
 }

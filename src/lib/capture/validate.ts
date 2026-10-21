@@ -134,17 +134,44 @@ function citedStatesWaiting(text: string): boolean {
  */
 type ModelDue = Extract<ModelProposal, { kind: "create_task" }>["due"];
 
+/** A chat line starts with the day it was written: "[2026-10-18 09:15] Peter：…". */
+const LINE_DAY = /^\[(\d{4}-\d{2}-\d{2})[ T]\d{2}:\d{2}\]/;
+
+/**
+ * The day each line was written, which is the day a relative date in it is
+ * counted from: a "聽日" in a WhatsApp message from three days ago meant two
+ * days ago. A long message split into several lines is stamped only on its
+ * first, so a line takes the day of the nearest stamped line above it. A note
+ * has no stamps, and every line is the capture's own day.
+ */
+function lineDays(lines: CaptureLine[], captureDay: string): Map<string, string> {
+  const days = new Map<string, string>();
+  let current = captureDay;
+  for (const line of lines) {
+    current = line.text.match(LINE_DAY)?.[1] ?? current;
+    days.set(line.label, current);
+  }
+  return days;
+}
+
 function checkDue(
   due: ModelDue,
   citationLabels: string[],
   ctx: CaptureValidationContext,
   flags: Set<ProposalFlag>,
+  days: Map<string, string>,
 ): { dueDate: string | null; duePhrase: string | null } {
   if (!due) return { dueDate: null, duePhrase: null };
   const near = compact(citedNeighbourhood(ctx.lines, citationLabels));
-  if (!near.includes(compact(due.phrase))) return { dueDate: null, duePhrase: null };
+  const phrase = compact(due.phrase);
+  if (!near.includes(phrase)) return { dueDate: null, duePhrase: null };
 
-  const resolved = resolveDateExpression(due.phrase, ctx.anchor);
+  // Counted from the day of the cited line that says it, else the first cited.
+  const sayer =
+    citationLabels.find((label) =>
+      compact(ctx.lines.find((line) => line.label === label)?.text ?? "").includes(phrase),
+    ) ?? citationLabels[0];
+  const resolved = resolveDateExpression(due.phrase, days.get(sayer) ?? ctx.anchor);
   if (!resolved) return { dueDate: null, duePhrase: null };
   if (resolved !== due.date) flags.add("date_check");
   return { dueDate: resolved, duePhrase: due.phrase };
@@ -158,6 +185,7 @@ export function validateCaptureProposals(
   dropped: { index: number; reason: DropReason }[];
 } {
   const lineByLabel = new Map(ctx.lines.map((line) => [line.label, line]));
+  const days = lineDays(ctx.lines, ctx.anchor);
   const openTitleKeys = new Set(
     [...[...ctx.tasks.values()].map((task) => task.title), ...(ctx.pendingTitles ?? [])].map(
       duplicateKey,
@@ -192,7 +220,7 @@ export function validateCaptureProposals(
     const flags = new Set<ProposalFlag>();
 
     if (proposal.kind === "create_task") {
-      const { dueDate, duePhrase } = checkDue(proposal.due, labels, ctx, flags);
+      const { dueDate, duePhrase } = checkDue(proposal.due, labels, ctx, flags, days);
       const title = proposal.title.slice(0, 200);
       if (openTitleKeys.has(duplicateKey(title))) flags.add("possible_duplicate");
       const estimate =
@@ -241,7 +269,7 @@ export function validateCaptureProposals(
       return;
     }
 
-    const { dueDate, duePhrase } = checkDue(proposal.due, labels, ctx, flags);
+    const { dueDate, duePhrase } = checkDue(proposal.due, labels, ctx, flags, days);
     // Only real changes survive: "done" for a task already done, or the due
     // date it already has, would be an Apply button that does nothing.
     const status = proposal.status && proposal.status !== task.category ? proposal.status : null;

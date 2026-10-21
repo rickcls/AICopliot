@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assistantSystemPrompt } from "@/lib/assistant/protocol";
 import {
+  buildCaptureUserMessage,
   buildReviseBlock,
   CAPTURE_SYSTEM_PROMPT,
   clarificationLine,
@@ -35,6 +36,31 @@ describe("capture prompt", () => {
   it("lets a later correction win over the lines it corrects", () => {
     expect(CAPTURE_SYSTEM_PROMPT).toContain('"補充："');
     expect(CAPTURE_SYSTEM_PROMPT).toContain("the correction wins");
+  });
+});
+
+describe("buildCaptureUserMessage", () => {
+  const base = {
+    today: "2026-10-16",
+    weekday: 5,
+    timeZone: "Asia/Hong_Kong",
+    lines: [{ label: "C1", text: "[2026-10-14 09:15] Peter：聽日send報價" }],
+    tasks: [],
+    projects: [],
+    language: "zh-Hant" as const,
+  };
+
+  it("adds no source line to the person's own note", () => {
+    expect(buildCaptureUserMessage(base)).not.toContain("SOURCE:");
+  });
+
+  it("says whose words a chat or an email is", () => {
+    expect(buildCaptureUserMessage({ ...base, source: "whatsapp" })).toContain(
+      "Lines from 我 are the person's own messages; every other line is someone else's words",
+    );
+    expect(buildCaptureUserMessage({ ...base, source: "email" })).toContain(
+      "SOURCE: an email the person received",
+    );
   });
 });
 

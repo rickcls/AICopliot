@@ -79,7 +79,10 @@ export const reviseProposalSchema = z.object({
 export const createCaptureSchema = z.object({
   text: z.string().trim().min(3, "Write a little more first").max(8000).optional(),
   documentId: z.string().trim().min(1).optional(),
-  source: z.enum(["text", "voice"]).default("text"),
+  // "email" and "whatsapp" are text the person brought from elsewhere — a
+  // dropped mail file or a WhatsApp export read in the browser — so the model is
+  // told they are other people's words.
+  source: z.enum(["text", "voice", "email", "whatsapp"]).default("text"),
 }).refine(
   (value) => (value.text === undefined) !== (value.documentId === undefined),
   "Send text or a document, not both",

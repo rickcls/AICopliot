@@ -31,6 +31,9 @@ const envSchema = z.object({
   // The key is 32 random bytes, base64 (openssl rand -base64 32).
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** Outlook (Microsoft Graph, read-only). One app registration for company and personal accounts. */
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
   INTEGRATION_ENCRYPTION_KEY: z.string().optional(),
   // The public origin Google redirects back to. Unset, the request's own
   // origin is used — fine for one domain, but every preview URL would need

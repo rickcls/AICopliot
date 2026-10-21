@@ -5,6 +5,7 @@ import { open, parseKey, seal } from "@/lib/crypto/secretbox";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { emailCaptureBody, header, type GmailPart } from "@/lib/gmail/message";
+import type { MailboxStatus, MailListItem } from "@/lib/mail/mailboxes";
 import { OAuthError, refreshAccessToken, revokeToken } from "@/lib/gmail/oauth";
 
 /**
@@ -47,12 +48,7 @@ export function gmailRedirectUri(requestUrl: string): string {
   return new URL("/api/integrations/google/callback", origin).toString();
 }
 
-export interface GmailStatus {
-  configured: boolean;
-  connected: boolean;
-  email: string | null;
-  needsReconnect: boolean;
-}
+export type GmailStatus = MailboxStatus;
 
 export async function getGmailStatus(userId: string): Promise<GmailStatus> {
   const configured = gmailConfig() !== null;
@@ -149,14 +145,7 @@ async function gmailGet<T>(fetcher: typeof fetch, token: string, path: string): 
   return (await response.json()) as T;
 }
 
-export interface GmailListItem {
-  id: string;
-  from: string;
-  subject: string;
-  date: string;
-  snippet: string;
-  captureId: string | null;
-}
+export type GmailListItem = MailListItem;
 
 /** Headers of recent inbox mail. No model call, nothing stored but a timestamp. */
 export async function listRecentMail(

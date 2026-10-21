@@ -92,6 +92,22 @@ describe("validateCaptureProposals", () => {
     expect(proposals[0].flags).toContain("possible_duplicate");
   });
 
+  it("counts a relative date from the day the chat message was written", () => {
+    const { lines: chat } = splitCaptureLines(
+      "[2026-10-13 10:00] Peter：份合約好重要。聽日要簽\n[2026-10-15 18:00] Peter：下星期五交報價",
+    );
+    // C1 is stamped 13 October; C2 is the same message's second sentence; C3 is the 15th.
+    const { proposals } = validateCaptureProposals(
+      [
+        create({ title: "Sign the contract", due: { phrase: "聽日", date: "2026-10-17" }, citations: ["C2"] }),
+        create({ title: "Send the quote", due: { phrase: "下星期五", date: "2026-10-23" }, citations: ["C3"] }),
+      ],
+      { ...ctx, lines: chat },
+    );
+    expect(proposals[0].payload).toMatchObject({ dueDate: "2026-10-14" });
+    expect(proposals[1].payload).toMatchObject({ dueDate: "2026-10-23" });
+  });
+
   it("drops a proposal with no real citation", () => {
     const { proposals, dropped } = validateCaptureProposals(
       [create({ citations: [] }), create({ citations: ["C99", "S1"] })],

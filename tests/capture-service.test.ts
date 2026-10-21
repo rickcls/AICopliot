@@ -111,6 +111,46 @@ describe("createCapture", () => {
     );
   });
 
+  it("tells the model a WhatsApp chat is other people's words, dated per message", async () => {
+    const body = "[2026-10-14 09:15] Peter：聽日send報價俾我\n[2026-10-14 09:16] 我：冇問題";
+    mockPrisma.capture.findFirst.mockResolvedValue({
+      id: "cap-1",
+      body,
+      localDate: new Date("2026-10-16T00:00:00Z"),
+      timeZone: "Asia/Hong_Kong",
+      replyLanguage: "zh-Hant",
+      source: "whatsapp",
+    });
+    const chat = fakeChat(
+      JSON.stringify({
+        proposals: [
+          {
+            kind: "create_task",
+            title: "發送報價給 Peter",
+            description: null,
+            project: null,
+            priority: null,
+            status: null,
+            due: { phrase: "聽日", date: "2026-10-17" },
+            estimatedHours: null,
+            citations: ["C1"],
+          },
+        ],
+      }),
+    );
+
+    await service.createCapture(access, { text: body, source: "whatsapp" }, { chat, now: NOW });
+
+    expect(mockPrisma.capture.create.mock.calls[0][0].data.source).toBe("whatsapp");
+    const prompt = JSON.stringify(chat.complete.mock.calls[0][0]);
+    expect(prompt).toContain("SOURCE: a WhatsApp chat the person took part in");
+    expect(prompt).not.toContain("task-secret-id");
+    // "聽日" in a message from 14 October is the 15th, not the day after the capture.
+    const [proposal] = mockPrisma.captureProposal.createMany.mock.calls[0][0].data;
+    expect(proposal.payload).toMatchObject({ dueDate: "2026-10-15", duePhrase: "聽日" });
+    expect(proposal.flags).toContain("date_check");
+  });
+
   it("detects English input and asks for English", async () => {
     const chat = fakeChat('{"proposals":[]}');
     await service.createCapture(access, { text: "Send the quote to ABC tomorrow", source: "text" }, { chat, now: NOW });

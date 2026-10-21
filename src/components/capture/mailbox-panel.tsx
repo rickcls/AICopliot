@@ -5,22 +5,31 @@ import { Inbox, Mail } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { Badge, Button, buttonClasses, Card, ErrorState, Spinner } from "@/components/ui";
 import type { CaptureView } from "@/lib/capture/view";
-import type { GmailListItem, GmailStatus } from "@/lib/gmail/service";
+import {
+  MAILBOX_ROUTES,
+  type MailboxKind,
+  type MailboxStatus,
+  type MailListItem,
+} from "@/lib/mail/mailboxes";
 
 /**
- * Gmail on the Capture page: read-only, and only on request. "Check Gmail"
- * lists headers; "Suggest tasks" reads that one email in full and turns it
- * into a private capture, whose suggestions appear below like any other.
+ * A mailbox on the Capture page — Gmail or Outlook — read-only, and only on
+ * request. "Check" lists headers; "Suggest tasks" reads that one email in full
+ * and turns it into a private capture, whose suggestions appear below like any
+ * other. Not shown at all when the server has no app registered for it.
  */
-export function GmailPanel({
+export function MailboxPanel({
+  kind,
   status,
   onCaptured,
 }: {
-  status: GmailStatus;
+  kind: MailboxKind;
+  status: MailboxStatus;
   onCaptured: (capture: CaptureView) => void;
 }) {
   const t = useT();
-  const [messages, setMessages] = useState<GmailListItem[] | null>(null);
+  const routes = MAILBOX_ROUTES[kind];
+  const [messages, setMessages] = useState<MailListItem[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needsReconnect, setNeedsReconnect] = useState(status.needsReconnect);
@@ -31,14 +40,14 @@ export function GmailPanel({
     setBusy("check");
     setError(null);
     try {
-      const response = await fetch("/api/gmail/messages");
+      const response = await fetch(routes.list);
       const data = await response.json().catch(() => ({}));
       if (data.code === "reconnect") {
         setNeedsReconnect(true);
         return;
       }
       if (!response.ok) {
-        setError(data.error ?? t("gmail.failed"));
+        setError(data.error ?? t(`${kind}.failed`));
         return;
       }
       setMessages(data.messages);
@@ -49,18 +58,18 @@ export function GmailPanel({
     }
   }
 
-  async function capture(message: GmailListItem) {
+  async function capture(message: MailListItem) {
     setBusy(message.id);
     setError(null);
     try {
-      const response = await fetch(`/api/gmail/messages/${message.id}/capture`, { method: "POST" });
+      const response = await fetch(routes.capture(message.id), { method: "POST" });
       const data = await response.json().catch(() => ({}));
       if (data.code === "reconnect") {
         setNeedsReconnect(true);
         return;
       }
       if (!response.ok || !data.capture) {
-        setError(data.error ?? t("gmail.captureFailed"));
+        setError(data.error ?? t(`${kind}.captureFailed`));
         return;
       }
       onCaptured(data.capture as CaptureView);
@@ -80,24 +89,26 @@ export function GmailPanel({
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Mail className="size-4 text-slate-400" aria-hidden />
-            {t("gmail.title")}
+            {t(`${kind}.title`)}
             {status.connected && status.email ? (
-              <span className="text-xs font-normal text-slate-500">{t("gmail.connectedAs", { email: status.email })}</span>
+              <span className="text-xs font-normal text-slate-500">
+                {t(`${kind}.connectedAs`, { email: status.email })}
+              </span>
             ) : null}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            {needsReconnect ? t("gmail.needsReconnect") : t("gmail.lead")}
+            {needsReconnect ? t(`${kind}.needsReconnect`) : t(`${kind}.lead`)}
           </p>
         </div>
         {!status.connected || needsReconnect ? (
           // A full navigation, not fetch: the OAuth flow leaves the site.
-          <a href="/api/integrations/google/start" className={buttonClasses({ size: "sm" })}>
-            {needsReconnect ? t("gmail.reconnect") : t("gmail.connect")}
+          <a href={routes.start} className={buttonClasses({ size: "sm" })}>
+            {needsReconnect ? t(`${kind}.reconnect`) : t(`${kind}.connect`)}
           </a>
         ) : (
           <Button type="button" size="sm" disabled={busy !== null} onClick={() => void check()}>
             {busy === "check" ? <Spinner className="border-white/40 border-t-white" /> : <Inbox className="size-4" aria-hidden />}
-            {busy === "check" ? t("gmail.checking") : t("gmail.check")}
+            {busy === "check" ? t(`${kind}.checking`) : t(`${kind}.check`)}
           </Button>
         )}
       </div>
@@ -110,7 +121,7 @@ export function GmailPanel({
 
       {messages ? (
         messages.length === 0 ? (
-          <p className="border-t border-slate-100 px-4 py-3 text-sm text-slate-500">{t("gmail.empty")}</p>
+          <p className="border-t border-slate-100 px-4 py-3 text-sm text-slate-500">{t(`${kind}.empty`)}</p>
         ) : (
           <ul className="divide-y divide-slate-100 border-t border-slate-100">
             {messages.map((message) => (
@@ -123,7 +134,7 @@ export function GmailPanel({
                   </p>
                 </div>
                 {message.captureId ? (
-                  <Badge tone="success">{t("gmail.captured")}</Badge>
+                  <Badge tone="success">{t(`${kind}.captured`)}</Badge>
                 ) : (
                   <Button
                     type="button"
@@ -133,7 +144,7 @@ export function GmailPanel({
                     onClick={() => void capture(message)}
                   >
                     {busy === message.id ? <Spinner /> : null}
-                    {busy === message.id ? t("gmail.capturing") : t("gmail.capture")}
+                    {busy === message.id ? t(`${kind}.capturing`) : t(`${kind}.capture`)}
                   </Button>
                 )}
               </li>
