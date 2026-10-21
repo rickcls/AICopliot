@@ -6,10 +6,10 @@ import Link from "next/link";
 import { CaptureBox } from "@/components/capture/capture-box";
 import { CaptureCard, type ProjectOption } from "@/components/capture/capture-card";
 import type { ColleagueOption } from "@/components/capture/proposal-list";
-import { GmailPanel } from "@/components/capture/gmail-panel";
+import { MailboxPanel } from "@/components/capture/mailbox-panel";
 import { useT } from "@/components/i18n-provider";
 import type { CaptureView } from "@/lib/capture/view";
-import type { GmailStatus } from "@/lib/gmail/service";
+import type { MailboxStatus } from "@/lib/mail/mailboxes";
 
 /**
  * The capture box with the notes beneath it. On /capture it lists recent
@@ -23,6 +23,7 @@ export function CaptureWorkspace({
   personalProjectId,
   compact = false,
   gmail,
+  outlook,
 }: {
   initialCaptures: CaptureView[];
   projects: ProjectOption[];
@@ -30,7 +31,8 @@ export function CaptureWorkspace({
   personalProjectId: string;
   compact?: boolean;
   /** Offered on the Capture page; Today keeps to the box. */
-  gmail?: GmailStatus;
+  gmail?: MailboxStatus;
+  outlook?: MailboxStatus;
 }) {
   const t = useT();
   const [captures, setCaptures] = useState(initialCaptures);
@@ -46,14 +48,23 @@ export function CaptureWorkspace({
         onCaptured={(capture) => setCaptures((current) => [capture, ...current])}
       />
 
-      {gmail ? (
-        <GmailPanel
-          status={gmail}
-          onCaptured={(capture) =>
-            setCaptures((current) => [capture, ...current.filter((row) => row.id !== capture.id)])
-          }
-        />
-      ) : null}
+      {(
+        [
+          ["gmail", gmail],
+          ["outlook", outlook],
+        ] as const
+      ).map(([kind, status]) =>
+        status ? (
+          <MailboxPanel
+            key={kind}
+            kind={kind}
+            status={status}
+            onCaptured={(capture) =>
+              setCaptures((current) => [capture, ...current.filter((row) => row.id !== capture.id)])
+            }
+          />
+        ) : null,
+      )}
 
       {captures.map((capture) => (
         <CaptureCard

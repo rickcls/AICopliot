@@ -15,13 +15,15 @@ import { WhatsAppChat } from "@/components/capture/whatsapp-chat";
 import { useT } from "@/components/i18n-provider";
 import { Button, ErrorState, Spinner, Textarea } from "@/components/ui";
 import type { CaptureView } from "@/lib/capture/view";
+import { MAIL_FILE, MAX_MAIL_FILE_BYTES, mailFileToCaptureText } from "@/lib/mail/file";
+import { cn } from "@/lib/utils";
 import { parseWhatsAppChat, type ParsedChat } from "@/lib/whatsapp/parse";
 
 /** Plain-text files are read in the browser; anything else is uploaded and indexed. */
 const READ_LOCALLY = /\.(txt|md|markdown)$/i;
 /** An iPhone exports a chat as a .zip holding `_chat.txt`; it is opened here, never uploaded. */
 const CHAT_ARCHIVE = /\.zip$/i;
-const ACCEPT = ".pdf,.docx,.md,.markdown,.txt,.csv,.zip";
+const ACCEPT = ".pdf,.docx,.md,.markdown,.txt,.csv,.zip,.eml,.msg";
 /** An export with photos and video can run to gigabytes; only its text is wanted. */
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 
@@ -66,6 +68,7 @@ export function CaptureBox({
   // A WhatsApp chat pasted or picked: shown as a chat to choose from, with its
   // raw text kept in case the person wants it as an ordinary note after all.
   const [chat, setChat] = useState<{ parsed: ParsedChat; raw: string } | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   function appendSpoken(spoken: string) {
     setDictated(true);
@@ -73,7 +76,7 @@ export function CaptureBox({
   }
 
   async function send(
-    payload: { text: string; source: "text" | "voice" | "whatsapp" } | { documentId: string },
+    payload: { text: string; source: "text" | "voice" | "whatsapp" | "email" } | { documentId: string },
   ) {
     const response = await fetch("/api/captures", {
       method: "POST",
@@ -118,6 +121,24 @@ export function CaptureBox({
 
   async function captureFile(file: File) {
     setError(null);
+    // An email file: read here and captured as someone else's words, like a
+    // checked Gmail or Outlook message. The file itself goes nowhere.
+    if (MAIL_FILE.test(file.name)) {
+      try {
+        if (file.size > MAX_MAIL_FILE_BYTES) throw new Error(t("capture.mailFileTooLarge"));
+        setBusy(t("capture.readingMail", { name: file.name }));
+        const body = await mailFileToCaptureText(file.name, await file.arrayBuffer());
+        if (!body) throw new Error(t("capture.mailFileEmpty"));
+        setBusy(t("capture.submitting"));
+        await send({ text: body, source: "email" });
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : t("capture.mailFileEmpty"));
+      } finally {
+        setBusy(null);
+        if (fileInput.current) fileInput.current.value = "";
+      }
+      return;
+    }
     if (CHAT_ARCHIVE.test(file.name)) {
       try {
         if (file.size > MAX_ARCHIVE_BYTES) throw new Error(t("capture.whatsappTooLarge"));
@@ -173,7 +194,25 @@ export function CaptureBox({
         event.preventDefault();
         void submit();
       }}
-      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      // A file can be dropped anywhere on the box — an email dragged out of
+      // Outlook arrives as a .msg, an exported chat as a .zip or .txt.
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(event) => {
+        const file = event.dataTransfer.files?.[0];
+        if (!file) return;
+        event.preventDefault();
+        setDragging(false);
+        if (busy === null) void captureFile(file);
+      }}
+      className={cn(
+        "rounded-xl border bg-white p-4 shadow-sm",
+        dragging ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-200",
+      )}
     >
       <label htmlFor={inputId} className="text-sm font-semibold text-slate-900">
         {t("capture.inputLabel")}

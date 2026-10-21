@@ -282,6 +282,8 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    gmail:{id}`, once per person). Email text is someone else's words: it
    reaches the model only as capture lines marked as data, and nothing it says
    is applied without a click. The app never sends mail or writes to Gmail.
+   **Outlook keeps the same contract** through Microsoft Graph, with
+   `offline_access User.Read Mail.Read` and nothing more (`src/lib/outlook/`).
    **WhatsApp connects to nothing:** it has no API for personal chats, so a chat
    is a file the person exports, or text they paste, read in the browser; only
    the part they pick is sent, and it is someone else's words like an email.
@@ -915,6 +917,37 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
   (with their labels, so they render as sources) instead of discarding them.
 
 ## Email, WhatsApp, and voice notes
+
+**Outlook** (`src/lib/outlook/`) is Gmail's twin for a company Microsoft 365
+account or a personal one, offered only when `MICROSOFT_CLIENT_ID`,
+`MICROSOFT_CLIENT_SECRET`, and `INTEGRATION_ENCRYPTION_KEY` are set. Three
+differences matter:
+- **One registration, both kinds of account:** sign-in goes through the
+  `common` endpoint (redirect URI `/api/integrations/microsoft/callback`).
+- **Refresh tokens rotate:** every refresh may return a new one, which is
+  sealed and stored in place of the old. Keeping the first one would stop
+  working within days.
+- **A company may need IT to approve the app first.** The callback recognises
+  that refusal (`needsAdminConsent`: AADSTS65001/90094/90008) and the Capture
+  page shows an administrator approval link (`adminConsentUrl`) to send IT,
+  rather than a generic failure. `invalid_grant` and `interaction_required`
+  (MFA, conditional access) mark the account `needsReconnect`.
+
+"Check Outlook" lists the last three days of the Focused inbox, headers only.
+Focused is filtered in code because Graph refuses most filter-and-sort
+combinations. A picked message is read as text through `uniqueBody` (the part
+not quoted from the thread) and captured once per person (`outlook:{id}`).
+Disconnecting deletes the token; Microsoft has no per-app revoke short of
+signing the person out everywhere. Both mailboxes render through one
+`MailboxPanel` and one Settings row (`MAILBOX_ROUTES`, `src/lib/mail/mailboxes.ts`),
+and share the mail-text helpers in `src/lib/mail/text.ts`.
+
+**Mail files are the way round a blocked company.** An `.eml` (Outlook on the
+web) or `.msg` (dragged out of Outlook for Windows) dropped on the capture box
+is read in the browser (`src/lib/mail/file.ts`: `postal-mime`, which honours
+Big5; `@kenjiuno/msgreader`) and captured as `source: email`. The file is never
+uploaded or stored as a document. The capture box accepts a drop of any file
+it can read.
 
 **WhatsApp** (`src/lib/whatsapp/parse.ts`, pure) reads an exported chat — an
 iPhone's `.zip` holding `_chat.txt`, opened in the browser with `fflate` and

@@ -1,4 +1,6 @@
-import { createHash, randomBytes } from "node:crypto";
+import { pkceChallenge } from "@/lib/oauth/pkce";
+
+export { pkceChallenge, randomToken } from "@/lib/oauth/pkce";
 
 /**
  * Google's OAuth 2.0 authorization-code flow with PKCE, for one scope:
@@ -10,14 +12,6 @@ export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.reado
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke";
-
-export function randomToken(): string {
-  return randomBytes(32).toString("base64url");
-}
-
-export function pkceChallenge(verifier: string): string {
-  return createHash("sha256").update(verifier).digest("base64url");
-}
 
 export function buildAuthUrl({
   clientId,
