@@ -131,7 +131,6 @@ export const tasksZhHant = {
       assignee: "負責人",
       priority: "優先度",
       milestone: "里程碑",
-      dates: "日期",
       startDate: "開始日期",
       dueDate: "到期日",
       estimate: "工時",

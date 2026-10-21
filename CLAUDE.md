@@ -1287,8 +1287,9 @@ competing objects with the description the smallest thing on screen.
 - **The controls are capped at `max-w-sm`, not stretched to the panel.** Empty
   space to the right of a short value is what makes the block read as a list of
   facts rather than a wall of inputs — same as the reference.
-- **Start and due share one row.** They describe one span, and separate rows
-  spent two labels saying so.
+- **Start and due are separate rows.** Each carries its own label. One
+  "Dates" row left two identical boxes, and the names existed only as
+  accessible labels.
 - **The start date shows only where it means something.** It draws a bar on
   the timeline, which only delivery projects have, so elsewhere the row is the
   due date alone. A task that already has a start date keeps the field, so it
@@ -1326,8 +1327,8 @@ its own PATCHing instead of reporting changes upward. Its rules:
 - **The expand control reopens the task in the form modal**, handing over the
   panel's current draft rather than the stored record, so an edit still being
   typed survives the switch. The panel's label column is `4.5rem` rather than the
-  modal's `6rem` — at 448px, 6rem left the two date inputs wrapping with the
-  arrow orphaned between them.
+  modal's `6rem`, because the panel is 448px wide. Each date is its own row, so
+  the column only has to fit the label.
 - **There is no Save button, because there is nothing to submit.** The footer
   reports save state instead.
 

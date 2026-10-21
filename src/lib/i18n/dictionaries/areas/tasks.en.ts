@@ -129,7 +129,6 @@ export const tasksEn = {
       assignee: "Assignee",
       priority: "Priority",
       milestone: "Milestone",
-      dates: "Dates",
       startDate: "Start date",
       dueDate: "Due date",
       estimate: "Estimate",
