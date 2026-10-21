@@ -152,7 +152,7 @@ export function VoiceRecorder({
           FOCUS_RING,
           state === "recording"
             ? "border-red-200 bg-red-50 text-red-700"
-            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+            : "border-sand-200 bg-white text-sand-700 hover:bg-sand-50",
           "disabled:cursor-not-allowed disabled:opacity-50",
         )}
       >
@@ -168,7 +168,7 @@ export function VoiceRecorder({
           {t("voice.recording", { time: clock(elapsed) })}
         </span>
       ) : state === "transcribing" ? (
-        <span className="text-xs text-slate-500" aria-live="polite">
+        <span className="text-xs text-sand-500" aria-live="polite">
           {t("voice.transcribing", progress)}
         </span>
       ) : null}

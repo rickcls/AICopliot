@@ -243,7 +243,7 @@ export function MilestonesPanel({
       ) : null}
 
       {draft ? (
-        <form onSubmit={save} className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
+        <form onSubmit={save} className="mt-4 space-y-3 rounded-lg bg-sand-50 p-3">
           <div>
             <label
               htmlFor="milestone-title"
@@ -269,7 +269,7 @@ export function MilestonesPanel({
               className="mb-1.5 block text-sm font-medium"
             >
               {t("milestones.description")}{" "}
-              <span className="font-normal text-slate-500">{t("milestones.optional")}</span>
+              <span className="font-normal text-sand-500">{t("milestones.optional")}</span>
             </label>
             <Textarea
               id="milestone-description"
@@ -287,7 +287,7 @@ export function MilestonesPanel({
             <div>
               <label
                 htmlFor="milestone-date"
-                className="mb-1 block text-xs text-slate-500"
+                className="mb-1 block text-xs text-sand-500"
               >
                 {t("milestones.targetDate")}
               </label>
@@ -304,7 +304,7 @@ export function MilestonesPanel({
             <div>
               <label
                 htmlFor="milestone-status"
-                className="mb-1 block text-xs text-slate-500"
+                className="mb-1 block text-xs text-sand-500"
               >
                 {t("milestones.status")}
               </label>
@@ -366,7 +366,7 @@ export function MilestonesPanel({
           />
         </div>
       ) : (
-        <ul className="mt-3 -mx-1 divide-y divide-slate-100">
+        <ul className="mt-3 -mx-1 divide-y divide-sand-100">
           {milestones.map((milestone) => {
             const open = expanded.has(milestone.id);
             const busy = busyId === milestone.id;
@@ -376,7 +376,7 @@ export function MilestonesPanel({
                 <div
                   className={cn(
                     "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1 py-2 transition-colors",
-                    open ? "bg-slate-50" : "hover:bg-slate-50/70",
+                    open ? "bg-sand-50" : "hover:bg-sand-50/70",
                     busy && "opacity-60",
                   )}
                 >
@@ -389,11 +389,11 @@ export function MilestonesPanel({
                     <ChevronRight
                       aria-hidden
                       className={cn(
-                        "size-3.5 shrink-0 text-slate-400 transition-transform",
+                        "size-3.5 shrink-0 text-sand-400 transition-transform",
                         open && "rotate-90",
                       )}
                     />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-sand-900">
                       {milestone.title}
                     </span>
                   </button>
@@ -402,7 +402,7 @@ export function MilestonesPanel({
                     <span
                       className={cn(
                         "text-xs whitespace-nowrap tabular-nums",
-                        milestone.targetDate ? "text-slate-500" : "text-slate-300",
+                        milestone.targetDate ? "text-sand-500" : "text-sand-300",
                       )}
                     >
                       {milestone.targetDate
@@ -419,7 +419,7 @@ export function MilestonesPanel({
                 </div>
 
                 {open ? (
-                  <div className="border-t border-slate-100 bg-slate-50/50 px-1 py-3 pl-6">
+                  <div className="border-t border-sand-100 bg-sand-50/50 px-1 py-3 pl-6">
                     <DescriptionList>
                       <Field name={t("milestones.description")}>
                         {milestone.description ? (
@@ -427,13 +427,13 @@ export function MilestonesPanel({
                             {milestone.description}
                           </p>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="text-sand-400">—</span>
                         )}
                       </Field>
 
                       {milestone.completedAt ? (
                         <Field name={t("milestones.completed")}>
-                          <span className="text-slate-600">
+                          <span className="text-sand-600">
                             {formatInstantDay(milestone.completedAt, dateLocale, timeZone)}
                           </span>
                         </Field>
@@ -455,7 +455,7 @@ export function MilestonesPanel({
                               <li key={citation.id}>
                                 <a
                                   href={`/documents/${citation.chunk.document.id}`}
-                                  className="text-xs text-slate-700 underline hover:text-slate-900"
+                                  className="text-xs text-sand-700 underline hover:text-sand-900"
                                 >
                                   {citation.chunk.document.originalFilename}
                                   {citation.chunk.pageNumber
@@ -466,7 +466,7 @@ export function MilestonesPanel({
                                     : ""}
                                 </a>
                                 {citation.excerpt ? (
-                                  <p className="mt-0.5 line-clamp-2 max-w-3xl text-xs text-slate-500 italic">
+                                  <p className="mt-0.5 line-clamp-2 max-w-3xl text-xs text-sand-500 italic">
                                     “{citation.excerpt}”
                                   </p>
                                 ) : null}

@@ -25,7 +25,7 @@ export function TracedRequirements({
   const t = useT();
   if (links.length === 0) {
     return (
-      <span className="text-sm text-slate-400">{empty ?? t("tasks.traced.empty")}</span>
+      <span className="text-sm text-sand-400">{empty ?? t("tasks.traced.empty")}</span>
     );
   }
 
@@ -37,11 +37,11 @@ export function TracedRequirements({
             href={`/projects/${projectId}/requirements?req=${link.requirement.id}`}
             title={link.requirement.title}
             className={cn(
-              "inline-flex max-w-full items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700 hover:border-slate-300 hover:text-slate-900",
+              "inline-flex max-w-full items-center gap-1.5 rounded-md border border-sand-200 bg-white px-2 py-0.5 text-xs text-sand-700 hover:border-sand-300 hover:text-sand-900",
               FOCUS_RING,
             )}
           >
-            <span className="shrink-0 font-mono text-[11px] text-slate-500">
+            <span className="shrink-0 font-mono text-[11px] text-sand-500">
               {formatRequirementCode(link.requirement.sequence)}
             </span>
             <span className="min-w-0 truncate">{link.requirement.title}</span>

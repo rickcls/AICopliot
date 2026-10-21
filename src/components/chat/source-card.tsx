@@ -21,7 +21,7 @@ import { sourceAnchorId } from "./answer-body";
  */
 function LabelChip({ label }: { label: string }) {
   return (
-    <span className="shrink-0 rounded border border-slate-300 bg-white px-1 font-mono text-[10px] font-medium text-slate-500">
+    <span className="shrink-0 rounded border border-sand-300 bg-white px-1 font-mono text-[10px] font-medium text-sand-500">
       {label}
     </span>
   );
@@ -86,20 +86,20 @@ export function SourceCard({
           <Badge tone="info">{label}</Badge>
           <Link
             href={citation.href}
-            className="text-xs font-medium text-slate-900 hover:underline"
+            className="text-xs font-medium text-sand-900 hover:underline"
           >
             {citation.title}
           </Link>
-          {status ? <span className="text-xs text-slate-500">{status}</span> : null}
+          {status ? <span className="text-xs text-sand-500">{status}</span> : null}
           {sourceDate ? (
-            <span className="text-xs text-slate-500">{sourceDate}</span>
+            <span className="text-xs text-sand-500">{sourceDate}</span>
           ) : null}
-          {writtenBy ? <span className="text-xs text-slate-500">{writtenBy}</span> : null}
-          <span className="ml-auto text-xs text-slate-400">
+          {writtenBy ? <span className="text-xs text-sand-500">{writtenBy}</span> : null}
+          <span className="ml-auto text-xs text-sand-400">
             {t("chat.source.observed", { date: formatDate(citation.observedAt, dateLocale, timeZone) })}
           </span>
         </div>
-        <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-pretty text-slate-600 italic">
+        <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-pretty text-sand-600 italic">
           {citation.excerpt}
         </blockquote>
       </div>
@@ -116,21 +116,21 @@ export function SourceCard({
   return (
     <div
       id={anchorId}
-      className="scroll-mt-24 rounded-lg border border-slate-200 bg-slate-50/60 p-3 transition-shadow"
+      className="scroll-mt-24 rounded-lg border border-sand-200 bg-sand-50/60 p-3 transition-shadow"
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {citation.label ? <LabelChip label={citation.label} /> : null}
         <Link
           // Opens the cited passage itself, not the top of the document.
           href={`/documents/${citation.documentId}/chunks?chunk=${citation.chunkId}#chunk-${citation.chunkId}`}
-          className="text-xs font-medium text-slate-900 hover:underline"
+          className="text-xs font-medium text-sand-900 hover:underline"
         >
           {citation.filename}
         </Link>
         {location ? (
-          <span className="text-xs text-slate-500">{location}</span>
+          <span className="text-xs text-sand-500">{location}</span>
         ) : null}
-        <span className="ml-auto text-xs text-slate-400">
+        <span className="ml-auto text-xs text-sand-400">
           {citation.matchType === "lexical"
             ? t("chat.source.lexical")
             : citation.matchType === "hybrid"
@@ -138,7 +138,7 @@ export function SourceCard({
               : t("chat.source.semantic", { percent: (citation.score * 100).toFixed(0) })}
         </span>
       </div>
-      <blockquote className="mt-2 border-l-2 border-slate-300 pl-3 text-xs text-pretty text-slate-600 italic">
+      <blockquote className="mt-2 border-l-2 border-sand-300 pl-3 text-xs text-pretty text-sand-600 italic">
         {citation.excerpt}
       </blockquote>
     </div>

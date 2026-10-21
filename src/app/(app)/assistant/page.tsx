@@ -26,7 +26,7 @@ export default async function AssistantPage({
     <div className="mx-auto max-w-6xl">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("assistant.title")}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-slate-600">{t("assistant.lead")}</p>
+        <p className="mt-1 max-w-3xl text-sm text-sand-600">{t("assistant.lead")}</p>
       </div>
       {/* The workspace keeps the web-search switch across thread changes.
           The conversation itself is keyed inside, so opening another one

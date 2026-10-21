@@ -95,13 +95,13 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sand-100 px-4 py-3">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <CalendarClock className="size-4 text-slate-400" aria-hidden />
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-sand-900">
+            <CalendarClock className="size-4 text-sand-400" aria-hidden />
             {t("plan.title")}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-sand-500">
             {plan && !editing
               ? t("plan.total", { used, available: plan.availableMinutes })
               : mode === "next"
@@ -124,9 +124,9 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
           }}
           className="flex flex-wrap items-end gap-3 p-4"
         >
-          {plan && mode === "replace" ? <p className="w-full text-xs text-slate-500">{t("plan.replaces")}</p> : null}
+          {plan && mode === "replace" ? <p className="w-full text-xs text-sand-500">{t("plan.replaces")}</p> : null}
           <div>
-            <label htmlFor={`${ids}-hours`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-hours`} className="mb-1 block text-xs font-medium text-sand-500">
               {mode === "next" ? t("plan.nextHours") : t("plan.hours")}
             </label>
             <Input
@@ -141,7 +141,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
             />
           </div>
           <div className="min-w-0 flex-1 basis-64">
-            <label htmlFor={`${ids}-note`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-note`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("plan.note")}
             </label>
             <Input
@@ -176,8 +176,8 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
         <div className="p-4">
           {plan.summary || plan.note ? (
             <div className="mb-3 space-y-1">
-              {plan.summary ? <p className="text-sm text-pretty text-slate-700">{plan.summary}</p> : null}
-              {plan.note ? <p className="text-sm text-slate-500">{plan.note}</p> : null}
+              {plan.summary ? <p className="text-sm text-pretty text-sand-700">{plan.summary}</p> : null}
+              {plan.note ? <p className="text-sm text-sand-500">{plan.note}</p> : null}
             </div>
           ) : null}
           <ol className="space-y-2">
@@ -187,7 +187,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
               return (
                 <Fragment key={item.taskId}>
                   {firstOfBatch ? (
-                    <li aria-hidden className="pt-2 text-xs font-medium text-slate-400">
+                    <li aria-hidden className="pt-2 text-xs font-medium text-sand-400">
                       {t("plan.batch", { count: item.batch })}
                     </li>
                   ) : null}
@@ -200,18 +200,18 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
                             href={`/projects/${item.projectId}/tasks?task=${item.taskId}`}
                             className={cn(
                               "text-sm font-medium hover:underline",
-                              item.state === "done" ? "text-slate-400 line-through" : "text-slate-900",
+                              item.state === "done" ? "text-sand-400 line-through" : "text-sand-900",
                             )}
                           >
                             {item.title}
                           </Link>
                           {item.state === "done" ? <span className="sr-only">{t("plan.done")}</span> : null}
                           {item.state === "updated" ? <Badge tone="info">{t("plan.updated")}</Badge> : null}
-                          <span className="text-xs text-slate-500 tabular-nums">
+                          <span className="text-xs text-sand-500 tabular-nums">
                             {t("plan.minutes", { count: item.minutes })} · {item.projectName}
                           </span>
                         </div>
-                        {item.reason ? <p className="text-xs text-slate-500">{item.reason}</p> : null}
+                        {item.reason ? <p className="text-xs text-sand-500">{item.reason}</p> : null}
                       </div>
                       {item.state !== "done" ? (
                         <button
@@ -221,7 +221,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
                           aria-controls={stripId}
                           aria-label={t("checkIn.actions", { title: item.title })}
                           className={cn(
-                            "shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                            "shrink-0 rounded-md px-2 py-1 text-xs font-medium text-sand-600 hover:bg-sand-100 hover:text-sand-900",
                             FOCUS_RING,
                           )}
                         >
@@ -235,7 +235,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
                         taskId={item.taskId}
                         allowSnooze={false}
                         onSaved={(action) => checkedIn(item.taskId, action)}
-                        className="mt-2 ml-8 rounded-lg bg-slate-50 px-3 py-2"
+                        className="mt-2 ml-8 rounded-lg bg-sand-50 px-3 py-2"
                       />
                     ) : null}
                   </li>
@@ -268,7 +268,7 @@ function StateMark({ state, index }: { state: PlanItemState; index: number }) {
           ? "bg-emerald-600 text-white"
           : state === "updated"
             ? "bg-blue-100 text-blue-700"
-            : "bg-slate-100 text-slate-600",
+            : "bg-sand-100 text-sand-600",
       )}
     >
       {state === "done" ? (

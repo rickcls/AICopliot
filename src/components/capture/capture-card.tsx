@@ -133,12 +133,12 @@ export function CaptureCard({
 
   return (
     <Card id={`capture-${capture.id}`} className="scroll-mt-24 overflow-hidden">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 px-4 py-2.5">
-        <span className="text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-sand-100 px-4 py-2.5">
+        <span className="text-xs text-sand-500">
           {/* The capture's own calendar day, UTC-pinned: a clock time here
               would render in the server's zone, then the browser's. */}
           {formatDay(capture.localDate, dateLocale)}
-          <span className="mx-1.5 text-slate-300">·</span>
+          <span className="mx-1.5 text-sand-300">·</span>
           {sourceLabel}
         </span>
         {pending.length > 0 ? (
@@ -148,7 +148,7 @@ export function CaptureCard({
         {capture.source === "email" ? (
           <Link
             href={`/email?capture=${capture.id}`}
-            className="text-xs font-medium text-slate-500 hover:text-slate-900"
+            className="text-xs font-medium text-sand-500 hover:text-sand-900"
           >
             {t("capture.replyToEmail")}
           </Link>
@@ -156,7 +156,7 @@ export function CaptureCard({
         {capture.documentId ? (
           <Link
             href={`/documents/${capture.documentId}`}
-            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900"
+            className="inline-flex items-center gap-1 text-xs font-medium text-sand-500 hover:text-sand-900"
           >
             <FileText className="size-3.5" aria-hidden />
             {t("capture.openDocument")}
@@ -166,7 +166,7 @@ export function CaptureCard({
             type="button"
             disabled={busy === "save"}
             onClick={() => void saveAsDocument()}
-            className={cn("text-xs font-medium text-slate-500 hover:text-slate-900 disabled:opacity-50", FOCUS_RING)}
+            className={cn("text-xs font-medium text-sand-500 hover:text-sand-900 disabled:opacity-50", FOCUS_RING)}
           >
             {t("capture.saveAsDocument")}
           </button>
@@ -175,7 +175,7 @@ export function CaptureCard({
           type="button"
           onClick={() => setShowNote(!showNote)}
           aria-expanded={showNote}
-          className={cn("text-xs font-medium text-slate-500 hover:text-slate-900", FOCUS_RING)}
+          className={cn("text-xs font-medium text-sand-500 hover:text-sand-900", FOCUS_RING)}
         >
           {showNote ? t("capture.hideNote") : t("capture.showNote")}
         </button>
@@ -183,7 +183,7 @@ export function CaptureCard({
           type="button"
           onClick={() => void remove()}
           title={t("capture.delete")}
-          className={cn("rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-red-700", FOCUS_RING)}
+          className={cn("rounded p-1 text-sand-400 hover:bg-sand-100 hover:text-red-700", FOCUS_RING)}
         >
           <Trash2 className="size-3.5" aria-hidden />
           <span className="sr-only">{t("capture.delete")}</span>
@@ -191,7 +191,7 @@ export function CaptureCard({
       </div>
 
       {showNote ? (
-        <p className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm whitespace-pre-wrap text-slate-700">
+        <p className="border-b border-sand-100 bg-sand-50 px-4 py-3 text-sm whitespace-pre-wrap text-sand-700">
           {capture.body}
         </p>
       ) : null}
@@ -205,11 +205,11 @@ export function CaptureCard({
           </Button>
         </div>
       ) : capture.status === "processing" ? (
-        <p className="flex items-center gap-2 p-4 text-sm text-slate-500">
+        <p className="flex items-center gap-2 p-4 text-sm text-sand-500">
           <Spinner /> {t("capture.submitting")}
         </p>
       ) : capture.proposals.length === 0 ? (
-        <p className="p-4 text-sm text-slate-500">{t("capture.noSuggestions")}</p>
+        <p className="p-4 text-sm text-sand-500">{t("capture.noSuggestions")}</p>
       ) : (
         <ProposalList
           proposals={capture.proposals}

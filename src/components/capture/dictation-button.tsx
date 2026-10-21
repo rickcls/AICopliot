@@ -154,7 +154,7 @@ export function DictationButton({
           FOCUS_RING,
           listening
             ? "border-red-200 bg-red-50 text-red-700"
-            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+            : "border-sand-200 bg-white text-sand-700 hover:bg-sand-50",
           "disabled:cursor-not-allowed disabled:opacity-50",
         )}
       >
@@ -162,7 +162,7 @@ export function DictationButton({
         {listening ? t("dictation.stop") : t("dictation.start")}
       </button>
       {listening ? (
-        <span className="min-w-0 truncate text-xs text-slate-500" aria-live="polite">
+        <span className="min-w-0 truncate text-xs text-sand-500" aria-live="polite">
           {interim || t("dictation.listening")}
         </span>
       ) : null}

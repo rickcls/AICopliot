@@ -92,8 +92,8 @@ function NavItem({
         // Centred while it is an icon rail, left-aligned once labels appear.
         "justify-center px-2 py-2 md:justify-start md:px-3",
         active
-          ? "bg-slate-900 text-white"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+          ? "bg-sand-900 text-white"
+          : "text-sand-600 hover:bg-sand-100 hover:text-sand-900",
         className,
       )}
     >
@@ -124,7 +124,7 @@ export function AppSidebar({
   const activeProjectId = /^\/projects\/([^/]+)/.exec(pathname)?.[1];
 
   return (
-    <aside className="sticky top-0 z-30 flex h-dvh w-14 shrink-0 flex-col border-r border-slate-200 bg-white md:w-64">
+    <aside className="sticky top-0 z-30 flex h-dvh w-14 shrink-0 flex-col border-r border-sand-200 bg-white md:w-64">
       <div className="flex h-14 shrink-0 items-center justify-center px-2 md:justify-start md:px-4">
         <Link href="/today" title={`${t("app.name")} — ${t("app.tagline")}`}>
           <span className="text-sm font-semibold tracking-tight md:hidden">
@@ -174,14 +174,14 @@ export function AppSidebar({
           <div>
             <p
               className={cn(
-                "pb-1.5 text-xs font-semibold tracking-wide text-slate-400 uppercase",
+                "pb-1.5 text-xs font-semibold tracking-wide text-sand-400 uppercase",
                 "hidden px-3 md:block",
               )}
             >
               {t("nav.projectsHeading")}
             </p>
             {/* On the rail a divider stands in for the heading. */}
-            <div className="mx-2 mb-2 border-t border-slate-200 md:hidden" />
+            <div className="mx-2 mb-2 border-t border-sand-200 md:hidden" />
 
             <ul className="space-y-0.5">
               {projects.map((project) => {
@@ -196,8 +196,8 @@ export function AppSidebar({
                         "flex items-center gap-2.5 rounded-lg text-sm transition-colors",
                         "justify-center px-2 py-2 md:justify-start md:px-2 md:py-1.5",
                         isActive
-                          ? "bg-slate-100 font-semibold text-slate-900"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                          ? "bg-sand-100 font-semibold text-sand-900"
+                          : "text-sand-600 hover:bg-sand-50 hover:text-sand-900",
                       )}
                     >
                       {/* Initial stands in for the name on the rail, and gives
@@ -209,8 +209,8 @@ export function AppSidebar({
                         className={cn(
                           "grid size-5.5 shrink-0 place-items-center rounded-md text-[10px] font-semibold transition-colors",
                           isActive
-                            ? "bg-slate-900 text-white"
-                            : "bg-slate-200 text-slate-600",
+                            ? "bg-sand-900 text-white"
+                            : "bg-sand-200 text-sand-600",
                         )}
                       >
                         {project.personal ? (
@@ -231,16 +231,16 @@ export function AppSidebar({
         ) : null}
       </nav>
 
-      <div className="shrink-0 border-t border-slate-200 p-2 md:p-3">
+      <div className="shrink-0 border-t border-sand-200 p-2 md:p-3">
         <div className="hidden md:block">
           {workspaces.length > 1 ? (
             <WorkspaceSwitcher current={workspaceId} workspaces={workspaces} />
           ) : (
-            <p className="truncate px-1 text-xs font-medium text-slate-900">
+            <p className="truncate px-1 text-xs font-medium text-sand-900">
               {workspaceName}
             </p>
           )}
-          <p className="truncate px-1 text-xs text-slate-500">{userEmail}</p>
+          <p className="truncate px-1 text-xs text-sand-500">{userEmail}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <ThemeToggle />
             <LocaleSwitcher />
@@ -258,7 +258,7 @@ export function AppSidebar({
           onClick={() => signOut({ callbackUrl: "/" })}
           title={t("nav.signOutAs", { email: userEmail })}
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900",
+            "flex w-full items-center gap-2.5 rounded-lg text-sm font-medium text-sand-600 transition-colors hover:bg-sand-100 hover:text-sand-900",
             "justify-center px-2 py-2 md:justify-start md:px-1",
           )}
         >

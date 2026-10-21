@@ -27,7 +27,7 @@ function Cell({ children }: { children: React.ReactNode }) {
 }
 
 function None() {
-  return <span className="text-slate-300">—</span>;
+  return <span className="text-sand-300">—</span>;
 }
 
 /**
@@ -60,7 +60,7 @@ export function TraceabilityMatrix({
 
   if (rows.length === 0) {
     return (
-      <p className="px-6 py-12 text-center text-sm text-slate-500">
+      <p className="px-6 py-12 text-center text-sm text-sand-500">
         {t("requirements.matrix.empty")}
       </p>
     );
@@ -68,12 +68,12 @@ export function TraceabilityMatrix({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-sand-100 px-3 py-2 text-xs text-sand-500">
         {approved.length === 0 ? (
           <span>{t("requirements.matrix.nothingAgreed")}</span>
         ) : (
           <>
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-sand-700">
               {t("requirements.matrix.agreed", { count: approved.length })}
             </span>
             {DELIVERY_STATES.map((state) => (
@@ -95,7 +95,7 @@ export function TraceabilityMatrix({
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] table-fixed border-collapse text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+          <thead className="border-b border-sand-200 bg-sand-50 text-xs text-sand-500">
             <tr>
               <th scope="col" className="w-[30%] px-3 py-2 font-medium">
                 {t("requirements.matrix.requirement")}
@@ -117,7 +117,7 @@ export function TraceabilityMatrix({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-sand-100">
             {rows.map((row) => {
               const tasks = row.links.filter((link) => link.task);
               const milestones = row.links.filter((link) => link.milestone);
@@ -126,7 +126,7 @@ export function TraceabilityMatrix({
               const isApproved = row.status === "approved";
 
               return (
-                <tr key={row.id} className="hover:bg-slate-50/60">
+                <tr key={row.id} className="hover:bg-sand-50/60">
                   <Cell>
                     <button
                       type="button"
@@ -136,10 +136,10 @@ export function TraceabilityMatrix({
                         FOCUS_RING,
                       )}
                     >
-                      <span className="shrink-0 font-mono text-xs text-slate-500">
+                      <span className="shrink-0 font-mono text-xs text-sand-500">
                         {formatRequirementCode(row.sequence)}
                       </span>
-                      <span className="min-w-0 text-slate-900 hover:underline">
+                      <span className="min-w-0 text-sand-900 hover:underline">
                         {row.title}
                       </span>
                     </button>
@@ -154,8 +154,8 @@ export function TraceabilityMatrix({
                       className={cn(
                         "text-xs",
                         row.priority === "must"
-                          ? "font-semibold text-slate-900"
-                          : "text-slate-500",
+                          ? "font-semibold text-sand-900"
+                          : "text-sand-500",
                       )}
                     >
                       {t(`requirementPriority.${row.priority}`)}
@@ -176,12 +176,12 @@ export function TraceabilityMatrix({
                             ) : (
                               <span
                                 aria-hidden
-                                className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-300"
+                                className="mt-1.5 size-1.5 shrink-0 rounded-full bg-sand-300"
                               />
                             )}
                             <Link
                               href={`${base}/tasks?task=${link.task!.id}`}
-                              className="min-w-0 text-slate-700 hover:underline"
+                              className="min-w-0 text-sand-700 hover:underline"
                             >
                               {link.task!.title}
                             </Link>
@@ -199,7 +199,7 @@ export function TraceabilityMatrix({
                           <li key={link.id} className="text-xs">
                             <Link
                               href={`${base}/timeline`}
-                              className="text-slate-700 hover:underline"
+                              className="text-sand-700 hover:underline"
                             >
                               {link.milestone!.title}
                             </Link>
@@ -217,7 +217,7 @@ export function TraceabilityMatrix({
                           <li key={link.id} className="text-xs">
                             <Link
                               href={`${base}/risks`}
-                              className="line-clamp-2 text-slate-700 hover:underline"
+                              className="line-clamp-2 text-sand-700 hover:underline"
                             >
                               {link.risk!.description}
                             </Link>
@@ -232,7 +232,7 @@ export function TraceabilityMatrix({
                         {t(`deliveryState.${state}`)}
                       </Badge>
                     ) : (
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-sand-400">
                         {t("requirements.matrix.notAgreed")}
                       </span>
                     )}

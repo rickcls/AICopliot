@@ -37,7 +37,7 @@ export default async function ProjectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             {t("nav.projects")}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">{t("projects.lead")}</p>
+          <p className="mt-1 text-sm text-sand-600">{t("projects.lead")}</p>
         </div>
         {/* The workspace-wide summary left the sidebar when Today became home;
             it is a view across projects, so it is reached from here. */}

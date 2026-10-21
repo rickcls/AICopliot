@@ -80,9 +80,9 @@ export default async function TodayPage() {
     <div className="mx-auto max-w-4xl">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("today.title")}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          <span className="font-medium text-slate-900">{heading}</span>
-          <span className="mx-1.5 text-slate-300">·</span>
+        <p className="mt-1 text-sm text-sand-600">
+          <span className="font-medium text-sand-900">{heading}</span>
+          <span className="mx-1.5 text-sand-300">·</span>
           {solo ? t("today.soloLead") : t("today.lead")}
         </p>
       </div>
@@ -114,10 +114,10 @@ export default async function TodayPage() {
 
           {sections.length === 0 && quietLater.length === 0 && undatedRows.length === 0 ? (
             <Card className="p-5">
-              <h2 className="text-sm font-semibold text-slate-900">
+              <h2 className="text-sm font-semibold text-sand-900">
                 {t("today.allClearTitle")}
               </h2>
-              <p className="mt-1 text-sm text-slate-600">{t("today.allClearBody")}</p>
+              <p className="mt-1 text-sm text-sand-600">{t("today.allClearBody")}</p>
             </Card>
           ) : null}
 
@@ -149,7 +149,7 @@ export default async function TodayPage() {
           ) : null}
 
           {laterCount > 0 ? (
-            <p className="text-sm text-slate-500">{t("today.later", { count: laterCount })}</p>
+            <p className="text-sm text-sand-500">{t("today.later", { count: laterCount })}</p>
           ) : null}
         </div>
       )}
@@ -174,7 +174,7 @@ function TaskSection({
         <SectionHeader title={title} description={description} />
       </div>
       <Card className="mt-2 overflow-hidden">
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-sand-100">
           {rows.map((row) => (
             <TodayTaskRow key={row.id} task={row} />
           ))}

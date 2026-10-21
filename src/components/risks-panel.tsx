@@ -303,7 +303,7 @@ export function RisksPanel({
               <div>
                 <label
                   htmlFor="risk-milestone"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("risks.milestone")}
                 </label>
@@ -328,7 +328,7 @@ export function RisksPanel({
               <div>
                 <label
                   htmlFor="risk-impact"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("risks.impact")}
                 </label>
@@ -352,7 +352,7 @@ export function RisksPanel({
               <div>
                 <label
                   htmlFor="risk-likelihood"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("risks.likelihood")}
                 </label>
@@ -379,7 +379,7 @@ export function RisksPanel({
               <div>
                 <label
                   htmlFor="risk-status"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("risks.status")}
                 </label>
@@ -407,7 +407,7 @@ export function RisksPanel({
                 className="mb-1.5 block text-sm font-medium"
               >
                 {t("risks.mitigation")}{" "}
-                <span className="font-normal text-slate-500">{t("risks.optional")}</span>
+                <span className="font-normal text-sand-500">{t("risks.optional")}</span>
               </label>
               <Textarea
                 id="risk-mitigation"
@@ -474,7 +474,7 @@ export function RisksPanel({
           <div
             role="search"
             aria-label={t("risks.filterLabel")}
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-sand-200 bg-sand-50/60 px-3 py-2.5"
           >
             <div className="flex flex-wrap items-center gap-1.5">
               <FilterChip
@@ -515,11 +515,11 @@ export function RisksPanel({
             </div>
           </div>
           {visibleRisks.length === 0 ? (
-            <p className="px-6 py-10 text-center text-sm text-slate-500">
+            <p className="px-6 py-10 text-center text-sm text-sand-500">
               {t("risks.noMatch")}
             </p>
           ) : null}
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-sand-100">
             {visibleRisks.map((risk) => {
               const open = expanded.has(risk.id);
               const busy = busyId === risk.id;
@@ -531,7 +531,7 @@ export function RisksPanel({
                   <div
                     className={cn(
                       "flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 transition-colors",
-                      open ? "bg-slate-50" : "hover:bg-slate-50/70",
+                      open ? "bg-sand-50" : "hover:bg-sand-50/70",
                       busy && "opacity-60",
                     )}
                   >
@@ -544,11 +544,11 @@ export function RisksPanel({
                       <ChevronRight
                         aria-hidden
                         className={cn(
-                          "size-3.5 shrink-0 text-slate-400 transition-transform",
+                          "size-3.5 shrink-0 text-sand-400 transition-transform",
                           open && "rotate-90",
                         )}
                       />
-                      <span className="min-w-0 flex-1 truncate text-sm text-slate-900">
+                      <span className="min-w-0 flex-1 truncate text-sm text-sand-900">
                         {risk.description}
                       </span>
                     </button>
@@ -576,7 +576,7 @@ export function RisksPanel({
                   </div>
 
                   {open ? (
-                    <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-9">
+                    <div className="border-t border-sand-100 bg-sand-50/50 px-3 py-3 pl-9">
                       {/* A two-column list gives the prose one wide measure
                           instead of stacking four narrow labelled blocks. */}
                       <DescriptionList className="text-sm">
@@ -599,7 +599,7 @@ export function RisksPanel({
                         </Field>
 
                         <Field name={t("risks.exposure")}>
-                          <span className="text-slate-600">
+                          <span className="text-sand-600">
                             {t("risks.exposureValue", {
                               impact: level(risk.impact),
                               likelihood: level(risk.likelihood),
@@ -609,7 +609,7 @@ export function RisksPanel({
 
                         {risk.milestone ? (
                           <Field name={t("risks.milestone")}>
-                            <span className="text-slate-600">
+                            <span className="text-sand-600">
                               {risk.milestone.title}
                             </span>
                           </Field>
@@ -631,7 +631,7 @@ export function RisksPanel({
                                 <li key={citation.id}>
                                   <a
                                     href={`/documents/${citation.chunk.document.id}`}
-                                    className="text-xs text-slate-700 underline hover:text-slate-900"
+                                    className="text-xs text-sand-700 underline hover:text-sand-900"
                                   >
                                     {citation.chunk.document.originalFilename}
                                     {citation.chunk.pageNumber
@@ -647,7 +647,7 @@ export function RisksPanel({
                                     </Badge>
                                   ) : null}
                                   {citation.excerpt ? (
-                                    <p className="mt-0.5 line-clamp-2 max-w-3xl text-xs text-slate-500 italic">
+                                    <p className="mt-0.5 line-clamp-2 max-w-3xl text-xs text-sand-500 italic">
                                       “{citation.excerpt}”
                                     </p>
                                   ) : null}

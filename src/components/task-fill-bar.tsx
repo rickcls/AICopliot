@@ -83,7 +83,7 @@ export function TaskFillBar({
           )}
           {filling ? t("tasks.fill.reading") : t("tasks.fill.button")}
         </Button>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-sand-500">
           {blockedReason
             ? blockedReason
             : hasLinkedDocuments
@@ -101,7 +101,7 @@ export function TaskFillBar({
       {summary ? (
         <div
           role="status"
-          className="space-y-2 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-xs text-slate-700"
+          className="space-y-2 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-xs text-sand-700"
         >
           <p>
             {nothingNew
@@ -121,20 +121,20 @@ export function TaskFillBar({
 
           {summary.requirements.length > 0 ? (
             <div>
-              <p className="mb-1 font-medium text-slate-500">{t("tasks.detail.delivers")}</p>
+              <p className="mb-1 font-medium text-sand-500">{t("tasks.detail.delivers")}</p>
               <ul className="flex flex-wrap gap-1.5">
                 {summary.requirements.map((requirement) => (
                   <li
                     key={requirement.id}
-                    className="inline-flex max-w-full items-center gap-1 rounded-full bg-white py-0.5 pr-1 pl-2 ring-1 ring-slate-200 ring-inset"
+                    className="inline-flex max-w-full items-center gap-1 rounded-full bg-white py-0.5 pr-1 pl-2 ring-1 ring-sand-200 ring-inset"
                   >
-                    <span className="font-medium text-slate-500">{requirement.code}</span>
+                    <span className="font-medium text-sand-500">{requirement.code}</span>
                     <span className="truncate">{requirement.title}</span>
                     <button
                       type="button"
                       onClick={() => onRemoveRequirement(requirement.id)}
                       aria-label={t("tasks.fill.doNotLink", { code: requirement.code })}
-                      className="rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded-full p-0.5 text-sand-400 hover:bg-sand-100 hover:text-sand-700"
                     >
                       <X className="size-3" aria-hidden />
                     </button>
@@ -146,18 +146,18 @@ export function TaskFillBar({
 
           {summary.sources.length > 0 ? (
             <div>
-              <p className="mb-1 font-medium text-slate-500">{t("tasks.detail.sources")}</p>
+              <p className="mb-1 font-medium text-sand-500">{t("tasks.detail.sources")}</p>
               <ul className="space-y-1.5">
                 {summary.sources.map((source) => (
                   <li key={source.chunkId}>
-                    <span className="font-medium text-slate-800">
+                    <span className="font-medium text-sand-800">
                       {source.filename}
                       {source.pageNumber
                         ? ` · ${t("common.page", { page: source.pageNumber })}`
                         : ""}
                     </span>
-                    <span className="text-slate-500"> — {list(source.fields)}</span>
-                    <p className="mt-0.5 text-slate-600 italic">“{source.excerpt}”</p>
+                    <span className="text-sand-500"> — {list(source.fields)}</span>
+                    <p className="mt-0.5 text-sand-600 italic">“{source.excerpt}”</p>
                   </li>
                 ))}
               </ul>

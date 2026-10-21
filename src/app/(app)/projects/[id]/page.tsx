@@ -58,11 +58,11 @@ function OverviewCard({
     // otherwise as wide as its longest truncated title.
     <Card className="flex min-w-0 flex-col p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        <h2 className="text-sm font-semibold text-sand-900">{title}</h2>
         {href ? (
           <Link
             href={href}
-            className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900"
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-sand-500 hover:text-sand-900"
           >
             {linkLabel}
             <ArrowRight className="size-3" aria-hidden />
@@ -97,26 +97,26 @@ function DiscoveryStage({
       <Link
         href={href}
         className={cn(
-          "flex h-full items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50",
+          "flex h-full items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition-colors hover:border-sand-300 hover:bg-sand-50",
           FOCUS_RING,
-          done ? "border-emerald-200" : "border-slate-200",
+          done ? "border-emerald-200" : "border-sand-200",
         )}
       >
         <span
           aria-hidden
           className={cn(
             "grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold",
-            done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500",
+            done ? "bg-emerald-600 text-white" : "bg-sand-100 text-sand-500",
           )}
         >
           {done ? <Check className="size-3.5" /> : index}
         </span>
         <span className="min-w-0">
-          <span className="block text-xs font-medium text-slate-500">
+          <span className="block text-xs font-medium text-sand-500">
             {label}
             {done ? <span className="sr-only"> {doneLabel}</span> : null}
           </span>
-          <span className="block text-sm font-semibold text-slate-900 tabular-nums">
+          <span className="block text-sm font-semibold text-sand-900 tabular-nums">
             {value}
           </span>
           {hint ? (
@@ -174,7 +174,7 @@ function nextStepCopy(
 }
 
 function Quiet({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-slate-500">{children}</p>;
+  return <p className="text-sm text-sand-500">{children}</p>;
 }
 
 export default async function ProjectOverviewPage({
@@ -343,15 +343,15 @@ export default async function ProjectOverviewPage({
     <div className="space-y-6">
       {project.discoveryEnabled ? (
         <>
-          <Card className="flex flex-wrap items-center justify-between gap-4 border-slate-300 p-5">
+          <Card className="flex flex-wrap items-center justify-between gap-4 border-sand-300 p-5">
             <div className="min-w-0">
-              <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+              <p className="text-xs font-medium tracking-wide text-sand-500 uppercase">
                 {t("overview.nextStep")}
               </p>
-              <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">
+              <h2 className="mt-1 text-lg font-semibold tracking-tight text-sand-900">
                 {next.title}
               </h2>
-              <p className="mt-1 max-w-2xl text-sm text-pretty text-slate-600">
+              <p className="mt-1 max-w-2xl text-sm text-pretty text-sand-600">
                 {next.description}
               </p>
             </div>
@@ -538,7 +538,7 @@ export default async function ProjectOverviewPage({
                         <span
                           className={cn(
                             "shrink-0 text-xs",
-                            late ? "font-medium text-red-700" : "text-slate-500",
+                            late ? "font-medium text-red-700" : "text-sand-500",
                           )}
                         >
                           {milestone.targetDate
@@ -586,7 +586,7 @@ export default async function ProjectOverviewPage({
             >
               {report && latestReport ? (
                 <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-sand-500">
                     <Badge tone={HEALTH_TONE[report.health]}>
                       {t(`reportHealth.${report.health}`)}
                     </Badge>
@@ -596,7 +596,7 @@ export default async function ProjectOverviewPage({
                       date: formatDate(latestReport.createdAt, dateLocale, timeZone),
                     })}
                   </div>
-                  <p className="line-clamp-3 text-sm text-slate-700">
+                  <p className="line-clamp-3 text-sm text-sand-700">
                     {report.narrative}
                   </p>
                 </div>
@@ -609,8 +609,8 @@ export default async function ProjectOverviewPage({
       ) : null}
 
       {offLayers.length > 0 ? (
-        <Card className="divide-y divide-slate-100">
-          <h2 className="px-5 pt-5 pb-3 text-sm font-semibold text-slate-900">
+        <Card className="divide-y divide-sand-100">
+          <h2 className="px-5 pt-5 pb-3 text-sm font-semibold text-sand-900">
             {t("project.layers.title")}
           </h2>
           {offLayers.map((layer) => (
@@ -619,14 +619,14 @@ export default async function ProjectOverviewPage({
               className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
             >
               <div className="min-w-0">
-                <h3 className="text-sm font-medium text-slate-900">
+                <h3 className="text-sm font-medium text-sand-900">
                   {t(
                     layer === "discovery"
                       ? "project.layers.discoveryTitle"
                       : "project.layers.deliveryTitle",
                   )}
                 </h3>
-                <p className="mt-0.5 max-w-2xl text-sm text-pretty text-slate-600">
+                <p className="mt-0.5 max-w-2xl text-sm text-pretty text-sand-600">
                   {t(
                     layer === "discovery"
                       ? "project.layers.discoveryBody"

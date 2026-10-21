@@ -140,7 +140,7 @@ export function EmailComposer({
           className="grid gap-3 sm:grid-cols-2"
         >
           <div>
-            <label htmlFor={`${ids}-purpose`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-purpose`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.purpose")}
             </label>
             <Select
@@ -157,7 +157,7 @@ export function EmailComposer({
             </Select>
           </div>
           <div>
-            <label htmlFor={`${ids}-to`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-to`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.recipient")}
             </label>
             <Input
@@ -169,7 +169,7 @@ export function EmailComposer({
             />
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor={`${ids}-points`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-points`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.keyPoints")}
             </label>
             <Textarea
@@ -182,7 +182,7 @@ export function EmailComposer({
             />
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor={`${ids}-incoming`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-incoming`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.incoming")}
             </label>
             <Textarea
@@ -195,7 +195,7 @@ export function EmailComposer({
             />
           </div>
           <div>
-            <label htmlFor={`${ids}-task`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-task`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.task")}
             </label>
             <Select
@@ -213,7 +213,7 @@ export function EmailComposer({
             </Select>
           </div>
           <div>
-            <label htmlFor={`${ids}-language`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-language`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.language")}
             </label>
             <Select
@@ -259,13 +259,13 @@ export function EmailComposer({
             </div>
           ) : null}
           <div>
-            <label htmlFor={`${ids}-subject`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-subject`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.subject")}
             </label>
             <Input id={`${ids}-subject`} value={subject} onChange={(event) => setSubject(event.target.value)} />
           </div>
           <div>
-            <label htmlFor={`${ids}-body`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-body`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.body")}
             </label>
             <Textarea
@@ -286,7 +286,7 @@ export function EmailComposer({
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50",
+                "inline-flex h-10 items-center gap-2 rounded-lg border border-sand-300 bg-white px-4 text-sm font-medium text-sand-900 hover:bg-sand-50",
                 FOCUS_RING,
               )}
             >
@@ -296,14 +296,14 @@ export function EmailComposer({
             <a
               href={mailtoUrl({ to, subject, body })}
               className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                "inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-sand-600 hover:bg-sand-100 hover:text-sand-900",
                 FOCUS_RING,
               )}
             >
               <Mail className="size-4" aria-hidden />
               {t("email.openMail")}
             </a>
-            <span className="text-xs text-slate-500">{t("email.neverSent")}</span>
+            <span className="text-xs text-sand-500">{t("email.neverSent")}</span>
           </div>
         </Card>
       ) : null}
@@ -311,20 +311,20 @@ export function EmailComposer({
       <section className="space-y-2">
         <SectionHeader title={t("email.recent")} />
         {drafts.length === 0 ? (
-          <p className="text-sm text-slate-500">{t("email.noDrafts")}</p>
+          <p className="text-sm text-sand-500">{t("email.noDrafts")}</p>
         ) : (
-          <Card className="divide-y divide-slate-100">
+          <Card className="divide-y divide-sand-100">
             {drafts.map((item) => (
               <div key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
                 <button
                   type="button"
                   onClick={() => show(item)}
-                  className={cn("min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-900 hover:underline", FOCUS_RING)}
+                  className={cn("min-w-0 flex-1 truncate text-left text-sm font-medium text-sand-900 hover:underline", FOCUS_RING)}
                 >
                   {item.subject || item.body.slice(0, 60)}
                 </button>
                 {item.flags.length > 0 ? <Badge tone="warning">{item.flags.length}</Badge> : null}
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-sand-500">
                   {[t(`email.purposes.${item.purpose as Purpose}`), item.recipient, formatInstantDay(item.createdAt, intlLocale(locale), timeZone)]
                     .filter(Boolean)
                     .join(" · ")}
@@ -333,7 +333,7 @@ export function EmailComposer({
                   type="button"
                   onClick={() => void remove(item.id)}
                   title={t("email.delete")}
-                  className={cn("rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-red-700", FOCUS_RING)}
+                  className={cn("rounded p-1 text-sand-400 hover:bg-sand-100 hover:text-red-700", FOCUS_RING)}
                 >
                   <Trash2 className="size-3.5" aria-hidden />
                   <span className="sr-only">{t("email.delete")}</span>

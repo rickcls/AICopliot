@@ -81,21 +81,21 @@ export default async function RequirementsPackPage({
 
       <article
         lang={htmlLang(locale)}
-        className="mt-6 rounded-xl border border-slate-200 bg-white p-8 shadow-sm print:mt-0 print:border-0 print:p-0 print:shadow-none">
-        <header className="border-b border-slate-200 pb-5">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+        className="mt-6 rounded-xl border border-sand-200 bg-white p-8 shadow-sm print:mt-0 print:border-0 print:p-0 print:shadow-none">
+        <header className="border-b border-sand-200 pb-5">
+          <p className="text-xs font-medium tracking-wide text-sand-500 uppercase">
             {project.name}
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sand-900">
             {t(`requirementsPack.title.${kind}`)}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-sand-500">
             {t("requirementsPack.summary", {
               date: formatDay(today, intlLocale(locale)),
               count,
             })}
           </p>
-          <p className="mt-3 text-sm text-pretty text-slate-700">
+          <p className="mt-3 text-sm text-pretty text-sand-700">
             {kind === "questions"
               ? t("requirementsPack.questionsIntro")
               : t("requirementsPack.signoffIntro")}
@@ -103,7 +103,7 @@ export default async function RequirementsPackPage({
         </header>
 
         {count === 0 ? (
-          <p className="py-10 text-center text-sm text-slate-500">
+          <p className="py-10 text-center text-sm text-sand-500">
             {kind === "questions"
               ? t("requirementsPack.questionsEmpty")
               : t("requirementsPack.signoffEmpty")}
@@ -112,24 +112,24 @@ export default async function RequirementsPackPage({
           groups.map((group) => (
             <section key={group.heading ?? "unassigned"} className="mt-6">
               {group.heading ? (
-                <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase">
+                <h2 className="mb-3 text-sm font-semibold tracking-wide text-sand-500 uppercase">
                   {t("requirementsPack.forStakeholder", { name: group.heading })}
                 </h2>
               ) : null}
               <ol className="space-y-5">
                 {group.items.map((item) => (
                   <li key={item.code} className="break-inside-avoid">
-                    <h3 className="text-base font-semibold text-slate-900">
-                      <span className="mr-2 font-mono text-sm text-slate-500">
+                    <h3 className="text-base font-semibold text-sand-900">
+                      <span className="mr-2 font-mono text-sm text-sand-500">
                         {item.code}
                       </span>
                       {item.title}
                     </h3>
-                    <p className="mt-0.5 text-xs text-slate-500 uppercase">
+                    <p className="mt-0.5 text-xs text-sand-500 uppercase">
                       {item.priorityLabel} · {item.type}
                     </p>
                     {item.description ? (
-                      <p className="mt-2 text-sm text-pretty text-slate-700">
+                      <p className="mt-2 text-sm text-pretty text-sand-700">
                         {item.description}
                       </p>
                     ) : null}
@@ -142,13 +142,13 @@ export default async function RequirementsPackPage({
                       </div>
                     ) : null}
                     {item.acceptanceCriteria ? (
-                      <p className="mt-2 text-sm text-slate-700">
+                      <p className="mt-2 text-sm text-sand-700">
                         <span className="font-medium">{t("requirementsPack.acceptance")} </span>
                         {item.acceptanceCriteria}
                       </p>
                     ) : null}
                     {item.evidence.length > 0 ? (
-                      <p className="mt-1.5 text-xs text-slate-400 italic">
+                      <p className="mt-1.5 text-xs text-sand-400 italic">
                         {t("requirementsPack.source", { sources: item.evidence.join("; ") })}
                       </p>
                     ) : null}
@@ -160,15 +160,15 @@ export default async function RequirementsPackPage({
         )}
 
         {kind === "signoff" && count > 0 ? (
-          <footer className="mt-10 grid gap-8 border-t border-slate-200 pt-6 text-sm text-slate-700 sm:grid-cols-3 print:grid-cols-3">
+          <footer className="mt-10 grid gap-8 border-t border-sand-200 pt-6 text-sm text-sand-700 sm:grid-cols-3 print:grid-cols-3">
             {[
               t("requirementsPack.approvedBy"),
               t("requirementsPack.role"),
               t("requirementsPack.date"),
             ].map((label) => (
               <div key={label}>
-                <div className="h-10 border-b border-slate-400" />
-                <p className="mt-1 text-xs text-slate-500">{label}</p>
+                <div className="h-10 border-b border-sand-400" />
+                <p className="mt-1 text-xs text-sand-500">{label}</p>
               </div>
             ))}
           </footer>

@@ -132,7 +132,7 @@ export function TaskChat({
 
   if (!loaded) {
     return (
-      <div className="flex items-center gap-2 p-4 text-sm text-slate-500">
+      <div className="flex items-center gap-2 p-4 text-sm text-sand-500">
         <Spinner className="size-4" />
         {t("tasks.chat.loading")}
       </div>
@@ -142,7 +142,7 @@ export function TaskChat({
   return (
     <div className="flex min-h-full flex-col">
       <div className="flex-1 space-y-4 p-4">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-sand-500">
           <span className="mr-auto">
             {linkedDocumentCount > 0
               ? t("tasks.chat.readsLinked", { count: linkedDocumentCount })
@@ -152,7 +152,7 @@ export function TaskChat({
             <>
               <a
                 href={`/chat/${conversationId}`}
-                className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-slate-100 hover:text-slate-800"
+                className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-sand-100 hover:text-sand-800"
               >
                 <ExternalLink className="size-3.5" aria-hidden />
                 {t("tasks.chat.openInAsk")}
@@ -161,7 +161,7 @@ export function TaskChat({
                 type="button"
                 onClick={newThread}
                 disabled={pending}
-                className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-sand-100 hover:text-sand-800 disabled:opacity-50"
               >
                 <Plus className="size-3.5" aria-hidden />
                 {t("tasks.chat.newThread")}
@@ -172,7 +172,7 @@ export function TaskChat({
 
         {turns.length === 0 ? (
           <div className="space-y-2">
-            <p className="text-sm text-slate-600">{t("tasks.chat.intro")}</p>
+            <p className="text-sm text-sand-600">{t("tasks.chat.intro")}</p>
             <ul className="space-y-1.5">
               {SUGGESTIONS.map((key) => {
                 const suggestion = t(`tasks.chat.suggestions.${key}`);
@@ -181,7 +181,7 @@ export function TaskChat({
                     <button
                       type="button"
                       onClick={() => void ask(suggestion)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      className="w-full rounded-lg border border-sand-200 px-3 py-2 text-left text-sm text-sand-700 hover:border-sand-300 hover:bg-sand-50"
                     >
                       {suggestion}
                     </button>
@@ -220,9 +220,9 @@ export function TaskChat({
           event.preventDefault();
           void ask(question);
         }}
-        className="sticky bottom-0 border-t border-slate-200 bg-white p-3"
+        className="sticky bottom-0 border-t border-sand-200 bg-white p-3"
       >
-        <div className="flex items-end gap-2 rounded-2xl border border-slate-300 p-1.5 focus-within:border-slate-900">
+        <div className="flex items-end gap-2 rounded-2xl border border-sand-300 p-1.5 focus-within:border-sand-900">
           <label htmlFor="task-chat-question" className="sr-only">
             {t("tasks.chat.inputLabel")}
           </label>

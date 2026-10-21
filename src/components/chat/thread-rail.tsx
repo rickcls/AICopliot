@@ -10,7 +10,7 @@ import { Badge, FOCUS_RING, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 const ROW_ACTION = cn(
-  "grid size-7 shrink-0 place-items-center rounded-md text-slate-400 transition",
+  "grid size-7 shrink-0 place-items-center rounded-md text-sand-400 transition",
   // Revealed on hover or keyboard focus. Touch screens have no hover, so they
   // always show the actions rather than hiding them behind a gesture.
   "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100",
@@ -67,17 +67,17 @@ export function ThreadRail({
         href="/chat"
         onClick={onNavigate}
         className={cn(
-          "flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3",
-          "text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50",
+          "flex h-9 items-center gap-2 rounded-lg border border-sand-300 bg-white px-3",
+          "text-sm font-medium text-sand-900 transition-colors hover:bg-sand-50",
           FOCUS_RING,
         )}
       >
-        <Plus className="size-4 text-slate-400" aria-hidden />
+        <Plus className="size-4 text-sand-400" aria-hidden />
         {t("chat.rail.newThread")}
       </Link>
 
       {threads.length === 0 ? (
-        <p className="mt-4 px-1 text-xs text-slate-500">
+        <p className="mt-4 px-1 text-xs text-sand-500">
           {t("chat.rail.empty")}
         </p>
       ) : (
@@ -116,7 +116,7 @@ export function ThreadRail({
                 key={thread.id}
                 className={cn(
                   "group flex items-start gap-0.5 rounded-lg transition-colors",
-                  active ? "bg-slate-100" : "hover:bg-slate-50",
+                  active ? "bg-sand-100" : "hover:bg-sand-50",
                   busy && "opacity-60",
                 )}
               >
@@ -133,8 +133,8 @@ export function ThreadRail({
                     className={cn(
                       "block truncate text-sm",
                       active
-                        ? "font-medium text-slate-900"
-                        : "text-slate-700",
+                        ? "font-medium text-sand-900"
+                        : "text-sand-700",
                     )}
                   >
                     {thread.title}
@@ -157,7 +157,7 @@ export function ThreadRail({
                         {thread.projectName}
                       </Badge>
                     ) : null}
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-sand-400">
                       {formatThreadTime(thread.lastMessageAt, nowIso, t, dateLocale, timeZone)}
                     </span>
                   </span>
@@ -171,7 +171,7 @@ export function ThreadRail({
                       setDraftTitle(thread.title);
                       setEditingId(thread.id);
                     }}
-                    className={cn(ROW_ACTION, "hover:bg-slate-200 hover:text-slate-700")}
+                    className={cn(ROW_ACTION, "hover:bg-sand-200 hover:text-sand-700")}
                   >
                     <Pencil className="size-3.5" aria-hidden />
                   </button>

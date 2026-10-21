@@ -53,7 +53,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
+      <body className="flex min-h-full flex-col bg-sand-50 text-sand-900">
         <I18nProvider locale={locale} timeZone={timeZone}>
           {children}
         </I18nProvider>

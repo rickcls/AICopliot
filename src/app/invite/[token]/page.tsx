@@ -53,7 +53,7 @@ export default async function InvitePage({
     body = (
       <>
         <h1 className="text-lg font-semibold">{t("invite.invalidTitle")}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("invite.askForNew")}</p>
+        <p className="mt-1 text-sm text-sand-500">{t("invite.askForNew")}</p>
       </>
     );
   } else if (isMember) {
@@ -62,7 +62,7 @@ export default async function InvitePage({
         <h1 className="text-lg font-semibold">
           {t("invite.title", { workspace: invite.workspaceName })}
         </h1>
-        <p className="mt-1 mb-6 text-sm text-slate-500">{t("invite.alreadyMember")}</p>
+        <p className="mt-1 mb-6 text-sm text-sand-500">{t("invite.alreadyMember")}</p>
         <AcceptInviteButton token={token} label={t("invite.openWorkspace")} />
       </>
     );
@@ -70,7 +70,7 @@ export default async function InvitePage({
     body = (
       <>
         <h1 className="text-lg font-semibold">{t(UNUSABLE_TITLE[invite.state])}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("invite.askForNew")}</p>
+        <p className="mt-1 text-sm text-sand-500">{t("invite.askForNew")}</p>
       </>
     );
   } else {
@@ -80,11 +80,11 @@ export default async function InvitePage({
         <h1 className="text-lg font-semibold">
           {t("invite.title", { workspace: invite.workspaceName })}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">{t("invite.lead", { role })}</p>
+        <p className="mt-1 text-sm text-sand-500">{t("invite.lead", { role })}</p>
         <div className="mt-6">
           {user ? (
             <>
-              <p className="mb-3 text-xs text-slate-500">
+              <p className="mb-3 text-xs text-sand-500">
                 {t("invite.signedInAs", { email: user.email })}
               </p>
               <AcceptInviteButton token={token} label={t("invite.accept")} />

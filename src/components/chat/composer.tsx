@@ -94,7 +94,7 @@ export function Composer({
           event.preventDefault();
           submit();
         }}
-        className="rounded-2xl border border-slate-300 bg-white p-2 shadow-sm focus-within:border-slate-900"
+        className="rounded-2xl border border-sand-300 bg-white p-2 shadow-sm focus-within:border-sand-900"
       >
         <label htmlFor="question" className="sr-only">
           {t("chat.composer.question")}
@@ -188,7 +188,7 @@ export function Composer({
             ) : null}
           </Select>
 
-          <span className="hidden min-w-0 truncate text-xs text-slate-500 sm:inline">
+          <span className="hidden min-w-0 truncate text-xs text-sand-500 sm:inline">
             {focus.kind !== "none"
               ? ""
               : projectId
@@ -220,7 +220,7 @@ export function Composer({
           {t("chat.composer.noEvidence")}
         </p>
       ) : (
-        <p className="mt-2 px-1 text-xs text-slate-400">
+        <p className="mt-2 px-1 text-xs text-sand-400">
           {focus.kind === "task"
             ? t("chat.composer.hintTask")
             : focus.kind === "documents"

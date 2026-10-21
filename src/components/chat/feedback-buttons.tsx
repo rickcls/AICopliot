@@ -40,7 +40,7 @@ export function FeedbackButtons({
 
   return (
     <div className="flex items-center gap-1">
-      <span className="mr-1 text-xs text-slate-500">{t("chat.feedback.question")}</span>
+      <span className="mr-1 text-xs text-sand-500">{t("chat.feedback.question")}</span>
       <Button
         variant={rating === "up" ? "secondary" : "ghost"}
         size="icon"
@@ -60,7 +60,7 @@ export function FeedbackButtons({
         <ThumbsDown className="size-3.5" aria-hidden />
       </Button>
       {rating && !failed ? (
-        <span className="text-xs text-slate-500">{t("chat.feedback.thanks")}</span>
+        <span className="text-xs text-sand-500">{t("chat.feedback.thanks")}</span>
       ) : null}
       {failed ? (
         <span className="text-xs text-red-600">{t("chat.feedback.failed")}</span>

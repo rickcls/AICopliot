@@ -47,7 +47,7 @@ export default async function AllDocumentsPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{t("documents.title")}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-slate-600">{t("documents.lead")}</p>
+        <p className="mt-1 max-w-3xl text-sm text-sand-600">{t("documents.lead")}</p>
       </div>
 
       <form action="/documents" method="get" role="search" className="flex max-w-2xl gap-2">
@@ -69,7 +69,7 @@ export default async function AllDocumentsPage({
       </form>
 
       {query && query.length < MIN_QUERY_LENGTH ? (
-        <p className="text-sm text-slate-500">{t("documents.search.tooShort")}</p>
+        <p className="text-sm text-sand-500">{t("documents.search.tooShort")}</p>
       ) : null}
       {hits ? <DocumentSearchResults query={query} hits={hits} t={t} /> : null}
 

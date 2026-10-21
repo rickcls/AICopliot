@@ -197,7 +197,7 @@ export function MembersPanel({
           description={t("members.lead", { workspace: workspaceName })}
         />
         <Card className="overflow-hidden">
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-sand-100">
             {members.map((member) => {
               const self = member.userId === viewerId;
               const canEditRole = isAdmin && !member.isOwner;
@@ -213,13 +213,13 @@ export function MembersPanel({
                 >
                   <Avatar name={member.name} email={member.email} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">
+                    <p className="truncate text-sm font-medium text-sand-900">
                       {displayName(member)}{" "}
                       {self ? (
-                        <span className="font-normal text-slate-500">{t("members.you")}</span>
+                        <span className="font-normal text-sand-500">{t("members.you")}</span>
                       ) : null}
                     </p>
-                    <p className="truncate text-xs text-slate-500">{member.email}</p>
+                    <p className="truncate text-xs text-sand-500">{member.email}</p>
                   </div>
                   {member.isOwner ? <Badge tone="neutral">{t("members.owner")}</Badge> : null}
                   {canEditRole ? (
@@ -234,7 +234,7 @@ export function MembersPanel({
                       <option value="member">{t("members.roleMember")}</option>
                     </Select>
                   ) : (
-                    <span className="text-xs text-slate-500">{t(ROLE_KEY[member.role])}</span>
+                    <span className="text-xs text-sand-500">{t(ROLE_KEY[member.role])}</span>
                   )}
                   {canRemove ? (
                     <Button
@@ -260,10 +260,10 @@ export function MembersPanel({
           description={isAdmin ? t("members.invitesLead") : t("members.adminOnly")}
         />
         {isAdmin ? (
-          <Card className="divide-y divide-slate-100">
+          <Card className="divide-y divide-sand-100">
             <div className="flex flex-wrap items-end gap-3 p-4">
               <div>
-                <label htmlFor={roleSelectId} className="mb-1 block text-xs font-medium text-slate-500">
+                <label htmlFor={roleSelectId} className="mb-1 block text-xs font-medium text-sand-500">
                   {t("members.inviteAs")}
                 </label>
                 <Select
@@ -288,7 +288,7 @@ export function MembersPanel({
 
             {newLink ? (
               <div className="space-y-1.5 p-4">
-                <p className="text-xs font-medium text-slate-500">{t("members.newLinkLabel")}</p>
+                <p className="text-xs font-medium text-sand-500">{t("members.newLinkLabel")}</p>
                 <div className="flex gap-2">
                   <Input
                     readOnly
@@ -311,17 +311,17 @@ export function MembersPanel({
             ) : null}
 
             <div className="p-4">
-              <p className="mb-2 text-xs font-medium text-slate-500">{t("members.pending")}</p>
+              <p className="mb-2 text-xs font-medium text-sand-500">{t("members.pending")}</p>
               {invites.length === 0 ? (
-                <p className="text-sm text-slate-500">{t("members.noPending")}</p>
+                <p className="text-sm text-sand-500">{t("members.noPending")}</p>
               ) : (
                 <ul className="space-y-2">
                   {invites.map((invite) => (
                     <li key={invite.id} className="flex items-center justify-between gap-3 text-sm">
                       <span className="min-w-0 truncate">
                         {t(ROLE_KEY[invite.role])}
-                        <span className="mx-1.5 text-slate-300">·</span>
-                        <span className="text-slate-500">
+                        <span className="mx-1.5 text-sand-300">·</span>
+                        <span className="text-sand-500">
                           {t("members.expires", {
                             date: formatInstantDay(invite.expiresAt, intlLocale(locale), timeZone),
                           })}

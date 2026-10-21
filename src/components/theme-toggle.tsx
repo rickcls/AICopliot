@@ -56,7 +56,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       role="group"
       aria-label={t("theme.label")}
       className={cn(
-        "inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5",
+        "inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5",
         className,
       )}
     >
@@ -73,8 +73,8 @@ export function ThemeToggle({ className }: { className?: string }) {
             "grid size-7 place-items-center rounded-md transition-colors",
             FOCUS_RING,
             choice === value
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-400 hover:text-slate-900",
+              ? "bg-white text-sand-900 shadow-sm"
+              : "text-sand-400 hover:text-sand-900",
           )}
         >
           <Icon className="size-3.5" aria-hidden />

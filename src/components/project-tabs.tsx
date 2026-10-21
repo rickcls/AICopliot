@@ -135,7 +135,7 @@ export function ProjectTabs({
       // row: a two-row tab strip reads as two groups and hides which row the
       // active tab is on. `scrollbar-none` is deliberately not used — the bar is
       // the affordance telling you there is more to the right.
-      className="-mx-4 overflow-x-auto border-b border-slate-200 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+      className="-mx-4 overflow-x-auto border-b border-sand-200 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
     >
       <ul className="flex w-max min-w-full items-center gap-1">
         {sections.map((section) => {
@@ -154,15 +154,15 @@ export function ProjectTabs({
                   // so the active tab joins the line rather than floating above it.
                   "-mb-px border-b-2",
                   active
-                    ? "border-slate-900 font-semibold text-slate-900"
-                    : "border-transparent font-medium text-slate-500 hover:border-slate-300 hover:text-slate-900",
+                    ? "border-sand-900 font-semibold text-sand-900"
+                    : "border-transparent font-medium text-sand-500 hover:border-sand-300 hover:text-sand-900",
                 )}
               >
                 <Icon
                   aria-hidden
                   className={cn(
                     "size-4 shrink-0 transition-colors",
-                    active ? "text-slate-900" : "text-slate-400 group-hover:text-slate-600",
+                    active ? "text-sand-900" : "text-sand-400 group-hover:text-sand-600",
                   )}
                 />
                 {t(section.labelKey)}

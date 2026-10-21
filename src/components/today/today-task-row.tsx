@@ -75,14 +75,14 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
         </span>
         <Link
           href={`/projects/${task.projectId}/tasks?task=${task.id}`}
-          className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 hover:underline"
+          className="min-w-0 flex-1 truncate text-sm font-medium text-sand-900 hover:underline"
         >
           {task.title}
         </Link>
         {task.staleDays !== null ? (
           <Badge tone="warning">{t("today.staleBadge", { count: task.staleDays })}</Badge>
         ) : null}
-        <span className="flex shrink-0 items-center gap-3 text-xs text-slate-500">
+        <span className="flex shrink-0 items-center gap-3 text-xs text-sand-500">
           {task.blockedLabel ? (
             <span className="font-medium text-red-700">{task.blockedLabel}</span>
           ) : null}
@@ -134,7 +134,7 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
           aria-controls={`${ids}-actions`}
           aria-label={t("checkIn.actions", { title: task.title })}
           className={cn(
-            "shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+            "shrink-0 rounded-md px-2 py-1 text-xs font-medium text-sand-600 hover:bg-sand-100 hover:text-sand-900",
             FOCUS_RING,
           )}
         >

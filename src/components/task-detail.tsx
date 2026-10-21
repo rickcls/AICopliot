@@ -294,16 +294,16 @@ export function TaskDetail({
         type="button"
         aria-label={t("tasks.detail.closeDetails")}
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/30"
+        className="absolute inset-0 bg-sand-900/30"
       />
 
       <div
         role="dialog"
         aria-label={t("tasks.detail.dialogLabel", { title: task.title })}
         aria-modal="true"
-        className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-slate-200 bg-white shadow-xl"
+        className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-sand-200 bg-white shadow-xl"
       >
-        <div className="sticky top-0 z-10 flex flex-wrap items-start gap-2 border-b border-slate-200 bg-white/95 px-4 pt-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex flex-wrap items-start gap-2 border-b border-sand-200 bg-white/95 px-4 pt-4 backdrop-blur">
           {/* The name is edited in place at heading size, matching the create
               form — the title of the thing you are looking at, not a field. */}
           <Input
@@ -313,7 +313,7 @@ export function TaskDetail({
             aria-label={t("tasks.fields.name")}
             maxLength={200}
             disabled={disabled}
-            className="h-auto min-w-0 flex-1 border-transparent bg-transparent px-0 py-0 text-base font-semibold text-pretty text-slate-900 focus-visible:border-transparent disabled:bg-transparent"
+            className="h-auto min-w-0 flex-1 border-transparent bg-transparent px-0 py-0 text-base font-semibold text-pretty text-sand-900 focus-visible:border-transparent disabled:bg-transparent"
           />
 
           {/* Expanding hands the *current* draft to the form, not the stored
@@ -323,7 +323,7 @@ export function TaskDetail({
             onClick={() => onExpand(draft)}
             aria-label={t("tasks.detail.expand")}
             title={t("tasks.detail.expand")}
-            className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            className="shrink-0 rounded-lg p-1.5 text-sand-500 transition-colors hover:bg-sand-100 hover:text-sand-900"
           >
             <Maximize2 className="size-4" aria-hidden />
           </button>
@@ -331,7 +331,7 @@ export function TaskDetail({
             type="button"
             onClick={onClose}
             aria-label={t("common.close")}
-            className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            className="shrink-0 rounded-lg p-1.5 text-sand-500 transition-colors hover:bg-sand-100 hover:text-sand-900"
           >
             <X className="size-4" aria-hidden />
           </button>
@@ -358,8 +358,8 @@ export function TaskDetail({
                 className={cn(
                   "-mb-px inline-flex items-center gap-1.5 border-b-2 px-1.5 pt-1 pb-2 text-sm font-medium transition-colors",
                   tab === value
-                    ? "border-slate-900 text-slate-900"
-                    : "border-transparent text-slate-500 hover:text-slate-800",
+                    ? "border-sand-900 text-sand-900"
+                    : "border-transparent text-sand-500 hover:text-sand-800",
                 )}
               >
                 {value === "ai" ? (
@@ -498,7 +498,7 @@ export function TaskDetail({
               {assignee ? (
                 <Avatar name={assignee.name} email={assignee.email} />
               ) : (
-                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-slate-100")}>
+                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-sand-100")}>
                   <UserRound className="size-3.5" />
                 </span>
               )}
@@ -651,7 +651,7 @@ export function TaskDetail({
                   void save({ estimatedHours: event.target.value });
                 }}
               />
-              <span className="text-xs text-slate-400">{t("tasks.fields.hours")}</span>
+              <span className="text-xs text-sand-400">{t("tasks.fields.hours")}</span>
             </div>
 
             <span className={ROW_LABEL}>{t("tasks.fields.origin")}</span>
@@ -674,7 +674,7 @@ export function TaskDetail({
           <div>
             <label
               htmlFor="detail-description"
-              className="mb-1.5 block text-xs font-medium text-slate-500"
+              className="mb-1.5 block text-xs font-medium text-sand-500"
             >
               {t("tasks.fields.description")}
             </label>
@@ -689,9 +689,9 @@ export function TaskDetail({
               maxLength={4000}
               disabled={disabled}
               className={cn(
-                "min-h-32 w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm leading-relaxed text-slate-700",
-                "placeholder:text-slate-400 hover:bg-slate-100",
-                "focus-visible:border-slate-900 focus-visible:bg-white focus-visible:outline-hidden",
+                "min-h-32 w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm leading-relaxed text-sand-700",
+                "placeholder:text-sand-400 hover:bg-sand-100",
+                "focus-visible:border-sand-900 focus-visible:bg-white focus-visible:outline-hidden",
               )}
             />
           </div>
@@ -711,7 +711,7 @@ export function TaskDetail({
               )}
               {filling ? t("tasks.fill.reading") : t("tasks.fill.button")}
             </Button>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-sand-500">
               {fillBlocked ?? t("tasks.detail.fillReview")}
             </span>
           </div>
@@ -725,7 +725,7 @@ export function TaskDetail({
           {/* Dependencies, citations, and comments are relationships rather than
               fields of this draft — each saves on its own. */}
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
               {t("tasks.detail.delivers")}
             </h3>
             <TracedRequirements
@@ -736,7 +736,7 @@ export function TaskDetail({
           </div>
 
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
               {t("tasks.fields.documents")}
             </h3>
             <TaskDocumentsField
@@ -769,7 +769,7 @@ export function TaskDetail({
           </div>
 
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
               {t("tasks.detail.dependencies")}
             </h3>
             <TaskDependencies
@@ -783,18 +783,18 @@ export function TaskDetail({
 
           {task.citations.length > 0 ? (
             <div>
-              <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
                 {t("tasks.detail.sources")}
               </h3>
               <ul className="space-y-2">
                 {task.citations.map((citation) => (
                   <li
                     key={citation.id}
-                    className="rounded-lg border border-slate-200 p-2.5 text-xs"
+                    className="rounded-lg border border-sand-200 p-2.5 text-xs"
                   >
                     <a
                       href={`/documents/${citation.chunk.document.id}`}
-                      className="font-medium text-slate-800 underline hover:text-slate-950"
+                      className="font-medium text-sand-800 underline hover:text-sand-950"
                     >
                       {citation.chunk.document.originalFilename}
                       {citation.chunk.pageNumber
@@ -810,7 +810,7 @@ export function TaskDetail({
                       </Badge>
                     ) : null}
                     {citation.excerpt ? (
-                      <p className="mt-1 text-slate-600 italic">
+                      <p className="mt-1 text-sand-600 italic">
                         “{citation.excerpt}”
                       </p>
                     ) : null}
@@ -820,18 +820,18 @@ export function TaskDetail({
             </div>
           ) : null}
 
-          <div className="border-t border-slate-100 pt-4">
+          <div className="border-t border-sand-100 pt-4">
             <TaskComments taskId={task.id} currentUserId={currentUserId} />
           </div>
         </div>
 
         <div
           hidden={tab !== "details"}
-          className="sticky bottom-0 flex items-center gap-2 border-t border-slate-200 bg-white p-4"
+          className="sticky bottom-0 flex items-center gap-2 border-t border-sand-200 bg-white p-4"
         >
           {/* Saving is reported rather than commanded: there is no Save button
               because there is nothing to submit — each field commits itself. */}
-          <span className="flex-1 text-xs text-slate-500">
+          <span className="flex-1 text-xs text-sand-500">
             {saving ? (
               <span className="inline-flex items-center gap-1.5">
                 <Spinner className="size-3" />

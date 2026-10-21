@@ -110,7 +110,7 @@ export function TaskApproach({
 
   if (!loaded) {
     return (
-      <div className="flex items-center gap-2 p-4 text-sm text-slate-500">
+      <div className="flex items-center gap-2 p-4 text-sm text-sand-500">
         <Spinner />
       </div>
     );
@@ -121,10 +121,10 @@ export function TaskApproach({
   return (
     <div className="space-y-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="min-w-0 flex-1 text-xs text-slate-500">{t("approach.lead")}</p>
+        <p className="min-w-0 flex-1 text-xs text-sand-500">{t("approach.lead")}</p>
         <Link
           href={`/email?task=${taskId}`}
-          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900"
+          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-sand-600 hover:text-sand-900"
         >
           <Mail className="size-3.5" aria-hidden />
           {t("approach.draftEmail")}
@@ -140,14 +140,14 @@ export function TaskApproach({
         </Button>
       ) : (
         <>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-sand-500">
             {approach.evidence === "none"
               ? t("approach.noEvidence")
               : approach.evidence === "linked"
                 ? t("approach.evidenceLinked")
                 : t("approach.evidenceProject")}
           </p>
-          {approach.note ? <p className="text-sm text-pretty text-slate-700">{approach.note}</p> : null}
+          {approach.note ? <p className="text-sm text-pretty text-sand-700">{approach.note}</p> : null}
 
           <ol className="space-y-2">
             {approach.steps.map((step, index) => {
@@ -157,7 +157,7 @@ export function TaskApproach({
                   key={index}
                   className={cn(
                     "flex gap-3 rounded-lg border p-3",
-                    step.basis === "general" ? "border-dashed border-violet-200 bg-violet-50/40" : "border-slate-200",
+                    step.basis === "general" ? "border-dashed border-violet-200 bg-violet-50/40" : "border-sand-200",
                   )}
                 >
                   <input
@@ -176,7 +176,7 @@ export function TaskApproach({
                     }
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-pretty text-slate-900">
+                    <p className="text-sm text-pretty text-sand-900">
                       <span className="mr-1.5 font-semibold tabular-nums">{index + 1}.</span>
                       {step.text}
                     </p>
@@ -194,12 +194,12 @@ export function TaskApproach({
                               key={label}
                               href={`/documents/${source.documentId}/chunks?chunk=${source.chunkId}#chunk-${source.chunkId}`}
                               title={source.excerpt}
-                              className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 hover:bg-slate-200"
+                              className="inline-flex items-center gap-1 rounded-md bg-sand-100 px-1.5 py-0.5 text-xs text-sand-700 hover:bg-sand-200"
                             >
                               <BookOpen className="size-3" aria-hidden />
                               <span className="max-w-40 truncate">{source.filename}</span>
                               {source.pageNumber !== null ? (
-                                <span className="text-slate-500">
+                                <span className="text-sand-500">
                                   {t("approach.page", { page: source.pageNumber })}
                                 </span>
                               ) : null}

@@ -34,8 +34,8 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {t("dashboard.title")}
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          <span className="font-medium text-slate-900">{workspaceName}</span> ·{" "}
+        <p className="mt-1 text-sm text-sand-600">
+          <span className="font-medium text-sand-900">{workspaceName}</span> ·{" "}
           {t("workspaceOverview.counts", {
             projects: t("workspaceOverview.projects", { count: projectCount }),
             documents: t("workspaceOverview.documents", { count: documentCount }),
@@ -69,14 +69,14 @@ function SummarySkeleton({ label }: { label: string }) {
     <SkeletonRegion label={label} className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-20 bg-slate-100" />
+          <Skeleton key={i} className="h-20 bg-sand-100" />
         ))}
       </div>
       <Card className="p-5">
         <div className="space-y-3">
-          <Skeleton className="h-4 w-full bg-slate-100" />
-          <Skeleton className="h-4 w-11/12 bg-slate-100" />
-          <Skeleton className="h-4 w-4/5 bg-slate-100" />
+          <Skeleton className="h-4 w-full bg-sand-100" />
+          <Skeleton className="h-4 w-11/12 bg-sand-100" />
+          <Skeleton className="h-4 w-4/5 bg-sand-100" />
         </div>
       </Card>
     </SkeletonRegion>

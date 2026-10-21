@@ -80,13 +80,13 @@ export function CaptureWorkspace({
       {compact ? (
         <Link
           href="/capture"
-          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900"
+          className="inline-flex items-center gap-1 text-xs font-medium text-sand-500 hover:text-sand-900"
         >
           {t("capture.viewAll")}
           <ArrowRight className="size-3" aria-hidden />
         </Link>
       ) : captures.length === 0 ? (
-        <p className="text-sm text-slate-500">{t("capture.historyEmpty")}</p>
+        <p className="text-sm text-sand-500">{t("capture.historyEmpty")}</p>
       ) : null}
     </div>
   );

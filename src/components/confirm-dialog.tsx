@@ -30,7 +30,7 @@ import { Button } from "./ui";
  * focused control regardless of how the dialog was opened.
  */
 const DIALOG_INITIAL_FOCUS_RING =
-  "focus:outline-hidden focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 focus:ring-offset-white";
+  "focus:outline-hidden focus:ring-2 focus:ring-sand-900 focus:ring-offset-2 focus:ring-offset-white";
 
 export interface ConfirmOptions {
   title: string;
@@ -103,18 +103,18 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           // the element rather than the panel inside it is a click outside.
           if (event.target === dialogRef.current) settle(false);
         }}
-        className="m-auto w-[calc(100vw-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-xl open:animate-dialog-in backdrop:bg-black/50 backdrop:animate-overlay-in"
+        className="m-auto w-[calc(100vw-2rem)] max-w-md rounded-xl border border-sand-200 bg-white p-0 text-sand-900 shadow-xl open:animate-dialog-in backdrop:bg-black/50 backdrop:animate-overlay-in"
       >
         {options ? (
           <div className="p-5">
             <h2
               id="confirm-dialog-title"
-              className="text-sm font-semibold text-slate-900"
+              className="text-sm font-semibold text-sand-900"
             >
               {options.title}
             </h2>
             {options.body ? (
-              <div className="mt-2 text-sm text-slate-600">{options.body}</div>
+              <div className="mt-2 text-sm text-sand-600">{options.body}</div>
             ) : null}
             <div className="mt-5 flex justify-end gap-2">
               <Button

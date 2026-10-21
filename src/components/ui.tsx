@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * with no focus indicator at all.
  */
 export const FOCUS_RING =
-  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sand-900 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "icon";
@@ -45,10 +45,10 @@ export function buttonClasses({
     size === "sm" && "h-8 px-3 text-sm",
     size === "md" && "h-10 px-4 text-sm",
     size === "icon" && "size-8 shrink-0 p-0",
-    variant === "primary" && "bg-slate-900 text-white hover:bg-slate-700",
+    variant === "primary" && "bg-sand-900 text-white hover:bg-sand-700",
     variant === "secondary" &&
-      "border border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
-    variant === "ghost" && "text-slate-600 hover:bg-slate-100",
+      "border border-sand-300 bg-white text-sand-900 hover:bg-sand-50",
+    variant === "ghost" && "text-sand-600 hover:bg-sand-100",
     variant === "danger" && "bg-red-600 text-white hover:bg-red-700",
     className,
   );
@@ -93,10 +93,10 @@ export function Input({
   return (
     <input
       className={cn(
-        "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900",
-        "placeholder:text-slate-400 focus-visible:border-slate-900",
+        "h-10 w-full rounded-lg border border-sand-300 bg-white px-3 text-sm text-sand-900",
+        "placeholder:text-sand-400 focus-visible:border-sand-900",
         FOCUS_RING,
-        "disabled:cursor-not-allowed disabled:bg-slate-50",
+        "disabled:cursor-not-allowed disabled:bg-sand-50",
         className,
       )}
       {...props}
@@ -113,8 +113,8 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900",
-        "placeholder:text-slate-400 focus-visible:border-slate-900",
+        "w-full rounded-lg border border-sand-300 bg-white px-3 py-2 text-sm text-sand-900",
+        "placeholder:text-sand-400 focus-visible:border-sand-900",
         FOCUS_RING,
         className,
       )}
@@ -130,10 +130,10 @@ export function Select({
   return (
     <select
       className={cn(
-        "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900",
-        "focus-visible:border-slate-900",
+        "h-10 rounded-lg border border-sand-300 bg-white px-3 text-sm text-sand-900",
+        "focus-visible:border-sand-900",
         FOCUS_RING,
-        "disabled:cursor-not-allowed disabled:bg-slate-50",
+        "disabled:cursor-not-allowed disabled:bg-sand-50",
         className,
       )}
       {...props}
@@ -169,10 +169,10 @@ export function FilterChip({
         pressed
           ? alarming
             ? "border-red-700 bg-red-700 text-white"
-            : "border-slate-900 bg-slate-900 text-white"
+            : "border-sand-900 bg-sand-900 text-white"
           : alarming
             ? "border-red-200 bg-white text-red-700 hover:border-red-300"
-            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+            : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
         className,
       )}
       {...props}
@@ -182,7 +182,7 @@ export function FilterChip({
         <span
           className={cn(
             "tabular-nums",
-            pressed ? "text-white/70" : "text-slate-400",
+            pressed ? "text-white/70" : "text-sand-400",
           )}
         >
           {count}
@@ -203,7 +203,7 @@ export function SearchField({
       <svg
         aria-hidden
         viewBox="0 0 16 16"
-        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-sand-400"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.75"
@@ -241,20 +241,20 @@ export const QUIET_CONTROL =
   // select to `max-w-sm` made Assignee look like a wide empty bar while
   // Status/Priority (coloured) hug their labels — the jagged edge that made
   // the task form look broken.
-  "w-auto max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
+  "w-auto max-w-sm border-transparent bg-transparent hover:bg-sand-100 focus-visible:border-sand-900 focus-visible:bg-white disabled:bg-transparent";
 
 /**
  * Native checkboxes keep their platform rendering (and so their forced-colors
  * behaviour); this only aligns size, tint, and the focus ring with the rest of
  * the controls.
  */
-export const CHECKBOX = `size-4 shrink-0 rounded border-slate-300 accent-slate-900 ${FOCUS_RING}`;
+export const CHECKBOX = `size-4 shrink-0 rounded border-sand-300 accent-sand-900 ${FOCUS_RING}`;
 
 /** Fixed gutter for the leading icon on a quiet metadata row. */
 export const ROW_ICON =
-  "grid size-6 shrink-0 place-items-center text-slate-400";
+  "grid size-6 shrink-0 place-items-center text-sand-400";
 
-export const ROW_LABEL = "text-xs font-medium text-slate-500";
+export const ROW_LABEL = "text-xs font-medium text-sand-500";
 
 export function Card({
   className,
@@ -263,7 +263,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-slate-200 bg-white shadow-sm",
+        "rounded-xl border border-sand-200 bg-white shadow-sm",
         className,
       )}
       {...props}
@@ -278,7 +278,7 @@ export function Card({
  * row without nudging its neighbours.
  */
 const BADGE_TONES = {
-  neutral: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
+  neutral: "bg-sand-100 text-sand-700 ring-1 ring-inset ring-sand-200",
   info: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/70",
   success: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/70",
   warning: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/70",
@@ -326,11 +326,11 @@ export function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        <h2 className="text-base font-semibold tracking-tight text-slate-900">
+        <h2 className="text-base font-semibold tracking-tight text-sand-900">
           {title}
         </h2>
         {description ? (
-          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+          <p className="mt-0.5 text-xs text-sand-500">{description}</p>
         ) : null}
       </div>
       {children ? (
@@ -356,8 +356,8 @@ export function Field({
 }) {
   return (
     <>
-      <dt className="text-xs font-medium text-slate-500">{name}</dt>
-      <dd className="min-w-0 text-sm text-slate-700">{children}</dd>
+      <dt className="text-xs font-medium text-sand-500">{name}</dt>
+      <dd className="min-w-0 text-sm text-sand-700">{children}</dd>
     </>
   );
 }
@@ -411,7 +411,7 @@ export function ProgressBar({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
-      className={cn("h-1.5 overflow-hidden rounded-full bg-slate-100", className)}
+      className={cn("h-1.5 overflow-hidden rounded-full bg-sand-100", className)}
     >
       <div
         className="h-full rounded-full bg-emerald-500 transition-[width]"
@@ -443,13 +443,13 @@ export function StatCard({
     <Card
       className={cn(
         "h-full p-4",
-        href && "transition-colors group-hover:border-slate-300 group-hover:bg-slate-50",
+        href && "transition-colors group-hover:border-sand-300 group-hover:bg-sand-50",
       )}
     >
-      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="text-xs font-medium text-sand-500">{label}</p>
       <p
         className={cn(
-          "mt-1 text-2xl font-semibold tabular-nums text-slate-900",
+          "mt-1 text-2xl font-semibold tabular-nums text-sand-900",
           alarming && tone === "danger" && "text-red-700",
           alarming && tone === "warning" && "text-amber-700",
           alarming && tone === "success" && "text-emerald-700",
@@ -457,7 +457,7 @@ export function StatCard({
       >
         {value}
       </p>
-      {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
+      {hint ? <div className="mt-1 text-xs text-sand-500">{hint}</div> : null}
     </Card>
   );
 
@@ -527,7 +527,7 @@ export function Spinner({ className }: { className?: string }) {
     <span
       role="status"
       className={cn(
-        "inline-block size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900",
+        "inline-block size-4 animate-spin rounded-full border-2 border-sand-300 border-t-sand-900",
         className,
       )}
     >
@@ -547,7 +547,7 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn("animate-pulse rounded bg-slate-200", className)}
+      className={cn("animate-pulse rounded bg-sand-200", className)}
     />
   );
 }
@@ -580,9 +580,9 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/50 px-6 py-12 text-center">
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-sand-300 bg-sand-50/50 px-6 py-12 text-center">
+      <h3 className="text-sm font-semibold text-sand-900">{title}</h3>
+      <p className="mt-1 max-w-md text-sm text-sand-500">{description}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );

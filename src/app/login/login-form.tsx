@@ -80,7 +80,7 @@ export function LoginForm({
       <h1 className="text-lg font-semibold">
         {mode === "signin" ? t("auth.signInTitle") : t("auth.signUpTitle")}
       </h1>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-sand-500">
         {invited
           ? t("auth.invitedLead")
           : mode === "signin"
@@ -134,7 +134,7 @@ export function LoginForm({
             required
           />
           {mode === "signup" ? (
-            <p className="mt-1.5 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-sand-500">
               {t("auth.passwordHint")}
             </p>
           ) : null}
@@ -148,7 +148,7 @@ export function LoginForm({
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-slate-500">
+      <p className="mt-5 text-center text-sm text-sand-500">
         {mode === "signin" ? t("auth.noAccount") : t("auth.haveAccount")}{" "}
         <button
           type="button"
@@ -156,7 +156,7 @@ export function LoginForm({
             setMode(mode === "signin" ? "signup" : "signin");
             setError(null);
           }}
-          className="font-medium text-slate-900 underline underline-offset-2"
+          className="font-medium text-sand-900 underline underline-offset-2"
         >
           {mode === "signin" ? t("auth.createOne") : t("auth.signInLink")}
         </button>

@@ -32,12 +32,12 @@ export function DocumentSearchResults({
             : t("documents.search.results", { count: hits.length, query })
         }
       >
-        <Link href="/documents" className="text-xs font-medium text-slate-500 hover:text-slate-900">
+        <Link href="/documents" className="text-xs font-medium text-sand-500 hover:text-sand-900">
           {t("documents.search.clear")}
         </Link>
       </SectionHeader>
       {hits.length > 0 ? (
-        <Card className="divide-y divide-slate-100">
+        <Card className="divide-y divide-sand-100">
           {hits.map((hit) => (
             <div key={hit.documentId} className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -48,7 +48,7 @@ export function DocumentSearchResults({
                   {hit.title ?? hit.filename}
                 </Link>
                 <Badge tone={hit.kind === "meaning" ? "neutral" : "info"}>{t(MATCH_KEY[hit.kind])}</Badge>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-sand-500">
                   {[hit.projectName, hit.pageNumber !== null ? t("documents.search.page", { page: hit.pageNumber }) : null]
                     .filter(Boolean)
                     .join(" · ")}
@@ -56,14 +56,14 @@ export function DocumentSearchResults({
                 {hit.chunkId ? (
                   <Link
                     href={`/documents/${hit.documentId}/chunks?chunk=${hit.chunkId}#chunk-${hit.chunkId}`}
-                    className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-900"
+                    className="ml-auto text-xs font-medium text-sand-500 hover:text-sand-900"
                   >
                     {t("documents.search.openPassage")}
                   </Link>
                 ) : null}
               </div>
               {hit.snippet ? (
-                <p className="mt-1 text-xs text-pretty text-slate-600">
+                <p className="mt-1 text-xs text-pretty text-sand-600">
                   {hit.match ? (
                     <>
                       {hit.snippet.slice(0, hit.match[0])}

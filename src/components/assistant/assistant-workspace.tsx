@@ -165,18 +165,18 @@ function AssistantConversation({
         <Link
           href="/assistant"
           className={cn(
-            "flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
+            "flex items-center gap-2 rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm font-medium text-sand-700 hover:bg-sand-50",
             FOCUS_RING,
           )}
         >
           <Plus className="size-4" aria-hidden />
           {t("assistant.newThread")}
         </Link>
-        <p className="px-1 pt-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+        <p className="px-1 pt-2 text-xs font-semibold tracking-wide text-sand-400 uppercase">
           {t("assistant.threads")}
         </p>
         {threads.length === 0 ? (
-          <p className="px-1 text-xs text-slate-500">{t("assistant.noThreads")}</p>
+          <p className="px-1 text-xs text-sand-500">{t("assistant.noThreads")}</p>
         ) : (
           <ul className="space-y-0.5">
             {threads.map((thread) => (
@@ -186,7 +186,7 @@ function AssistantConversation({
                   aria-current={thread.id === threadId ? "true" : undefined}
                   className={cn(
                     "min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-sm",
-                    thread.id === threadId ? "bg-slate-100 font-medium text-slate-900" : "text-slate-600 hover:bg-slate-50",
+                    thread.id === threadId ? "bg-sand-100 font-medium text-sand-900" : "text-sand-600 hover:bg-sand-50",
                   )}
                 >
                   {thread.title}
@@ -195,7 +195,7 @@ function AssistantConversation({
                   type="button"
                   onClick={() => void removeThread(thread.id)}
                   title={t("assistant.deleteThread")}
-                  className={cn("rounded p-1 text-slate-300 hover:text-red-700 sm:opacity-0 sm:group-hover:opacity-100", FOCUS_RING)}
+                  className={cn("rounded p-1 text-sand-300 hover:text-red-700 sm:opacity-0 sm:group-hover:opacity-100", FOCUS_RING)}
                 >
                   <Trash2 className="size-3.5" aria-hidden />
                   <span className="sr-only">{t("assistant.deleteThread")}</span>
@@ -209,11 +209,11 @@ function AssistantConversation({
       <section className="min-w-0 space-y-6">
         {messages.length === 0 ? (
           <Card className="p-5">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <Bot className="size-4 text-slate-400" aria-hidden />
+            <div className="flex items-center gap-2 text-sm font-semibold text-sand-900">
+              <Bot className="size-4 text-sand-400" aria-hidden />
               {t("assistant.title")}
             </div>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600">{t("assistant.lead")}</p>
+            <p className="mt-1 max-w-2xl text-sm text-sand-600">{t("assistant.lead")}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {examples.map((example) => (
                 <button
@@ -222,7 +222,7 @@ function AssistantConversation({
                   onClick={() => void ask(example)}
                   disabled={busy}
                   className={cn(
-                    "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50",
+                    "rounded-full border border-sand-200 bg-white px-3 py-1 text-xs text-sand-700 hover:bg-sand-50",
                     FOCUS_RING,
                   )}
                 >
@@ -236,7 +236,7 @@ function AssistantConversation({
             {messages.map((message) => (
               <li key={message.id}>
                 {message.role === "user" ? (
-                  <div className="ml-auto max-w-[85%] rounded-xl bg-slate-900 px-4 py-2.5 text-sm whitespace-pre-wrap text-white">
+                  <div className="ml-auto max-w-[85%] rounded-xl bg-sand-900 px-4 py-2.5 text-sm whitespace-pre-wrap text-white">
                     <span className="sr-only">{t("assistant.you")}: </span>
                     {message.content}
                   </div>
@@ -256,7 +256,7 @@ function AssistantConversation({
         )}
 
         {busy ? (
-          <p className="flex items-center gap-2 text-sm text-slate-500" aria-live="polite">
+          <p className="flex items-center gap-2 text-sm text-sand-500" aria-live="polite">
             <Spinner /> {t("assistant.thinking")}
           </p>
         ) : null}
@@ -268,7 +268,7 @@ function AssistantConversation({
             event.preventDefault();
             void ask(question);
           }}
-          className="sticky bottom-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+          className="sticky bottom-4 rounded-xl border border-sand-200 bg-white p-3 shadow-sm"
         >
           <label htmlFor={inputId} className="sr-only">
             {t("assistant.title")}
@@ -298,7 +298,7 @@ function AssistantConversation({
               >
                 {webSearchAvailable ? t("assistant.webSearch") : t("assistant.webUnavailable")}
               </FilterChip>
-              <span className="hidden text-xs text-slate-400 sm:inline">{t("capture.shortcutHint", { key: "Ctrl/⌘" })}</span>
+              <span className="hidden text-xs text-sand-400 sm:inline">{t("capture.shortcutHint", { key: "Ctrl/⌘" })}</span>
             </div>
             <Button type="submit" size="sm" disabled={busy || !question.trim()}>
               {busy ? <Spinner className="border-white/40 border-t-white" /> : <Send className="size-3.5" aria-hidden />}

@@ -45,14 +45,14 @@ export default async function DocumentDetailPage({
   return (
     // Extracted document text is prose; cap the width so lines stay readable.
     <div className="mx-auto w-full max-w-4xl">
-      <Link href="/documents" className="text-sm text-slate-500 hover:text-slate-900">
+      <Link href="/documents" className="text-sm text-sand-500 hover:text-sand-900">
         ← {t("documents.detail.back")}
       </Link>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight break-words">{name}</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-sand-500">
             {document.title ? `${document.originalFilename} · ` : null}
             {t("documents.detail.uploaded", {
               size: formatBytes(document.sizeBytes),
@@ -85,14 +85,14 @@ export default async function DocumentDetailPage({
 
       <section className="mt-6 space-y-3">
         <Card className="p-4">
-          <h2 className="text-sm font-semibold text-slate-900">{t("documents.detail.summary")}</h2>
+          <h2 className="text-sm font-semibold text-sand-900">{t("documents.detail.summary")}</h2>
           {document.summary ? (
             <>
-              <p className="mt-2 text-sm text-pretty text-slate-700">{document.summary}</p>
-              <p className="mt-2 text-xs text-slate-400">{t("documents.detail.summaryHint")}</p>
+              <p className="mt-2 text-sm text-pretty text-sand-700">{document.summary}</p>
+              <p className="mt-2 text-xs text-sand-400">{t("documents.detail.summaryHint")}</p>
             </>
           ) : (
-            <p className="mt-2 text-sm text-slate-500">{t("documents.detail.noSummary")}</p>
+            <p className="mt-2 text-sm text-sand-500">{t("documents.detail.noSummary")}</p>
           )}
         </Card>
         <DocumentLabels
@@ -113,7 +113,7 @@ export default async function DocumentDetailPage({
           { label: t("documents.detail.updated"), value: formatInstantDay(document.updatedAt, dateLocale, timeZone) },
         ].map((item) => (
           <div key={item.label}>
-            <dt className="text-xs text-slate-500">{item.label}</dt>
+            <dt className="text-xs text-sand-500">{item.label}</dt>
             <dd className="mt-0.5 truncate text-sm font-medium" title={item.value}>
               {item.value}
             </dd>
@@ -140,7 +140,7 @@ export default async function DocumentDetailPage({
             }
           />
           <Card className="mt-3 max-h-96 overflow-auto p-4">
-            <pre className="font-sans text-xs whitespace-pre-wrap text-slate-700">
+            <pre className="font-sans text-xs whitespace-pre-wrap text-sand-700">
               {document.extractedText.slice(0, PREVIEW_CHARS)}
               {document.extractedText.length > PREVIEW_CHARS ? "\n\n…" : ""}
             </pre>

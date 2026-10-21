@@ -29,7 +29,7 @@ export default async function LandingPage() {
         <nav className="flex items-center gap-3 text-sm">
           <Link
             href="/login"
-            className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700"
+            className="rounded-lg bg-sand-900 px-4 py-2 font-medium text-white hover:bg-sand-700"
           >
             {t("landing.signIn")}
           </Link>
@@ -37,25 +37,25 @@ export default async function LandingPage() {
       </header>
 
       <section className="mx-auto max-w-3xl px-6 pt-12 pb-16 text-center sm:pt-20">
-        <p className="text-sm font-medium text-slate-500">
+        <p className="text-sm font-medium text-sand-500">
           {t("landing.eyebrow")}
         </p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
           {t("landing.title")}
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-slate-600">
+        <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-sand-600">
           {t("landing.lead")}
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href="/login"
-            className="w-full rounded-lg bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-700 sm:w-auto"
+            className="w-full rounded-lg bg-sand-900 px-6 py-3 text-sm font-medium text-white hover:bg-sand-700 sm:w-auto"
           >
             {t("landing.getStarted")}
           </Link>
           <Link
             href="/login"
-            className="w-full rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-medium hover:bg-slate-50 sm:w-auto"
+            className="w-full rounded-lg border border-sand-300 bg-white px-6 py-3 text-sm font-medium hover:bg-sand-50 sm:w-auto"
           >
             {t("landing.tryAssistant")}
           </Link>
@@ -67,17 +67,17 @@ export default async function LandingPage() {
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+              className="rounded-xl border border-sand-200 bg-white p-6 shadow-sm"
             >
               <h2 className="text-sm font-semibold">{t(feature.title)}</h2>
-              <p className="mt-2 text-sm text-pretty text-slate-600">
+              <p className="mt-2 text-sm text-pretty text-sand-600">
                 {t(feature.body)}
               </p>
             </div>
           ))}
         </div>
 
-        <p className="mt-10 text-center text-xs text-slate-500">
+        <p className="mt-10 text-center text-xs text-sand-500">
           {t("landing.footnote")}
         </p>
       </section>

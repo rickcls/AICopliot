@@ -50,7 +50,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
       role="group"
       aria-label={t("locale.label")}
       className={cn(
-        "inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5",
+        "inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5",
         className,
       )}
     >
@@ -67,8 +67,8 @@ export function LocaleSwitcher({ className }: { className?: string }) {
             "grid h-7 min-w-7 place-items-center rounded-md px-1.5 text-xs font-medium transition-colors",
             FOCUS_RING,
             current === locale
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-400 hover:text-slate-900",
+              ? "bg-white text-sand-900 shadow-sm"
+              : "text-sand-400 hover:text-sand-900",
           )}
         >
           <span aria-hidden>{MARK[locale]}</span>

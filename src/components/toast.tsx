@@ -42,8 +42,8 @@ const TONE_STYLES: Record<ToastTone, { box: string; icon: string }> = {
   },
   error: { box: "border-red-200 bg-red-50 text-red-900", icon: "text-red-600" },
   info: {
-    box: "border-slate-200 bg-white text-slate-900",
-    icon: "text-slate-500",
+    box: "border-sand-200 bg-white text-sand-900",
+    icon: "text-sand-500",
   },
 };
 

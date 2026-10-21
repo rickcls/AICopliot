@@ -211,10 +211,10 @@ export function CaptureBox({
       }}
       className={cn(
         "rounded-xl border bg-white p-4 shadow-sm",
-        dragging ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-200",
+        dragging ? "border-sand-900 ring-2 ring-sand-900/10" : "border-sand-200",
       )}
     >
-      <label htmlFor={inputId} className="text-sm font-semibold text-slate-900">
+      <label htmlFor={inputId} className="text-sm font-semibold text-sand-900">
         {t("capture.inputLabel")}
       </label>
       {chat ? (
@@ -267,7 +267,7 @@ export function CaptureBox({
                 value={speechLanguage}
                 disabled={listening}
                 onChange={(event) => setSpeechLanguage(event.target.value as DictationLanguage)}
-                className="h-8 rounded-lg border border-transparent bg-transparent px-1.5 text-xs text-slate-600 hover:bg-slate-100"
+                className="h-8 rounded-lg border border-transparent bg-transparent px-1.5 text-xs text-sand-600 hover:bg-sand-100"
               >
                 {DICTATION_LANGUAGES.map((option) => (
                   <option key={option} value={option}>
@@ -310,7 +310,7 @@ export function CaptureBox({
               </Button>
             </div>
             <div className="flex items-center gap-3">
-              <span className="hidden text-xs text-slate-400 sm:inline">
+              <span className="hidden text-xs text-sand-400 sm:inline">
                 {t("capture.shortcutHint", { key: "Ctrl/⌘" })}
               </span>
               <Button type="submit" disabled={busy !== null || listening || text.trim().length < 3}>
@@ -323,7 +323,7 @@ export function CaptureBox({
       )}
 
       {dictationSupported && !chat ? (
-        <p className="mt-2 text-xs text-slate-400">{t("voice.privacy")}</p>
+        <p className="mt-2 text-xs text-sand-400">{t("voice.privacy")}</p>
       ) : null}
 
       {error ? (

@@ -68,7 +68,7 @@ export function CheckInStrip({
       id={id}
       className={cn(
         "flex flex-wrap items-center gap-2",
-        className ?? "border-t border-slate-100 bg-slate-50/60 px-4 py-2.5",
+        className ?? "border-t border-sand-100 bg-sand-50/60 px-4 py-2.5",
       )}
     >
       <label htmlFor={`${id}-note`} className="sr-only">
