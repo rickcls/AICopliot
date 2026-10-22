@@ -165,17 +165,6 @@ export const STATUS_PILL: Record<TaskStatusColor, string> = {
   cyan: "bg-cyan-50 text-cyan-700 ring-cyan-200/70",
 };
 
-/**
- * Flag icon colour: the one place a task's priority is drawn. `low` is nearly
- * invisible on purpose — the flag exists to find the urgent rows.
- */
-export const PRIORITY_FLAG = {
-  low: "text-sand-300",
-  medium: "text-blue-500",
-  high: "text-amber-500",
-  urgent: "text-red-500",
-} as const;
-
 export function statusColorToken(
   status: Pick<TaskStatusOption, "color" | "category">,
 ): TaskStatusColor {
@@ -210,6 +199,15 @@ export function statusColorToken(
 export function isTaskOverdue(task: TaskRow, todayIso: string): boolean {
   if (!task.dueDate || task.status.category === "done") return false;
   return task.dueDate.slice(0, 10) < todayIso.slice(0, 10);
+}
+
+/**
+ * Whole days from the viewer's today to a date-only value: 0 is today,
+ * negative is past. Both are compared as UTC days, like `isTaskOverdue`.
+ */
+export function daysFromToday(dateIso: string, todayIso: string): number {
+  const day = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  return Math.round((day(dateIso) - day(todayIso)) / 86_400_000);
 }
 
 /** `<input type="date">` needs YYYY-MM-DD, not a full ISO timestamp. */

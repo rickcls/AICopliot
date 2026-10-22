@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
-  Flag,
   ListPlus,
   MessageSquareText,
   Paperclip,
@@ -15,7 +14,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { useLocale, useT } from "@/components/i18n-provider";
-import { PRIORITY_FLAG } from "@/components/task-types";
+import { PriorityBadge } from "@/components/priority-badge";
 import { useToast } from "@/components/toast";
 import {
   Badge,
@@ -357,15 +356,12 @@ function ProposalRow({
           <Icon className="size-4" aria-hidden />
           <span className="sr-only">{t(KIND_KEY[proposal.kind])}</span>
         </span>
-        {proposal.kind === "create_task" && values.priority ? (
-          <span className="shrink-0" title={t("priority.flag", { level: t(`priority.${values.priority}`) })}>
-            <Flag aria-hidden fill="currentColor" className={cn("size-3.5", PRIORITY_FLAG[values.priority])} />
-            <span className="sr-only">{t("priority.flag", { level: t(`priority.${values.priority}`) })}</span>
-          </span>
-        ) : null}
         <div className="min-w-0 flex-1">
-          <p className={cn("truncate text-sm font-medium", decided ? "text-sand-500" : "text-sand-900")}>
-            {headline}
+          <p className={cn("flex min-w-0 items-center gap-2 text-sm font-medium", decided ? "text-sand-500" : "text-sand-900")}>
+            <span className="truncate">{headline}</span>
+            {proposal.kind === "create_task" && values.priority ? (
+              <PriorityBadge priority={values.priority} />
+            ) : null}
           </p>
           <p className="truncate text-xs text-sand-500">
             {[...changes, projectName(values.projectId)].filter(Boolean).join(" · ")}

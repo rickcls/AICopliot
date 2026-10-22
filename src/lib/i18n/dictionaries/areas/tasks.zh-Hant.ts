@@ -144,6 +144,10 @@ export const tasksZhHant = {
       manual: "手動",
       aiSuggested: "AI 建議",
       datesInverted: "開始日期不可遲於到期日。",
+      setDate: "設定日期",
+      dueToday: "今日到期",
+      daysLeft: { one: "尚餘 {count} 日", other: "尚餘 {count} 日" },
+      daysOverdue: { one: "逾期 {count} 日", other: "逾期 {count} 日" },
     },
     detail: {
       closeDetails: "關閉工作詳情",

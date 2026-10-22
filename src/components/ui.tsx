@@ -297,9 +297,10 @@ export function SearchField({
  * chrome only appears on hover and focus, so at rest the block reads as a short
  * list of facts, and the description gets the space.
  *
- * Lives here rather than in `task-form.tsx` because the task detail panel and
- * the chat composer use it too, and importing a style constant *through* an
- * unrelated form component is the same drift `SectionHeader` was extracted to fix.
+ * Task fields have since moved to pills (`property-pill.tsx`), where a value
+ * needs to look changeable; this stays for secondary controls that should
+ * recede — the chat composer's pickers, the capture box's language, the
+ * workspace switcher.
  */
 export const QUIET_CONTROL =
   // `w-auto`, not `w-full`: empty space belongs *beside* a short value, not

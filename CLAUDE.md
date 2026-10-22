@@ -707,16 +707,21 @@ every field a live input; they are now one line (title, the facts that decide
 approval, a source count, inline approve/reject) expanding into the editor and
 sources. Decided items expand into read-only values, not disabled inputs.
 
-Two devices earn their keep in dense rows. **Priority is a coloured flag, not a
-badge** — next to a status pill, two same-shaped pills compete for one glance,
-and `low` is deliberately near-invisible because the column exists to find the
-urgent rows. It is the *only* mark of priority: board cards once carried a
-same-coloured stripe down the left edge as well, two marks saying one thing.
+Two devices earn their keep in dense rows. **Priority is a `PriorityBadge`
+(`priority-badge.tsx`): a shape, a colour, and the word.** The shape carries
+the level by itself — one, two, or three signal bars, and urgent a filled
+square with "!" — so it reads without colour; urgent is the only solid fill,
+because it is the level that must stand out on a board of tints, and `low` is
+deliberately faint. It replaced a small coloured flag that people did not
+notice (four flags differing only in hue read as one icon), and it is the
+*only* mark of priority: board cards once carried a same-coloured stripe as
+well, two marks saying one thing. It sits among a row's facts — after the
+title on Today, first in a card's facts, in the list's own column — never as
+a leading gutter icon, where its varying width would stagger the titles.
 **A risk's impact and likelihood collapse to one chip coloured by
 whichever is worse**; that is a rule for picking a colour, not a new severity
 scale, and both levels stay named in the chip and again in the expansion.
-Wherever colour replaces a word, the word goes to `sr-only` — see the flag on
-`task-card.tsx`.
+Wherever colour replaces a word, the word goes to `sr-only`.
 
 ## Personal work notes
 
@@ -1346,19 +1351,39 @@ without a z-index arms race. Three rules that are easy to undo by accident:
   `flex` on the element itself leaves it visible when closed.
 
 **Inside it, the layout follows Asana's task pane rather than a form.** The name
-is typed at heading size with no box, the metadata sits in quiet label/value
-rows, and the description gets the remaining height. Two earlier attempts were
+is typed at heading size with no box, the metadata sits in label/value rows
+whose values are pills, and the description gets the page. From `lg` the modal
+is two columns (`max-w-6xl`): the name and description on the left, the
+fields in a tinted side panel on the right. The panel sits between the two in
+the markup and the grid lifts it beside them, so a phone reads name, fields,
+description. The description is the one field that holds prose, so in the
+form and the detail panel alike it is set at reading size (15px, `leading-7`)
+and grows with what is written (`field-sizing-content`) — at least half the
+screen in the form — instead of scrolling inside a small `text-sm` box,
+which is what made it feel cramped. Two earlier attempts were
 worse: a flat `lg:grid-cols-7` gave each `<select>` about 100px — narrower than
 "In progress" or any real milestone title — and the two-column pairs that
 replaced it still drew seven bordered white boxes, so the form read as seven
 competing objects with the description the smallest thing on screen.
 
-- **Metadata controls are chrome-less at rest** (`QUIET_CONTROL`), showing their
-  border and fill only on hover and focus. That is what drops the apparent item
-  count without removing a single field.
-- **The controls are capped at `max-w-sm`, not stretched to the panel.** Empty
-  space to the right of a short value is what makes the block read as a list of
-  facts rather than a wall of inputs — same as the reference.
+- **Each value is a pill** (`property-pill.tsx`), the same in the form and the
+  detail panel: the status in its column's tint, the assignee with their
+  avatar, the priority in its badge's colours, a milestone or date with its
+  icon, and an empty value as a dashed prompt ("Set date"). They were
+  chrome-less selects (`QUIET_CONTROL`), which kept seven fields from reading
+  as seven boxes but made every value read as plain text that nothing said
+  could change. A pill gives a value shape and colour without the form box.
+- **Every pill is the native control underneath** — `<select>`, date, number —
+  so keyboard, platform picker, and screen reader are unchanged. A date pill
+  shows the formatted date — without the year when it is this year, so
+  "30 Oct · 8 days left" fits a side panel — and, on open work's due date,
+  "3 days left" / "2 days overdue" from `daysFromToday`, the same UTC days as
+  `isTaskOverdue`. The date input sits on top, invisible until focused, and a
+  click calls `showPicker()`. A tinted select forces its `<option>`s white:
+  Windows paints the menu in the select's own colours.
+- **Pills hug their value, not the panel.** Empty space to the right of a short
+  value is what makes the block read as a list of facts rather than a wall of
+  inputs — same as the reference.
 - **Start and due are separate rows.** Each carries its own label. One
   "Dates" row left two identical boxes, and the names existed only as
   accessible labels.

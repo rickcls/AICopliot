@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
-  Flag,
   Folder,
   Lightbulb,
   Maximize2,
+  Milestone,
   Sparkles,
+  Timer,
   UserRound,
   X,
 } from "lucide-react";
@@ -17,14 +18,18 @@ import {
   ErrorState,
   FOCUS_RING,
   Input,
-  QUIET_CONTROL,
-  ROW_ICON,
   ROW_LABEL,
-  Select,
   Spinner,
 } from "@/components/ui";
 import { proposalPatch } from "@/components/chat/proposal-card";
 import { useT } from "@/components/i18n-provider";
+import { PRIORITY_TONE, PriorityIcon } from "@/components/priority-badge";
+import {
+  PILL_EMPTY,
+  PillNumber,
+  PillSelect,
+  TaskDatePill,
+} from "@/components/property-pill";
 import { TaskApproach } from "@/components/task-approach";
 import { TaskChat } from "@/components/task-chat";
 import { TaskComments } from "@/components/task-comments";
@@ -39,10 +44,9 @@ import {
   type TaskDraft,
 } from "@/components/task-form";
 import {
-  PRIORITY_FLAG,
   STATUS_DOT,
+  STATUS_PILL,
   TASK_PRIORITIES,
-  isTaskOverdue,
   statusColorToken,
   type MemberOption,
   type MilestoneOption,
@@ -443,9 +447,11 @@ export function TaskDetail({
           {error ? <ErrorState message={error} /> : null}
 
           {/* Narrower than the create modal's 6rem: the panel is 448px.
-              Each date is its own row, so the column only has to fit the
-              label. Same icon gutter as the form so the controls share one edge. */}
-          <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
+              Each value is a pill (property-pill.tsx): the status in its
+              column's colour, the person with their avatar, the priority as
+              its badge, the date with how close it is, an empty value as a
+              dashed prompt. */}
+          <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
             {/* Bound to where the task is, not to a draft: picking another
                 project asks first, and a cancelled move leaves this as it was. */}
             {projects.length > 1 ? (
@@ -453,13 +459,10 @@ export function TaskDetail({
                 <label htmlFor="detail-project" className={ROW_LABEL}>
                   {t("tasks.fields.project")}
                 </label>
-                <div className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden className={ROW_ICON}>
-                    <Folder className="size-3.5" />
-                  </span>
-                  <Select
+                <div className="min-w-0">
+                  <PillSelect
                     id="detail-project"
-                    className={QUIET_CONTROL}
+                    icon={<Folder className="size-3.5 opacity-70" />}
                     value={task.projectId}
                     disabled={disabled}
                     onChange={(event) => onMove(event.target.value)}
@@ -469,7 +472,7 @@ export function TaskDetail({
                         {project.name}
                       </option>
                     ))}
-                  </Select>
+                  </PillSelect>
                 </div>
               </>
             ) : null}
@@ -477,43 +480,37 @@ export function TaskDetail({
             <label htmlFor="detail-status" className={ROW_LABEL}>
               {t("tasks.fields.status")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON}>
-                <span
-                  className={cn("size-2 rounded-full", STATUS_DOT[statusTone])}
-                />
-              </span>
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="detail-status"
-                className={cn(QUIET_CONTROL, "font-medium")}
+                tone={STATUS_PILL[statusTone]}
+                icon={<span className={cn("block size-2 rounded-full", STATUS_DOT[statusTone])} />}
                 value={draft.statusId}
                 disabled={disabled}
-                onChange={(event) =>
-                  void save({ statusId: event.target.value })
-                }
+                onChange={(event) => void save({ statusId: event.target.value })}
               >
                 {statuses.map((status) => (
                   <option key={status.id} value={status.id}>
                     {displayStatusLabel(status, t)}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             <label htmlFor="detail-assignee" className={ROW_LABEL}>
               {t("tasks.fields.assignee")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              {assignee ? (
-                <Avatar name={assignee.name} email={assignee.email} />
-              ) : (
-                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-sand-100")}>
-                  <UserRound className="size-3.5" />
-                </span>
-              )}
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="detail-assignee"
-                className={QUIET_CONTROL}
+                tone={assignee ? undefined : PILL_EMPTY}
+                icon={
+                  assignee ? (
+                    <Avatar name={assignee.name} email={assignee.email} className="size-5" />
+                  ) : (
+                    <UserRound className="size-3.5" />
+                  )
+                }
                 value={draft.assigneeId}
                 disabled={disabled}
                 onChange={(event) => void save({ assigneeId: event.target.value })}
@@ -524,22 +521,18 @@ export function TaskDetail({
                     {member.name}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             <label htmlFor="detail-priority" className={ROW_LABEL}>
               {t("tasks.fields.priority")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON}>
-                <Flag
-                  fill="currentColor"
-                  className={cn("size-3.5", PRIORITY_FLAG[draft.priority])}
-                />
-              </span>
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="detail-priority"
-                className={QUIET_CONTROL}
+                tone={PRIORITY_TONE[draft.priority]}
+                icon={<PriorityIcon priority={draft.priority} />}
+                className="font-semibold"
                 value={draft.priority}
                 disabled={disabled}
                 onChange={(event) =>
@@ -551,17 +544,17 @@ export function TaskDetail({
                     {t(`priority.${priority}`)}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             <label htmlFor="detail-milestone" className={ROW_LABEL}>
               {t("tasks.fields.milestone")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON} />
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="detail-milestone"
-                className={QUIET_CONTROL}
+                tone={draft.milestoneId ? undefined : PILL_EMPTY}
+                icon={<Milestone className="size-3.5 opacity-70" />}
                 value={draft.milestoneId}
                 disabled={disabled}
                 onChange={(event) => void save({ milestoneId: event.target.value })}
@@ -572,7 +565,7 @@ export function TaskDetail({
                     {milestone.title}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             {showStart ? (
@@ -580,12 +573,11 @@ export function TaskDetail({
                 <label htmlFor="detail-start" className={ROW_LABEL}>
                   {t("tasks.fields.startDate")}
                 </label>
-                <div className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden className={ROW_ICON} />
-                  <Input
+                <div className="min-w-0">
+                  <TaskDatePill
                     id="detail-start"
-                    type="date"
-                    className={QUIET_CONTROL}
+                    todayIso={todayIso}
+                    countdown={false}
                     value={draft.startDate}
                     disabled={disabled}
                     aria-invalid={datesInverted || undefined}
@@ -606,16 +598,11 @@ export function TaskDetail({
             <label htmlFor="detail-due" className={ROW_LABEL}>
               {t("tasks.fields.dueDate")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON} />
-              <Input
+            <div className="min-w-0">
+              <TaskDatePill
                 id="detail-due"
-                type="date"
-                className={cn(
-                  QUIET_CONTROL,
-                  isTaskOverdue(task, todayIso) &&
-                    "bg-red-50 text-red-700 hover:bg-red-100/80 focus-visible:bg-red-50",
-                )}
+                todayIso={todayIso}
+                countdown={selectedStatus.category !== "done"}
                 value={draft.dueDate}
                 disabled={disabled}
                 aria-invalid={datesInverted || undefined}
@@ -629,25 +616,19 @@ export function TaskDetail({
                   void save({ dueDate: event.target.value });
                 }}
               />
-              {isTaskOverdue(task, todayIso) ? (
-                <span className="text-xs font-medium text-red-700">
-                  {t("tasks.fields.overdue")}
-                </span>
-              ) : null}
             </div>
 
             <label htmlFor="detail-estimate" className={ROW_LABEL}>
               {t("tasks.fields.estimate")}
             </label>
-            <div className="flex items-center gap-1.5">
-              <span aria-hidden className={ROW_ICON} />
-              <Input
+            <div className="min-w-0">
+              <PillNumber
                 id="detail-estimate"
-                type="number"
+                icon={<Timer className="size-3.5" />}
+                unit={t("tasks.fields.hours")}
                 min={0}
                 step="0.5"
                 placeholder="0"
-                className={cn(QUIET_CONTROL, "w-20 max-w-none")}
                 value={draft.estimatedHours}
                 disabled={disabled}
                 onChange={(event) =>
@@ -660,12 +641,10 @@ export function TaskDetail({
                   void save({ estimatedHours: event.target.value });
                 }}
               />
-              <span className="text-xs text-sand-400">{t("tasks.fields.hours")}</span>
             </div>
 
             <span className={ROW_LABEL}>{t("tasks.fields.origin")}</span>
-            <div className="flex items-center gap-2">
-              <span aria-hidden className={ROW_ICON} />
+            <div className="flex items-center">
               <Badge tone={task.source === "manual" ? "neutral" : "info"}>
                 {task.source === "manual"
                   ? t("tasks.fields.manual")
@@ -683,7 +662,7 @@ export function TaskDetail({
           <div>
             <label
               htmlFor="detail-description"
-              className="mb-1.5 block text-xs font-medium text-sand-500"
+              className="mb-1.5 block text-sm font-semibold text-sand-700"
             >
               {t("tasks.fields.description")}
             </label>
@@ -697,10 +676,13 @@ export function TaskDetail({
               placeholder={t("tasks.fields.descriptionPlaceholder")}
               maxLength={4000}
               disabled={disabled}
+              // Grows with what is written rather than scrolling inside a small
+              // box, at reading size: the description is the one field here
+              // that holds prose.
               className={cn(
-                "min-h-32 w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm leading-relaxed text-sand-700",
-                "placeholder:text-sand-400 hover:bg-sand-100",
-                "focus-visible:border-sand-900 focus-visible:bg-white focus-visible:outline-hidden",
+                "field-sizing-content min-h-40 w-full rounded-xl border border-transparent bg-sand-50/60 px-3 py-2 text-[15px] leading-7 text-sand-800",
+                "placeholder:text-sand-400 hover:bg-sand-100/70",
+                "focus-visible:border-brand-500 focus-visible:bg-white focus-visible:outline-hidden",
               )}
             />
           </div>

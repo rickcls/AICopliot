@@ -1281,6 +1281,7 @@ export function TaskBoard({
           saving={saving}
           editing={editingId !== null}
           timeline={timeline}
+          todayIso={nowIso}
           onChange={setDraft}
           onDocumentChange={upsertDocument}
           onCancel={() => {

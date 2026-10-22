@@ -1,11 +1,12 @@
 "use client";
 
-import { CalendarClock, Flag, GitBranch, Sparkles, Timer } from "lucide-react";
+import { CalendarClock, GitBranch, Sparkles, Timer } from "lucide-react";
 import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Avatar, Badge, FOCUS_RING, type BadgeTone } from "@/components/ui";
 import { cn, formatDay } from "@/lib/utils";
 import type { TaskRow } from "@/components/task-types";
-import { PRIORITY_FLAG, isTaskOverdue } from "@/components/task-types";
+import { PriorityBadge } from "@/components/priority-badge";
+import { isTaskOverdue } from "@/components/task-types";
 
 /**
  * One card on the board.
@@ -20,8 +21,9 @@ import { PRIORITY_FLAG, isTaskOverdue } from "@/components/task-types";
  * — and at a board column's ~200px each one claimed its own line, so a card with
  * nothing but a priority and a citation count stood 200px tall.
  *
- * Priority is drawn once, as the flag. It used to be a stripe down the left
- * edge as well, in the same colour — two marks saying one thing.
+ * Priority is drawn once, as the first fact: a `PriorityBadge` (shape, colour,
+ * and word). It was a small flag before the title, which people did not
+ * notice, and before that a stripe down the edge as well.
  */
 
 /** The `Badge` shape, kept compact so the facts read as one row. */
@@ -61,7 +63,6 @@ export function TaskCard({
   const overdue = isTaskOverdue(task, todayIso);
   const t = useT();
   const dateLocale = useDateLocale();
-  const priorityFlag = t("priority.flag", { level: t(`priority.${task.priority}`) });
 
   return (
     <article
@@ -82,16 +83,6 @@ export function TaskCard({
     >
       <div className="p-3">
         <div className="flex items-start gap-2">
-          {/* The flag replaced a text badge, so the label it dropped is kept
-              for screen readers — colour is the only cue that remains visually. */}
-          <span title={priorityFlag} className="mt-0.5 shrink-0">
-            <span className="sr-only">{priorityFlag}</span>
-            <Flag
-              aria-hidden
-              fill="currentColor"
-              className={cn("size-3.5", PRIORITY_FLAG[task.priority])}
-            />
-          </span>
           <button
             type="button"
             onClick={onOpen}
@@ -111,7 +102,8 @@ export function TaskCard({
           ) : null}
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-1 pl-5.5">
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          <PriorityBadge priority={task.priority} />
           {task.dueDate ? (
             <Fact
               title={overdue ? t("tasks.card.pastDue") : t("tasks.card.dueDate")}

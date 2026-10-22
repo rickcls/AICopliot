@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CalendarClock,
-  Flag,
   GitBranch,
   GripVertical,
   PanelRight,
@@ -11,9 +10,9 @@ import {
 } from "lucide-react";
 import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Avatar, Badge, CHECKBOX, FOCUS_RING, Input, Select } from "@/components/ui";
+import { PriorityBadge } from "@/components/priority-badge";
 import { toPartialPayload, type TaskDraft } from "@/components/task-form";
 import {
-  PRIORITY_FLAG,
   STATUS_DOT,
   TASK_PRIORITIES,
   isTaskOverdue,
@@ -24,13 +23,6 @@ import {
   type TaskRow,
 } from "@/components/task-types";
 import { cn, formatDay } from "@/lib/utils";
-
-const PRIORITY_TEXT = {
-  low: "text-sand-400",
-  medium: "text-sand-600",
-  high: "text-amber-700",
-  urgent: "font-semibold text-red-700",
-} as const;
 
 export type ListEditField =
   | "title"
@@ -365,19 +357,7 @@ export function TaskListRow({
             ))}
           </Select>
         ) : (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs",
-              PRIORITY_TEXT[task.priority],
-            )}
-          >
-            <Flag
-              aria-hidden
-              fill="currentColor"
-              className={cn("size-3.5 shrink-0", PRIORITY_FLAG[task.priority])}
-            />
-            {t(`priority.${task.priority}`)}
-          </span>
+          <PriorityBadge priority={task.priority} />
         )}
       </td>
       <td

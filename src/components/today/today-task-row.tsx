@@ -3,9 +3,9 @@
 import { useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert, Flag } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { PRIORITY_FLAG } from "@/components/task-types";
+import { PriorityBadge } from "@/components/priority-badge";
 import { CheckInStrip } from "@/components/today/check-in-strip";
 import { useToast } from "@/components/toast";
 import { Badge, Button, FOCUS_RING, Input, buttonClasses } from "@/components/ui";
@@ -38,7 +38,6 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
   const [open, setOpen] = useState(false);
   const [due, setDue] = useState<string | null>(null);
   const [savingDue, setSavingDue] = useState(false);
-  const priority = t(`priority.${task.priority}`);
 
   // Saved on submit, not on change: a date field reports a value as soon as
   // each part is filled, so typing a year would save 0002-10-21 first.
@@ -69,10 +68,6 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
   return (
     <li>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 transition-colors hover:bg-sand-50/70 sm:flex-nowrap">
-        <span title={t("priority.flag", { level: priority })} className="shrink-0">
-          <span className="sr-only">{t("priority.flag", { level: priority })}</span>
-          <Flag aria-hidden fill="currentColor" className={cn("size-3.5", PRIORITY_FLAG[task.priority])} />
-        </span>
         <Link
           href={`/projects/${task.projectId}/tasks?task=${task.id}`}
           className={cn(
@@ -84,6 +79,7 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
         >
           {task.title}
         </Link>
+        <PriorityBadge priority={task.priority} />
         {task.staleDays !== null ? (
           <Badge tone="warning">{t("today.staleBadge", { count: task.staleDays })}</Badge>
         ) : null}
