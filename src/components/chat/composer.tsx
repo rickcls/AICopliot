@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef } from "react";
-import { ArrowUp, Crosshair, FolderKanban } from "lucide-react";
+import { ArrowUp, Crosshair, FileText, Files, FolderKanban, Library, SquareCheck } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { PillSelect } from "@/components/property-pill";
+import { PillSelect, type PillOption } from "@/components/property-pill";
+import { projectOptions } from "@/components/task-field-options";
 import { Button, Spinner, Textarea } from "@/components/ui";
 import type { ChatFocusState, FocusOptions, ProjectOption } from "./types";
 
@@ -70,7 +71,68 @@ export function Composer({
           ? `doc:${focus.documents[0].id}`
           : "several-documents"
         : "";
-  const canSend = !pending && value.trim().length >= 3 && evidenceCount > 0;
+  const wholeLabel = projectId ? t("chat.composer.wholeProject") : t("chat.composer.everyDocument");
+  const focusMenu: PillOption[] = [
+    {
+      value: "",
+      label: wholeLabel,
+      content: (
+        <>
+          <Library aria-hidden className="size-4 shrink-0 text-sand-400" />
+          <span className="truncate">{wholeLabel}</span>
+        </>
+      ),
+    },
+    ...(focus.kind === "task" && !focus.taskId
+      ? [{ value: "task:deleted", label: t("chat.composer.deletedTask"), disabled: true }]
+      : []),
+    ...focusOptions.tasks.map((task) => ({
+      value: `task:${task.id}`,
+      label: task.title,
+      group: t("chat.composer.aTask"),
+      content: (
+        <>
+          <SquareCheck aria-hidden className="size-4 shrink-0 text-sand-400" />
+          <span className="truncate">{task.title}</span>
+        </>
+      ),
+    })),
+    ...focusOptions.documents.map((document) => ({
+      value: `doc:${document.id}`,
+      label: document.filename,
+      group: t("chat.composer.aDocument"),
+      content: (
+        <>
+          <FileText aria-hidden className="size-4 shrink-0 text-sand-400" />
+          <span className="truncate">{document.filename}</span>
+        </>
+      ),
+    })),
+    ...(focus.kind === "documents" && focusValue === "several-documents"
+      ? [
+          {
+            value: "several-documents",
+            label: t("chat.composer.documentsCount", { count: focus.documents.length }),
+            disabled: true,
+          },
+        ]
+      : []),
+    ...(focusOptions.documents.length > 1
+      ? [
+          {
+            value: "choose-documents",
+            label: t("chat.composer.severalDocuments"),
+            content: (
+              <>
+                <Files aria-hidden className="size-4 shrink-0 text-sand-400" />
+                <span className="truncate">{t("chat.composer.severalDocuments")}</span>
+              </>
+            ),
+          },
+        ]
+      : []),
+  ];
+  const canSend =!pending && value.trim().length >= 3 && evidenceCount > 0;
 
   function grow(element: HTMLTextAreaElement) {
     element.style.height = "auto";
@@ -122,73 +184,43 @@ export function Composer({
             the send button are wider than the composer, and the row pushed the
             whole page sideways. */}
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
-          <label htmlFor="chat-project" className="sr-only">
+          <span id="chat-project-label" className="sr-only">
             {t("chat.composer.askAbout")}
-          </label>
+          </span>
           <PillSelect
             id="chat-project"
             icon={<FolderKanban className="size-3.5 opacity-70" />}
             value={projectId}
-            onChange={(event) => onProjectChange(event.target.value)}
+            options={[
+              {
+                value: "",
+                label: t("chat.composer.allDocuments"),
+                content: (
+                  <>
+                    <Library aria-hidden className="size-4 shrink-0 text-sand-400" />
+                    <span className="truncate">{t("chat.composer.allDocuments")}</span>
+                  </>
+                ),
+              },
+              ...projectOptions(projects),
+            ]}
+            onValueChange={onProjectChange}
             disabled={pending}
-            className="max-w-[14rem] shrink text-xs"
-          >
-            <option value="">{t("chat.composer.allDocuments")}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </PillSelect>
+            className="h-7 max-w-[14rem] shrink text-xs"
+          />
 
-          <label htmlFor="chat-focus" className="sr-only">
+          <span id="chat-focus-label" className="sr-only">
             {t("chat.composer.focusOn")}
-          </label>
+          </span>
           <PillSelect
             id="chat-focus"
             icon={<Crosshair className="size-3.5 opacity-70" />}
             value={focusValue}
-            onChange={(event) => onFocusChange(event.target.value)}
+            options={focusMenu}
+            onValueChange={onFocusChange}
             disabled={pending}
-            className="max-w-[14rem] shrink text-xs"
-          >
-            <option value="">
-              {projectId ? t("chat.composer.wholeProject") : t("chat.composer.everyDocument")}
-            </option>
-            {focus.kind === "task" && !focus.taskId ? (
-              <option value="task:deleted" disabled>
-                {t("chat.composer.deletedTask")}
-              </option>
-            ) : null}
-            {focusOptions.tasks.length > 0 ? (
-              <optgroup label={t("chat.composer.aTask")}>
-                {focusOptions.tasks.map((task) => (
-                  <option key={task.id} value={`task:${task.id}`}>
-                    {task.title}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-            {focusOptions.documents.length > 0 ? (
-              <optgroup label={t("chat.composer.aDocument")}>
-                {focusOptions.documents.map((document) => (
-                  <option key={document.id} value={`doc:${document.id}`}>
-                    {document.filename}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-            {focusValue === "several-documents" ? (
-              <option value="several-documents" disabled>
-                {focus.kind === "documents"
-                  ? t("chat.composer.documentsCount", { count: focus.documents.length })
-                  : ""}
-              </option>
-            ) : null}
-            {focusOptions.documents.length > 1 ? (
-              <option value="choose-documents">{t("chat.composer.severalDocuments")}</option>
-            ) : null}
-          </PillSelect>
+            className="h-7 max-w-[14rem] shrink text-xs"
+          />
 
           <span className="hidden min-w-0 truncate text-xs text-sand-500 sm:inline">
             {focus.kind !== "none"

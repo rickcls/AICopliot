@@ -20,14 +20,18 @@ import {
   TaskDatePill,
 } from "@/components/property-pill";
 import { TaskDocumentsField } from "@/components/task-documents-field";
+import {
+  assigneeOptions,
+  milestoneOptions,
+  priorityOptions,
+  statusOptions,
+} from "@/components/task-field-options";
 import { fillBlockedReason, TaskFillBar } from "@/components/task-fill-bar";
 import { fillDraft, type FillSummary } from "@/components/task-fill-client";
-import { displayStatusLabel } from "@/lib/i18n/status-labels";
 import { cn } from "@/lib/utils";
 import {
   STATUS_DOT,
   STATUS_PILL,
-  TASK_PRIORITIES,
   statusColorToken,
   toDateInput,
   type MemberOption,
@@ -339,7 +343,7 @@ export function TaskForm({
               the same as in the detail panel, so a task looks the same while
               it is being written and once it is saved. */}
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5">
-            <label htmlFor="task-assignee" className={ROW_LABEL}>
+            <label id="task-assignee-label" htmlFor="task-assignee" className={ROW_LABEL}>
               {t("tasks.fields.assignee")}
             </label>
             <div className="min-w-0">
@@ -354,21 +358,13 @@ export function TaskForm({
                   )
                 }
                 value={draft.assigneeId}
-                onChange={(event) =>
-                  onChange({ ...draft, assigneeId: event.target.value })
-                }
+                options={assigneeOptions(members, t)}
+                onValueChange={(assigneeId) => onChange({ ...draft, assigneeId })}
                 disabled={busy}
-              >
-                <option value="">{t("common.unassigned")}</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </PillSelect>
+              />
             </div>
 
-            <label htmlFor="task-status" className={ROW_LABEL}>
+            <label id="task-status-label" htmlFor="task-status" className={ROW_LABEL}>
               {t("tasks.fields.status")}
             </label>
             <div className="min-w-0">
@@ -377,20 +373,13 @@ export function TaskForm({
                 tone={STATUS_PILL[statusTone]}
                 icon={<span className={cn("block size-2 rounded-full", STATUS_DOT[statusTone])} />}
                 value={draft.statusId}
-                onChange={(event) =>
-                  onChange({ ...draft, statusId: event.target.value })
-                }
+                options={statusOptions(statuses, t)}
+                onValueChange={(statusId) => onChange({ ...draft, statusId })}
                 disabled={busy}
-              >
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {displayStatusLabel(status, t)}
-                  </option>
-                ))}
-              </PillSelect>
+              />
             </div>
 
-            <label htmlFor="task-priority" className={ROW_LABEL}>
+            <label id="task-priority-label" htmlFor="task-priority" className={ROW_LABEL}>
               {t("tasks.fields.priority")}
             </label>
             <div className="min-w-0">
@@ -400,24 +389,16 @@ export function TaskForm({
                 icon={<PriorityIcon priority={draft.priority} />}
                 className="font-semibold"
                 value={draft.priority}
-                onChange={(event) => {
+                options={priorityOptions(t)}
+                onValueChange={(priority) => {
                   setPriorityTouched(true);
-                  onChange({
-                    ...draft,
-                    priority: event.target.value as TaskPriority,
-                  });
+                  onChange({ ...draft, priority: priority as TaskPriority });
                 }}
                 disabled={busy}
-              >
-                {TASK_PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {t(`priority.${priority}`)}
-                  </option>
-                ))}
-              </PillSelect>
+              />
             </div>
 
-            <label htmlFor="task-milestone" className={ROW_LABEL}>
+            <label id="task-milestone-label" htmlFor="task-milestone" className={ROW_LABEL}>
               {t("tasks.fields.milestone")}
             </label>
             <div className="min-w-0">
@@ -426,18 +407,10 @@ export function TaskForm({
                 tone={draft.milestoneId ? undefined : PILL_EMPTY}
                 icon={<Milestone className="size-3.5 opacity-70" />}
                 value={draft.milestoneId}
-                onChange={(event) =>
-                  onChange({ ...draft, milestoneId: event.target.value })
-                }
+                options={milestoneOptions(milestones, t)}
+                onValueChange={(milestoneId) => onChange({ ...draft, milestoneId })}
                 disabled={busy}
-              >
-                <option value="">{t("common.none")}</option>
-                {milestones.map((milestone) => (
-                  <option key={milestone.id} value={milestone.id}>
-                    {milestone.title}
-                  </option>
-                ))}
-              </PillSelect>
+              />
             </div>
 
             {showStart ? (

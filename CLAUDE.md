@@ -1293,7 +1293,7 @@ The rules that keep it honest:
 The board's drag-and-drop uses native HTML5 drag events — one status change does
 not justify a dependency. Two rules: the drop handler reads the task id from
 `dataTransfer`, **not** from React state (state set in `dragstart` may not be
-committed when `drop` runs), and the status `<select>` in the detail panel stays
+committed when `drop` runs), and the status menu in the detail panel stays
 as the keyboard-accessible equivalent, so neither view is drag-only. The list
 uses a grip handle for the same reason a whole-row drag would fight the
 click-to-open row. The move is optimistic and rolls back on failure.
@@ -1383,14 +1383,35 @@ competing objects with the description the smallest thing on screen.
   chrome-less selects (`QUIET_CONTROL`), which kept seven fields from reading
   as seven boxes but made every value read as plain text that nothing said
   could change. A pill gives a value shape and colour without the form box.
-- **Every pill is the native control underneath** — `<select>`, date, number —
-  so keyboard, platform picker, and screen reader are unchanged. A date pill
+- **A date or number pill is the native input underneath**, so the platform
+  picker and the keyboard are unchanged. A date pill
   shows the formatted date — without the year when it is this year, so
   "30 Oct · 8 days left" fits a side panel — and, on open work's due date,
   "3 days left" / "2 days overdue" from `daysFromToday`, the same UTC days as
   `isTaskOverdue`. The date input sits on top, invisible until focused, and a
-  click calls `showPicker()`. A tinted select forces its `<option>`s white:
-  Windows paints the menu in the select's own colours.
+  click calls `showPicker()`.
+- **A choice pill opens its own menu, not a native `<select>`.** The
+  platform's list drew every status and priority as the same grey words, so
+  `PillSelect` takes `options` (`PillOption`: a plain `label` for the pill,
+  typeahead, and accessible name, plus `content` for how it is drawn) and the
+  menu shows each value as it looks elsewhere — a column as its `StatusTag`,
+  a priority as its badge, a person with their avatar. The builders live in
+  `task-field-options.tsx`, shared by the form and the detail panel; the chat
+  composer's project and focus pickers use the same menu, with `group`
+  headings for tasks and documents. Three rules:
+  - **The menu is a `popover` in the top layer**, placed with fixed
+    coordinates and flipped above the pill when there is more room there. So
+    the detail panel's scroll and a modal's overflow never clip it, and the
+    composer at the foot of the screen opens upward.
+  - **It is the WAI-ARIA listbox pattern**: the pill is a button with
+    `aria-haspopup="listbox"`; arrows, Home/End, Enter/Space, typeahead, and
+    Tab work in the list, with the active option carried by
+    `aria-activedescendant`. **Escape stops propagation**, so closing a menu
+    inside the task form does not close the form's `<dialog>` with it.
+  - **The pill is named by its row's label**: give the `<label>` (or a
+    `sr-only` span) the id `${id}-label`, and the button reads
+    `aria-labelledby="${id}-label ${id}-value"` — the field, then its value.
+    Pass `aria-label` instead where there is no visible label.
 - **Pills hug their value, not the panel.** Empty space to the right of a short
   value is what makes the block read as a list of facts rather than a wall of
   inputs — same as the reference.
@@ -1422,10 +1443,10 @@ its own PATCHing instead of reporting changes upward. Its rules:
   Sending the whole draft would defeat the no-`.default()` design of
   `updateTaskSchema`: two people editing different fields of one task would
   each overwrite the other's with whatever their panel happened to be showing.
-- **The draft moves before the request and is restored on failure.** A `<select>`
+- **The draft moves before the request and is restored on failure.** A pill
   bound to the server value visibly snaps back to the old option while the PATCH
   is in flight, which reads as the app rejecting the change.
-- **Text commits on blur, selects on change.** Saving a title per keystroke is a
+- **Text commits on blur, a choice when it is picked.** Saving a title per keystroke is a
   request per character. An emptied title is treated as a cancelled edit rather
   than a save the server would reject.
 - **The panel is keyed on `task.id` by the board**, so opening a different task
