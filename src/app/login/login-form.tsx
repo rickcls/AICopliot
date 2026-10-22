@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useT } from "@/components/i18n-provider";
-import { Button, Card, ErrorState, Input, Spinner } from "@/components/ui";
+import { Button, Card, ErrorState, FOCUS_RING, Input, Spinner } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 type Mode = "signin" | "signup";
 
@@ -137,7 +139,19 @@ export function LoginForm({
             <p className="mt-1.5 text-xs text-sand-500">
               {t("auth.passwordHint")}
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-1.5 text-right text-sm">
+              <Link
+                href="/forgot-password"
+                className={cn(
+                  "rounded-md font-medium text-sand-600 underline underline-offset-2",
+                  FOCUS_RING,
+                )}
+              >
+                {t("auth.forgotPassword")}
+              </Link>
+            </p>
+          )}
         </div>
 
         {error ? <ErrorState message={error} /> : null}

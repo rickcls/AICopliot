@@ -560,10 +560,25 @@ export const reviewEvaluationSchema = z.object({
   result: z.enum(["pass", "fail", "unreviewed"]),
 });
 
+const accountPasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(200);
+
 export const registerSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
-  password: z.string().min(8, "Password must be at least 8 characters").max(200),
+  password: accountPasswordSchema,
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+});
+
+/** A base64url token of 32 bytes is 43 characters; anything far off is not one. */
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+  password: accountPasswordSchema,
 });
 
 // --- Team workspaces ---------------------------------------------------------

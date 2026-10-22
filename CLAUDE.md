@@ -36,9 +36,12 @@ by a step cap, a time limit, read-only tools, and the same proposal path as
 everything else. Do not add multi-agent orchestration, background jobs, loops
 that outlive a request, or tools that write. External systems are read-only
 and read only when the user asks (Gmail is listed when "Check Gmail" is
-pressed, never on a schedule). The app never sends email and never writes to
-another system: email drafts leave through copy, `mailto:`, or a compose link
-the user opens.
+pressed, never on a schedule). The assistant never sends email and never
+writes to another system. A draft leaves through copy, `mailto:`, or a compose
+link the user opens. Account mail goes only through `src/lib/outbound/`:
+a password reset (`/api/password/forgot`, not under `/api/auth`, which the
+sign-in handler owns) and a notice when an account is created. A failed notice
+does not undo the account.
 
 ## Stack
 
