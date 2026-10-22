@@ -684,6 +684,12 @@ Also there, and to be reused rather than re-typed:
 - `SegmentedControl` + `Segment` — theme, language, board/list. Composed,
   not driven by an options array, because segments hold an icon, a language
   mark (with its own `lang`), or icon and text. Five copies existed.
+- `MessagePanel` — a whole page's message (the error and not-found pages):
+  a glyph in a tinted circle, a title, and actions, centred. `global-error.tsx`
+  stays self-contained on purpose, since a shared component may be what failed.
+- `Spinner inverse` on a filled button, instead of hand-overriding its colours
+  (twenty-nine places did). `AuthShell` (`auth-shell.tsx`) is the sign-in and
+  invite frame.
 - `identityTone(seed)` — one colour per person or project, from its id or
   email, so it is the same in every list. `Avatar` uses it, and `ProjectMark`
   (`project-mark.tsx`) is the one project mark — sidebar, project list, and
@@ -694,9 +700,13 @@ Also there, and to be reused rather than re-typed:
 `sand` (a warm grey whose lightness follows slate step for step, so contrast
 pairings held when it replaced slate), cards are `rounded-2xl` with the faint
 `shadow-soft` rather than a hard border, and copy sits a size up from the old
-`text-xs` default. **`brand` (terracotta) marks four things only: the primary
-action, the current selection (`bg-brand-50 text-brand-800` — a nav item, a
-pressed chip), focus, and the `BrandMark`.** It never carries a status: it
+`text-xs` default. **`brand` (terracotta) marks only: the primary action, the
+current selection (`bg-brand-50 text-brand-800` — a nav item, a pressed chip,
+a batch bar), focus, the `BrandMark` (which is also the assistant's avatar in
+Ask documents and on `/assistant`), and the person's own words in a
+conversation (their message bubble), plus the soft wash behind the landing
+and sign-in pages.** Prose the assistant writes is set at reading size
+(15px, `leading-7`), like a task description. It never carries a status: it
 sits close to overdue red and warning amber, so overdue keeps red *and* a
 glyph, and a status pill never borrows the brand. `BrandMark` is drawn with
 `currentColor` and `fill-white`, so the dark remap redraws it without a

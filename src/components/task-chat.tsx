@@ -248,7 +248,7 @@ export function TaskChat({
             className="rounded-full"
           >
             {pending ? (
-              <Spinner className="size-3.5 border-white/40 border-t-white" />
+              <Spinner inverse className="size-3.5" />
             ) : (
               <ArrowUp className="size-4" aria-hidden />
             )}

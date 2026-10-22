@@ -954,7 +954,7 @@ export function ReviewPanel({
               documentIds.size > 20
             }
           >
-            {busy ? <Spinner className="border-white/40 border-t-white" /> : null}
+            {busy ? <Spinner inverse /> : null}
             {t("planReview.generate")}
           </Button>
         </SectionHeader>

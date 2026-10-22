@@ -681,12 +681,20 @@ export function Avatar({
   );
 }
 
-export function Spinner({ className }: { className?: string }) {
+export function Spinner({
+  inverse = false,
+  className,
+}: {
+  /** On a filled button: white on the fill, instead of brand on the page. */
+  inverse?: boolean;
+  className?: string;
+}) {
   return (
     <span
       role="status"
       className={cn(
-        "inline-block size-4 animate-spin rounded-full border-2 border-sand-200 border-t-brand-600",
+        "inline-block size-4 animate-spin rounded-full border-2",
+        inverse ? "border-white/40 border-t-white" : "border-sand-200 border-t-brand-600",
         className,
       )}
     >
@@ -755,6 +763,55 @@ export function EmptyState({
       <p className="mt-1.5 max-w-md text-sm text-sand-500">{description}</p>
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
+  );
+}
+
+/**
+ * A whole page's message when there is nothing else to show: a load failure, a
+ * missing record. Centred, with a glyph in a tinted circle so it reads as the
+ * app speaking rather than as a stray card. The error and not-found pages had
+ * each set this up differently, at three heading sizes.
+ */
+export function MessagePanel({
+  icon,
+  tone = "brand",
+  title,
+  headingLevel = 2,
+  actions,
+  children,
+}: {
+  icon: React.ReactNode;
+  /** `danger` for a failure; `brand` for a neutral "nothing here". */
+  tone?: "brand" | "danger";
+  title: string;
+  headingLevel?: 1 | 2;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  const Heading = headingLevel === 1 ? "h1" : "h2";
+  return (
+    <Card className="mx-auto flex max-w-lg flex-col items-center px-6 py-10 text-center">
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-12 place-items-center rounded-full ring-1",
+          tone === "danger"
+            ? "bg-red-50 text-red-600 ring-red-100"
+            : "bg-brand-50 text-brand-600 ring-brand-100",
+        )}
+      >
+        {icon}
+      </span>
+      <Heading className="mt-4 text-lg font-semibold tracking-tight text-sand-900">
+        {title}
+      </Heading>
+      {children ? (
+        <div className="mt-1.5 max-w-md text-sm leading-relaxed text-sand-600">{children}</div>
+      ) : null}
+      {actions ? (
+        <div className="mt-6 flex flex-wrap justify-center gap-2">{actions}</div>
+      ) : null}
+    </Card>
   );
 }
 

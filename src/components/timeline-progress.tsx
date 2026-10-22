@@ -43,7 +43,7 @@ function Stat({
       >
         {value}
       </dd>
-      {hint ? <p className="mt-1 text-[11px] text-sand-400">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-sand-500">{hint}</p> : null}
     </div>
   );
 }

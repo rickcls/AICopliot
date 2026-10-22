@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AuthShell } from "@/components/auth-shell";
 import { Card, LinkButton } from "@/components/ui";
 import { getSessionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
@@ -52,14 +52,14 @@ export default async function InvitePage({
   if (!invite) {
     body = (
       <>
-        <h1 className="text-lg font-semibold">{t("invite.invalidTitle")}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{t("invite.invalidTitle")}</h1>
         <p className="mt-1 text-sm text-sand-500">{t("invite.askForNew")}</p>
       </>
     );
   } else if (isMember) {
     body = (
       <>
-        <h1 className="text-lg font-semibold">
+        <h1 className="text-xl font-semibold tracking-tight">
           {t("invite.title", { workspace: invite.workspaceName })}
         </h1>
         <p className="mt-1 mb-6 text-sm text-sand-500">{t("invite.alreadyMember")}</p>
@@ -69,7 +69,7 @@ export default async function InvitePage({
   } else if (invite.state !== "valid") {
     body = (
       <>
-        <h1 className="text-lg font-semibold">{t(UNUSABLE_TITLE[invite.state])}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{t(UNUSABLE_TITLE[invite.state])}</h1>
         <p className="mt-1 text-sm text-sand-500">{t("invite.askForNew")}</p>
       </>
     );
@@ -77,7 +77,7 @@ export default async function InvitePage({
     const role = t(invite.role === "admin" ? "invite.roleAdmin" : "invite.roleMember");
     body = (
       <>
-        <h1 className="text-lg font-semibold">
+        <h1 className="text-xl font-semibold tracking-tight">
           {t("invite.title", { workspace: invite.workspaceName })}
         </h1>
         <p className="mt-1 text-sm text-sand-500">{t("invite.lead", { role })}</p>
@@ -108,16 +108,8 @@ export default async function InvitePage({
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-sm">
-        <Link
-          href="/"
-          className="mb-8 block text-center text-sm font-semibold tracking-tight"
-        >
-          {t("app.name")}
-        </Link>
-        <Card className="p-6">{body}</Card>
-      </div>
-    </main>
+    <AuthShell appName={t("app.name")}>
+      <Card className="p-7">{body}</Card>
+    </AuthShell>
   );
 }

@@ -114,7 +114,7 @@ export function AnswerBody({
   const blocks = parseAnswer(text, knownLabels);
 
   return (
-    <div className="space-y-3 text-sm leading-relaxed text-pretty text-sand-700">
+    <div className="space-y-3 text-[15px] leading-7 text-pretty text-sand-800">
       {blocks.map((block, index) => {
         switch (block.type) {
           case "heading":

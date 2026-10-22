@@ -7,6 +7,7 @@ import { getGmailStatus } from "@/lib/gmail/service";
 import { getOutlookStatus } from "@/lib/outlook/service";
 import { DEFAULT_TIME_ZONE } from "@/lib/time";
 import { listMembers, listPendingInvites } from "@/lib/workspace/service";
+import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
-        <p className="mt-1 text-sm text-sand-600">{t("settings.lead")}</p>
-      </div>
+      <PageHeader title={t("settings.title")} lead={t("settings.lead")} />
       <SettingsPanel
         locale={locale}
         timeZone={timeZone}

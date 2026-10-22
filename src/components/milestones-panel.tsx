@@ -345,7 +345,7 @@ export function MilestonesPanel({
             <Button type="submit" size="sm" disabled={saving || !draft.title.trim()}>
               {saving ? (
                 <>
-                  <Spinner className="border-white/40 border-t-white" />
+                  <Spinner inverse />
                   {t("common.saving")}
                 </>
               ) : editingId ? (

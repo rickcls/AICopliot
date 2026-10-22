@@ -76,8 +76,8 @@ export function LoginForm({
   }
 
   return (
-    <Card className="p-6">
-      <h1 className="text-lg font-semibold">
+    <Card className="p-7">
+      <h1 className="text-xl font-semibold tracking-tight">
         {mode === "signin" ? t("auth.signInTitle") : t("auth.signUpTitle")}
       </h1>
       <p className="mt-1 text-sm text-sand-500">
@@ -143,7 +143,7 @@ export function LoginForm({
         {error ? <ErrorState message={error} /> : null}
 
         <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? <Spinner className="border-white/40 border-t-white" /> : null}
+          {pending ? <Spinner inverse /> : null}
           {mode === "signin" ? t("auth.submitSignIn") : t("auth.submitSignUp")}
         </Button>
       </form>

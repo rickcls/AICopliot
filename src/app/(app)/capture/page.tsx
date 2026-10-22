@@ -6,6 +6,7 @@ import { getGmailStatus } from "@/lib/gmail/service";
 import { adminConsentUrl } from "@/lib/outlook/oauth";
 import { getOutlookStatus, outlookConfig } from "@/lib/outlook/service";
 import { getT } from "@/lib/i18n/server";
+import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -41,10 +42,7 @@ export default async function CapturePage({
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("capture.title")}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-sand-600">{t("capture.lead")}</p>
-      </div>
+      <PageHeader title={t("capture.title")} lead={t("capture.lead")} />
       {notice ? (
         <p
           role="status"

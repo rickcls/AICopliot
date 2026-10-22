@@ -141,7 +141,7 @@ export function WhatsAppChat({
           {t("capture.whatsappAsText")}
         </Button>
         <Button type="button" disabled={busy !== null || !me || inRange === 0} onClick={send}>
-          {busy ? <Spinner className="border-white/40 border-t-white" /> : <Sparkles className="size-4" aria-hidden />}
+          {busy ? <Spinner inverse /> : <Sparkles className="size-4" aria-hidden />}
           {busy ?? t("capture.submit")}
         </Button>
       </div>

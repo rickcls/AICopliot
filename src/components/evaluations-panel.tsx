@@ -363,7 +363,7 @@ export function EvaluationsPanel({
             <Button type="submit" disabled={running || question.trim().length < 3}>
               {running ? (
                 <>
-                  <Spinner className="border-white/40 border-t-white" />
+                  <Spinner inverse />
                   {t("evaluations.running")}
                 </>
               ) : (

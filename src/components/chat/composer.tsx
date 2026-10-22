@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef } from "react";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Crosshair, FolderKanban } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { Button, QUIET_CONTROL, Select, Spinner, Textarea } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { PillSelect } from "@/components/property-pill";
+import { Button, Spinner, Textarea } from "@/components/ui";
 import type { ChatFocusState, FocusOptions, ProjectOption } from "./types";
 
 /**
@@ -94,7 +94,7 @@ export function Composer({
           event.preventDefault();
           submit();
         }}
-        className="rounded-2xl border border-sand-300 bg-white p-2 shadow-sm focus-within:border-sand-900"
+        className="rounded-2xl border border-sand-200/80 bg-white p-2 shadow-soft transition-shadow focus-within:border-brand-300 focus-within:ring-4 focus-within:ring-brand-100/70"
       >
         <label htmlFor="question" className="sr-only">
           {t("chat.composer.question")}
@@ -115,7 +115,7 @@ export function Composer({
           }}
           placeholder={t("chat.composer.placeholder")}
           disabled={pending}
-          className="resize-none border-transparent bg-transparent px-2 py-1.5 focus-visible:border-transparent focus-visible:ring-0"
+          className="resize-none border-transparent bg-transparent px-2 py-1.5 text-[15px] leading-relaxed focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
         />
 
         {/* Wraps and lets the pickers shrink: at phone width two pickers and
@@ -125,12 +125,13 @@ export function Composer({
           <label htmlFor="chat-project" className="sr-only">
             {t("chat.composer.askAbout")}
           </label>
-          <Select
+          <PillSelect
             id="chat-project"
+            icon={<FolderKanban className="size-3.5 opacity-70" />}
             value={projectId}
             onChange={(event) => onProjectChange(event.target.value)}
             disabled={pending}
-            className={cn(QUIET_CONTROL, "h-8 w-auto max-w-[14rem] min-w-0 shrink text-xs")}
+            className="max-w-[14rem] shrink text-xs"
           >
             <option value="">{t("chat.composer.allDocuments")}</option>
             {projects.map((project) => (
@@ -138,17 +139,18 @@ export function Composer({
                 {project.name}
               </option>
             ))}
-          </Select>
+          </PillSelect>
 
           <label htmlFor="chat-focus" className="sr-only">
             {t("chat.composer.focusOn")}
           </label>
-          <Select
+          <PillSelect
             id="chat-focus"
+            icon={<Crosshair className="size-3.5 opacity-70" />}
             value={focusValue}
             onChange={(event) => onFocusChange(event.target.value)}
             disabled={pending}
-            className={cn(QUIET_CONTROL, "h-8 w-auto max-w-[14rem] min-w-0 shrink text-xs")}
+            className="max-w-[14rem] shrink text-xs"
           >
             <option value="">
               {projectId ? t("chat.composer.wholeProject") : t("chat.composer.everyDocument")}
@@ -186,7 +188,7 @@ export function Composer({
             {focusOptions.documents.length > 1 ? (
               <option value="choose-documents">{t("chat.composer.severalDocuments")}</option>
             ) : null}
-          </Select>
+          </PillSelect>
 
           <span className="hidden min-w-0 truncate text-xs text-sand-500 sm:inline">
             {focus.kind !== "none"
@@ -207,7 +209,7 @@ export function Composer({
             className="ml-auto rounded-full"
           >
             {pending ? (
-              <Spinner className="size-3.5 border-white/40 border-t-white" />
+              <Spinner inverse className="size-3.5" />
             ) : (
               <ArrowUp className="size-4" aria-hidden />
             )}

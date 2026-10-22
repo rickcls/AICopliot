@@ -227,7 +227,7 @@ export function ProposalList({
             disabled={busy !== null}
             onClick={() => void apply(unflagged.map((proposal) => proposal.id))}
           >
-            {busy === "all" ? <Spinner className="border-white/40 border-t-white" /> : null}
+            {busy === "all" ? <Spinner inverse /> : null}
             {t("capture.applyAll", { count: unflagged.length })}
           </Button>
         </div>
@@ -376,7 +376,7 @@ function ProposalRow({
           {proposal.state === "pending" ? (
             <>
               <Button type="button" size="sm" disabled={busy} onClick={onApply}>
-                {busy ? <Spinner className="border-white/40 border-t-white" /> : null}
+                {busy ? <Spinner inverse /> : null}
                 {t("capture.apply")}
               </Button>
               <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onDismiss}>

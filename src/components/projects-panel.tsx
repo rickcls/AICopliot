@@ -193,7 +193,7 @@ export function ProjectsPanel({
             <Button type="submit" disabled={saving || !name.trim()}>
               {saving ? (
                 <>
-                  <Spinner className="border-white/40 border-t-white" />
+                  <Spinner inverse />
                   {t("projects.creating")}
                 </>
               ) : (

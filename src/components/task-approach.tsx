@@ -135,7 +135,7 @@ export function TaskApproach({
 
       {!approach ? (
         <Button type="button" disabled={busy !== null} onClick={() => void ask()}>
-          {busy === "ask" ? <Spinner className="border-white/40 border-t-white" /> : <Lightbulb className="size-4" aria-hidden />}
+          {busy === "ask" ? <Spinner inverse /> : <Lightbulb className="size-4" aria-hidden />}
           {busy === "ask" ? t("approach.asking") : t("approach.ask")}
         </Button>
       ) : (
@@ -217,7 +217,7 @@ export function TaskApproach({
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" disabled={busy !== null} onClick={() => void append()}>
-              {busy === "append" ? <Spinner className="border-white/40 border-t-white" /> : null}
+              {busy === "append" ? <Spinner inverse /> : null}
               {t("approach.appendToDescription")}
             </Button>
             <Button

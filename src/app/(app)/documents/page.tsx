@@ -45,7 +45,7 @@ export default async function AllDocumentsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("documents.title")} lead={t("documents.lead")} className="mb-0" />
+      <PageHeader title={t("documents.title")} lead={t("documents.lead")} />
 
       <form action="/documents" method="get" role="search" className="flex max-w-2xl gap-2">
         <label htmlFor="document-search" className="sr-only">

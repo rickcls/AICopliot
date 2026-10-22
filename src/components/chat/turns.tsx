@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, RotateCcw, Sparkles } from "lucide-react";
+import { Check, RotateCcw } from "lucide-react";
 import type { AnswerProgress } from "@/lib/rag/answer";
 import { useT } from "@/components/i18n-provider";
 import { Badge, Button, Spinner, type BadgeTone } from "@/components/ui";
@@ -10,6 +10,7 @@ import { AnswerBody } from "./answer-body";
 import { FeedbackButtons } from "./feedback-buttons";
 import { NextActions } from "./next-actions";
 import { SourceCard } from "./source-card";
+import { BrandMark } from "@/components/brand-mark";
 import type { AssistantTurn as AssistantTurnModel, UserTurn as UserTurnModel } from "./types";
 
 const CONFIDENCE_TONE: Record<"high" | "medium" | "low", BadgeTone> = {
@@ -35,7 +36,7 @@ export function UserTurn({
     <div className="flex flex-col items-end gap-1.5">
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl rounded-br-md bg-sand-100 px-4 py-2.5 text-sm text-pretty whitespace-pre-wrap text-sand-900",
+          "max-w-[85%] rounded-2xl rounded-br-md bg-brand-50 px-4 py-2.5 text-[15px] leading-relaxed text-pretty whitespace-pre-wrap text-brand-950 ring-1 ring-brand-100 ring-inset",
           turn.status === "failed" && "bg-red-50 text-red-900",
         )}
       >
@@ -83,12 +84,8 @@ export function AssistantTurn({
   const t = useT();
   return (
     <div className="flex gap-3">
-      <span
-        aria-hidden
-        className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-sand-900 text-white"
-      >
-        <Sparkles className="size-3.5" />
-      </span>
+      {/* The assistant wears the app's own mark, here and on /assistant. */}
+      <BrandMark className="mt-0.5 size-7" />
 
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -207,12 +204,7 @@ export function PendingTurn({
 
   return (
     <div className="flex gap-3">
-      <span
-        aria-hidden
-        className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-sand-900 text-white"
-      >
-        <Sparkles className="size-3.5 animate-pulse" />
-      </span>
+      <BrandMark className="mt-0.5 size-7 animate-pulse" />
 
       <div className="min-w-0 flex-1 space-y-1.5 pt-1">
         {phases.slice(0, -1).map((progress, index) => (

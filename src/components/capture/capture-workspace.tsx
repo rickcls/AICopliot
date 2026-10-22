@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, NotebookPen } from "lucide-react";
 import Link from "next/link";
 import { CaptureBox } from "@/components/capture/capture-box";
 import { CaptureCard, type ProjectOption } from "@/components/capture/capture-card";
 import type { ColleagueOption } from "@/components/capture/proposal-list";
 import { MailboxPanel } from "@/components/capture/mailbox-panel";
 import { useT } from "@/components/i18n-provider";
+import { EmptyState } from "@/components/ui";
 import type { CaptureView } from "@/lib/capture/view";
 import type { MailboxStatus } from "@/lib/mail/mailboxes";
 
@@ -86,7 +87,11 @@ export function CaptureWorkspace({
           <ArrowRight className="size-3" aria-hidden />
         </Link>
       ) : captures.length === 0 ? (
-        <p className="text-sm text-sand-500">{t("capture.historyEmpty")}</p>
+        <EmptyState
+          icon={<NotebookPen className="size-5" />}
+          title={t("capture.historyEmpty")}
+          description={t("capture.historyEmptyBody")}
+        />
       ) : null}
     </div>
   );

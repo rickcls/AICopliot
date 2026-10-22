@@ -1,7 +1,8 @@
 "use client";
 
 import { useT } from "@/components/i18n-provider";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { CircleAlert } from "lucide-react";
+import { Button, LinkButton, MessagePanel } from "@/components/ui";
 
 /**
  * Failure boundary for signed-in pages without a nearer one. Without it a
@@ -20,24 +21,27 @@ export default function AppError({
 }) {
   const t = useT();
   return (
-    <Card className="mx-auto max-w-lg p-6">
-      <h2 className="text-sm font-semibold text-sand-900">
-        {t("errors.loadFailedTitle")}
-      </h2>
-      <p className="mt-1 text-sm text-sand-600">{t("errors.loadFailedBody")}</p>
+    <MessagePanel
+      tone="danger"
+      icon={<CircleAlert className="size-6" />}
+      title={t("errors.loadFailedTitle")}
+      actions={
+        <>
+          <Button type="button" onClick={retry}>
+            {t("errors.tryAgain")}
+          </Button>
+          <LinkButton href="/today" variant="secondary">
+            {t("errors.goToToday")}
+          </LinkButton>
+        </>
+      }
+    >
+      <p>{t("errors.loadFailedBody")}</p>
       {error.digest ? (
         <p className="mt-2 font-mono text-xs text-sand-400">
           {t("errors.reference", { digest: error.digest })}
         </p>
       ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" onClick={retry}>
-          {t("errors.tryAgain")}
-        </Button>
-        <LinkButton href="/today" variant="secondary">
-          {t("errors.goToToday")}
-        </LinkButton>
-      </div>
-    </Card>
+    </MessagePanel>
   );
 }

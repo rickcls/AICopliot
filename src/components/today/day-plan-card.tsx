@@ -171,7 +171,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
               </Button>
             ) : null}
             <Button type="submit" disabled={busy || !(hours >= 0.5 && hours <= 14)}>
-              {busy ? <Spinner className="border-white/40 border-t-white" /> : null}
+              {busy ? <Spinner inverse /> : null}
               {busy ? t("plan.making") : mode === "next" ? t("plan.makeNext") : t("plan.make")}
             </Button>
           </div>

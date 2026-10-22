@@ -41,7 +41,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={retry}
-            className="mt-6 inline-flex h-10 items-center rounded-lg bg-sand-900 px-4 text-sm font-medium text-white hover:bg-sand-700"
+            className="mt-6 inline-flex h-10 items-center rounded-xl bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"
           >
             再試一次 · Try again
           </button>

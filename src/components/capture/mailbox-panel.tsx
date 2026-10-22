@@ -107,7 +107,7 @@ export function MailboxPanel({
           </a>
         ) : (
           <Button type="button" size="sm" disabled={busy !== null} onClick={() => void check()}>
-            {busy === "check" ? <Spinner className="border-white/40 border-t-white" /> : <Inbox className="size-4" aria-hidden />}
+            {busy === "check" ? <Spinner inverse /> : <Inbox className="size-4" aria-hidden />}
             {busy === "check" ? t(`${kind}.checking`) : t(`${kind}.check`)}
           </Button>
         )}

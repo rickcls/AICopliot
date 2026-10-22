@@ -94,7 +94,7 @@ export function ProposalCard({
             </span>
           ) : (
             <Button type="button" size="sm" onClick={() => void apply()} disabled={applying}>
-              {applying ? <Spinner className="size-3.5 border-white/40 border-t-white" /> : null}
+              {applying ? <Spinner inverse className="size-3.5" /> : null}
               {t("chat.proposal.apply")}
             </Button>
           )}

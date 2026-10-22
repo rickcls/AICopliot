@@ -6,7 +6,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { ThreadSummary } from "@/lib/chat/history";
 import { formatThreadTime } from "@/lib/chat/relative-time";
 import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
-import { Badge, FOCUS_RING, Input } from "@/components/ui";
+import { Badge, FOCUS_RING, Input, LinkButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 const ROW_ACTION = cn(
@@ -63,18 +63,15 @@ export function ThreadRail({
 
   return (
     <nav aria-label={t("chat.rail.label")} className={className}>
-      <Link
+      <LinkButton
         href="/chat"
         onClick={onNavigate}
-        className={cn(
-          "flex h-9 items-center gap-2 rounded-lg border border-sand-300 bg-white px-3",
-          "text-sm font-medium text-sand-900 transition-colors hover:bg-sand-50",
-          FOCUS_RING,
-        )}
+        variant="secondary"
+        className="w-full justify-start"
       >
-        <Plus className="size-4 text-sand-400" aria-hidden />
+        <Plus className="size-4" aria-hidden />
         {t("chat.rail.newThread")}
-      </Link>
+      </LinkButton>
 
       {threads.length === 0 ? (
         <p className="mt-4 px-1 text-xs text-sand-500">
@@ -115,8 +112,8 @@ export function ThreadRail({
               <li
                 key={thread.id}
                 className={cn(
-                  "group flex items-start gap-0.5 rounded-lg transition-colors",
-                  active ? "bg-sand-100" : "hover:bg-sand-50",
+                  "group flex items-start gap-0.5 rounded-xl transition-colors",
+                  active ? "bg-brand-100/70" : "hover:bg-sand-100",
                   busy && "opacity-60",
                 )}
               >
@@ -133,17 +130,17 @@ export function ThreadRail({
                     className={cn(
                       "block truncate text-sm",
                       active
-                        ? "font-medium text-sand-900"
+                        ? "font-medium text-brand-800"
                         : "text-sand-700",
                     )}
                   >
                     {thread.title}
                   </span>
-                  <span className="mt-1 flex items-center gap-1.5">
+                  <span className="mt-1 flex min-w-0 items-center gap-1.5">
                     {thread.focus === "task" ? (
                       // The task outranks the project: it is the narrower,
                       // more useful thing to recognise a thread by.
-                      <Badge tone="info" className="max-w-[9rem] truncate">
+                      <Badge tone="info" className="max-w-[9rem] min-w-0 truncate">
                         {t("chat.rail.taskBadge", {
                           title: thread.taskTitle ?? t("chat.rail.deletedTask"),
                         })}
@@ -157,7 +154,8 @@ export function ThreadRail({
                         {thread.projectName}
                       </Badge>
                     ) : null}
-                    <span className="text-xs text-sand-400">
+                    {/* The time keeps its line; the badge beside it truncates. */}
+                    <span className="shrink-0 text-xs whitespace-nowrap text-sand-400">
                       {formatThreadTime(thread.lastMessageAt, nowIso, t, dateLocale, timeZone)}
                     </span>
                   </span>

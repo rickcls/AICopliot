@@ -789,7 +789,7 @@ export function TaskBoard({
                         />
                         <span className="min-w-0 flex-1 truncate text-sm text-sand-800">
                           {statusLabel(status)}
-                          <span className="ml-1.5 text-[11px] text-sand-400">
+                          <span className="ml-1.5 text-xs text-sand-400">
                             {t(`statusCategory.${status.category}`)}
                             {taskCount > 0 ? ` · ${taskCount}` : ""}
                           </span>

@@ -327,7 +327,7 @@ export function CaptureBox({
                 {t("capture.shortcutHint", { key: "Ctrl/⌘" })}
               </span>
               <Button type="submit" disabled={busy !== null || listening || text.trim().length < 3}>
-                {busy ? <Spinner className="border-white/40 border-t-white" /> : <Sparkles className="size-4" aria-hidden />}
+                {busy ? <Spinner inverse /> : <Sparkles className="size-4" aria-hidden />}
                 {busy ?? t("capture.submit")}
               </Button>
             </div>

@@ -365,7 +365,7 @@ export function DocumentsPanel({
           <Button type="button" onClick={() => fileInput.current?.click()} disabled={progress !== null}>
             {progress ? (
               <>
-                <Spinner className="border-white/40 border-t-white" />
+                <Spinner inverse />
                 {t("documents.uploading", progress)}
               </>
             ) : (

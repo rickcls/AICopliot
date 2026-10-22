@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { computeMetrics } from "@/lib/evaluation/scoring";
 import { getT } from "@/lib/i18n/server";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
+import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +41,7 @@ export default async function EvaluationsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("evaluations.title")}</h1>
-        <p className="mt-1 text-sm text-sand-600">{t("evaluations.lead")}</p>
-      </div>
+      <PageHeader title={t("evaluations.title")} lead={t("evaluations.lead")} />
       <EvaluationsPanel
         projects={projects}
         initialEvaluations={evaluations.map((row) => ({

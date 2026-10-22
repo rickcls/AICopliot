@@ -46,7 +46,7 @@ export function TracedRequirements({
             </span>
             <span className="min-w-0 truncate">{link.requirement.title}</span>
             {link.requirement.status !== "approved" ? (
-              <span className="shrink-0 text-[11px] text-amber-700">
+              <span className="shrink-0 text-xs text-amber-700">
                 {requirementStatusLabel(link.requirement.status, t)}
               </span>
             ) : null}

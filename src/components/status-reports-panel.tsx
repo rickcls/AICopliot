@@ -289,7 +289,7 @@ export function StatusReportsPanel({
         <Button type="button" onClick={generate} disabled={pending}>
           {pending ? (
             <>
-              <Spinner className="border-white/40 border-t-white" />
+              <Spinner inverse />
               {t("reports.generating")}
             </>
           ) : (
@@ -313,16 +313,16 @@ export function StatusReportsPanel({
                 disabled={!run.report}
                 aria-pressed={selectedId === run.id}
                 onClick={() => setSelectedId(run.id)}
-                className={`min-w-48 rounded-lg border px-3 py-2 text-left text-xs transition-colors disabled:opacity-60 ${FOCUS_RING} ${
+                className={`min-w-48 rounded-xl border px-3 py-2 text-left text-xs transition-colors disabled:opacity-60 ${FOCUS_RING} ${
                   selectedId === run.id
-                    ? "border-sand-900 bg-sand-900 text-white"
+                    ? "border-brand-200 bg-brand-50 text-brand-900"
                     : "border-sand-200 bg-white hover:bg-sand-50"
                 }`}
               >
                 <span className="block font-medium">
                   {formatDate(run.createdAt, dateLocale, timeZone)}
                 </span>
-                <span className={selectedId === run.id ? "text-sand-300" : "text-sand-500"}>
+                <span className={selectedId === run.id ? "text-brand-700" : "text-sand-500"}>
                   {run.report
                     ? `${run.report.period.start} – ${run.report.period.end}`
                     : `${labelOr(t, `runStatus.${run.status}`, run.status)}: ${
