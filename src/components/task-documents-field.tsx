@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileText, Paperclip, X } from "lucide-react";
+import { FilePlus2, FileText, Paperclip, X } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { Badge, QUIET_CONTROL, Select, Spinner, buttonClasses } from "@/components/ui";
+import { PILL_EMPTY, PillSelect } from "@/components/property-pill";
+import { Badge, Spinner } from "@/components/ui";
 import type { ProjectDocumentOption } from "@/components/task-types";
 import { UPLOAD_EXTENSIONS, asUploadable, mailFileErrorKey } from "@/lib/mail/document";
 import { cn } from "@/lib/utils";
@@ -123,7 +124,7 @@ export function TaskDocumentsField({
           {linked.map((document) => (
             <li
               key={document.id}
-              className="group flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-sand-50"
+              className="group flex min-w-0 items-center gap-2 rounded-xl bg-sand-100/70 px-2.5 py-1.5 text-sm ring-1 ring-sand-200/70 ring-inset"
             >
               <FileText className="size-4 shrink-0 text-sand-400" aria-hidden />
               <a
@@ -159,9 +160,11 @@ export function TaskDocumentsField({
 
       <div className="flex flex-wrap items-center gap-2">
         {unlinked.length > 0 ? (
-          <Select
+          <PillSelect
             aria-label={t("tasks.documents.linkLabel")}
-            className={cn(QUIET_CONTROL, "max-w-xs text-sand-500")}
+            tone={PILL_EMPTY}
+            icon={<FilePlus2 className="size-3.5" />}
+            className="max-w-xs"
             value=""
             disabled={disabled}
             onChange={(event) => {
@@ -178,18 +181,16 @@ export function TaskDocumentsField({
                   : ` (${t(`documents.status.${document.status}`)})`}
               </option>
             ))}
-          </Select>
+          </PillSelect>
         ) : null}
 
         <label
-          className={buttonClasses({
-            variant: "ghost",
-            size: "sm",
-            className: cn(
-              "cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-sand-900",
-              (disabled || uploading) && "pointer-events-none opacity-50",
-            ),
-          })}
+          className={cn(
+            "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors",
+            PILL_EMPTY,
+            "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500",
+            (disabled || uploading) && "pointer-events-none opacity-50",
+          )}
         >
           {uploading ? <Spinner className="size-3.5" /> : <Paperclip className="size-3.5" aria-hidden />}
           {uploading ? t("tasks.documents.uploading") : t("tasks.documents.upload")}

@@ -142,6 +142,10 @@ export const tasksEn = {
       manual: "Manual",
       aiSuggested: "AI suggested",
       datesInverted: "Start date must be on or before the due date.",
+      setDate: "Set date",
+      dueToday: "due today",
+      daysLeft: { one: "{count} day left", other: "{count} days left" },
+      daysOverdue: { one: "{count} day overdue", other: "{count} days overdue" },
     },
     detail: {
       closeDetails: "Close task details",

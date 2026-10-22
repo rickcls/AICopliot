@@ -1,28 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { Flag, UserRound } from "lucide-react";
+import { Milestone, Timer, UserRound } from "lucide-react";
 import {
   Avatar,
   Button,
   Input,
-  QUIET_CONTROL,
-  ROW_ICON,
   ROW_LABEL,
-  Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
 import { useT } from "@/components/i18n-provider";
 import { Modal, ModalBody, ModalFooter } from "@/components/modal";
+import { PRIORITY_TONE, PriorityIcon } from "@/components/priority-badge";
+import {
+  PILL_EMPTY,
+  PillNumber,
+  PillSelect,
+  TaskDatePill,
+} from "@/components/property-pill";
 import { TaskDocumentsField } from "@/components/task-documents-field";
 import { fillBlockedReason, TaskFillBar } from "@/components/task-fill-bar";
 import { fillDraft, type FillSummary } from "@/components/task-fill-client";
 import { displayStatusLabel } from "@/lib/i18n/status-labels";
 import { cn } from "@/lib/utils";
 import {
-  PRIORITY_FLAG,
   STATUS_DOT,
+  STATUS_PILL,
   TASK_PRIORITIES,
   statusColorToken,
   toDateInput,
@@ -171,6 +175,7 @@ export function TaskForm({
   saving,
   editing,
   timeline,
+  todayIso,
   onChange,
   onDocumentChange,
   onCancel,
@@ -190,6 +195,8 @@ export function TaskForm({
   editing: boolean;
   /** Whether the project draws a timeline (delivery tools on). */
   timeline: boolean;
+  /** The viewer's day anchor from the server, for "3 days left" on the due date. */
+  todayIso: string;
   onChange: (draft: TaskDraft) => void;
   onDocumentChange: (document: ProjectDocumentOption) => void;
   onCancel: () => void;
@@ -249,6 +256,9 @@ export function TaskForm({
 
   return (
     <Modal
+      // Wide enough for the description to read as a page with the fields
+      // beside it, rather than a box at the foot of a column of fields.
+      className="max-w-6xl"
       title={editing ? t("tasks.form.editTitle") : t("tasks.form.newTitle")}
       // No subtitle: the fields below already carry their own defaults and
       // placeholders, and a line of explanation above them was one more thing
@@ -263,7 +273,13 @@ export function TaskForm({
         }}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <ModalBody>
+        {/* Two columns from `lg`: the name and the description are the page,
+            and the fields sit beside them in a tinted side panel. The panel
+            comes between the two in the markup, so on a phone the order is
+            name, fields, description — and the grid places it to the right
+            on a wide screen, spanning both rows. */}
+        <ModalBody className="p-0 lg:grid lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[auto_1fr]">
+          <div className="min-w-0 px-6 pt-5 lg:col-start-1 lg:row-start-1 lg:px-8 lg:pt-7">
           {/* The task's name is the heading of the thing being edited, not one
               more labelled field among seven, so it is typed at heading size
               with no box around it. */}
@@ -313,31 +329,30 @@ export function TaskForm({
               }}
             />
           </div>
+          </div>
 
+          <div className="mt-5 border-y border-sand-100 bg-sand-50/70 px-6 py-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:border-y-0 lg:border-l lg:py-7">
           {/* A plain grid, not the `<dl>` the record lists use: these are form
               controls, and wrapping them in a description list makes a screen
               reader announce a six-item list around fields whose own labels
-              already say everything. Every value cell starts with the same
-              `ROW_ICON` gutter so the controls share one left edge — without
-              it the status dot, priority flag, and assignee avatar each pushed
-              the text to a different x. Colour lives on those icons, not on
-              soft fills behind the selects: two coloured pills next to each
-              other compete for one glance. */}
-          <div className="mt-3 grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
+              already say everything. Each value is a pill (property-pill.tsx),
+              the same as in the detail panel, so a task looks the same while
+              it is being written and once it is saved. */}
+          <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5">
             <label htmlFor="task-assignee" className={ROW_LABEL}>
               {t("tasks.fields.assignee")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              {assignee ? (
-                <Avatar name={assignee.name} email={assignee.email} />
-              ) : (
-                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-sand-100")}>
-                  <UserRound className="size-3.5" />
-                </span>
-              )}
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="task-assignee"
-                className={QUIET_CONTROL}
+                tone={assignee ? undefined : PILL_EMPTY}
+                icon={
+                  assignee ? (
+                    <Avatar name={assignee.name} email={assignee.email} className="size-5" />
+                  ) : (
+                    <UserRound className="size-3.5" />
+                  )
+                }
                 value={draft.assigneeId}
                 onChange={(event) =>
                   onChange({ ...draft, assigneeId: event.target.value })
@@ -350,21 +365,17 @@ export function TaskForm({
                     {member.name}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             <label htmlFor="task-status" className={ROW_LABEL}>
               {t("tasks.fields.status")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON}>
-                <span
-                  className={cn("size-2 rounded-full", STATUS_DOT[statusTone])}
-                />
-              </span>
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="task-status"
-                className={cn(QUIET_CONTROL, "font-medium")}
+                tone={STATUS_PILL[statusTone]}
+                icon={<span className={cn("block size-2 rounded-full", STATUS_DOT[statusTone])} />}
                 value={draft.statusId}
                 onChange={(event) =>
                   onChange({ ...draft, statusId: event.target.value })
@@ -376,22 +387,18 @@ export function TaskForm({
                     {displayStatusLabel(status, t)}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             <label htmlFor="task-priority" className={ROW_LABEL}>
               {t("tasks.fields.priority")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON}>
-                <Flag
-                  fill="currentColor"
-                  className={cn("size-3.5", PRIORITY_FLAG[draft.priority])}
-                />
-              </span>
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="task-priority"
-                className={QUIET_CONTROL}
+                tone={PRIORITY_TONE[draft.priority]}
+                icon={<PriorityIcon priority={draft.priority} />}
+                className="font-semibold"
                 value={draft.priority}
                 onChange={(event) => {
                   setPriorityTouched(true);
@@ -407,17 +414,17 @@ export function TaskForm({
                     {t(`priority.${priority}`)}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             <label htmlFor="task-milestone" className={ROW_LABEL}>
               {t("tasks.fields.milestone")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON} />
-              <Select
+            <div className="min-w-0">
+              <PillSelect
                 id="task-milestone"
-                className={QUIET_CONTROL}
+                tone={draft.milestoneId ? undefined : PILL_EMPTY}
+                icon={<Milestone className="size-3.5 opacity-70" />}
                 value={draft.milestoneId}
                 onChange={(event) =>
                   onChange({ ...draft, milestoneId: event.target.value })
@@ -430,7 +437,7 @@ export function TaskForm({
                     {milestone.title}
                   </option>
                 ))}
-              </Select>
+              </PillSelect>
             </div>
 
             {showStart ? (
@@ -438,12 +445,11 @@ export function TaskForm({
                 <label htmlFor="task-start" className={ROW_LABEL}>
                   {t("tasks.fields.startDate")}
                 </label>
-                <div className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden className={ROW_ICON} />
-                  <Input
+                <div className="min-w-0">
+                  <TaskDatePill
                     id="task-start"
-                    type="date"
-                    className={QUIET_CONTROL}
+                    todayIso={todayIso}
+                    countdown={false}
                     value={draft.startDate}
                     onChange={(event) =>
                       onChange({ ...draft, startDate: event.target.value })
@@ -459,12 +465,11 @@ export function TaskForm({
             <label htmlFor="task-due" className={ROW_LABEL}>
               {t("tasks.fields.dueDate")}
             </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className={ROW_ICON} />
-              <Input
+            <div className="min-w-0">
+              <TaskDatePill
                 id="task-due"
-                type="date"
-                className={QUIET_CONTROL}
+                todayIso={todayIso}
+                countdown={selectedStatus?.category !== "done"}
                 value={draft.dueDate}
                 onChange={(event) =>
                   onChange({ ...draft, dueDate: event.target.value })
@@ -478,24 +483,22 @@ export function TaskForm({
             <label htmlFor="task-estimate" className={ROW_LABEL}>
               {t("tasks.fields.estimate")}
             </label>
-            <div className="flex items-center gap-1.5">
-              <span aria-hidden className={ROW_ICON} />
-              <Input
+            <div className="min-w-0">
+              <PillNumber
                 id="task-estimate"
-                type="number"
+                icon={<Timer className="size-3.5" />}
+                unit={t("tasks.fields.hours")}
                 min={0}
                 step="0.5"
                 // "0" rather than a dash: an empty number field is still null,
                 // and a dash placeholder reads as a value already set.
                 placeholder="0"
-                className={cn(QUIET_CONTROL, "w-20 max-w-none")}
                 value={draft.estimatedHours}
                 onChange={(event) =>
                   onChange({ ...draft, estimatedHours: event.target.value })
                 }
                 disabled={busy}
               />
-              <span className="text-xs text-sand-400">{t("tasks.fields.hours")}</span>
             </div>
 
             {/* Starts at the top rather than centred: the value grows a line
@@ -542,13 +545,15 @@ export function TaskForm({
             // earning nothing.
             <p className="mt-2 text-xs text-sand-500">{t("tasks.form.timelineHint")}</p>
           ) : null}
+          </div>
 
-          {/* The one field that needs room to think in, so it gets the space
-              the seven boxed inputs above it used to take. */}
-          <div className="mt-5">
+          {/* The one field that needs room to think in, so it gets the page:
+              the full main column, at reading size, growing with what is
+              written (`field-sizing-content`) from at least half the screen. */}
+          <div className="min-w-0 px-6 pt-5 pb-6 lg:col-start-1 lg:row-start-2 lg:px-8 lg:pb-8">
             <label
               htmlFor="task-description"
-              className="mb-1.5 block text-xs font-medium text-sand-500"
+              className="mb-2 block text-sm font-semibold text-sand-700"
             >
               {t("tasks.fields.description")}
             </label>
@@ -561,7 +566,7 @@ export function TaskForm({
               placeholder={t("tasks.fields.descriptionPlaceholder")}
               maxLength={4000}
               disabled={busy}
-              className="min-h-56 resize-y leading-relaxed"
+              className="field-sizing-content min-h-64 resize-y rounded-2xl border-sand-200/80 bg-sand-50/40 px-4 py-3 text-[15px] leading-7 text-sand-800 focus-visible:bg-white lg:min-h-[50vh]"
             />
           </div>
         </ModalBody>

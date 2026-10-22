@@ -16,6 +16,7 @@ import {
 import { useT } from "@/components/i18n-provider";
 import { SectionToggle, type ProjectSection } from "@/components/section-toggle";
 import type { MessageKey } from "@/lib/i18n/translate";
+import { FOCUS_RING_INSET } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -149,12 +150,14 @@ export function ProjectTabs({
                 ref={active ? activeTab : undefined}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "group relative flex items-center gap-2 whitespace-nowrap px-3 py-2.5 text-sm transition-colors",
+                  "group relative flex items-center gap-2 whitespace-nowrap rounded-t-lg px-3 py-2.5 text-sm transition-colors",
+                  // Inset: the strip scrolls sideways, so an offset ring would be clipped.
+                  FOCUS_RING_INSET,
                   // `-mb-px` pulls the underline onto the container's own border
                   // so the active tab joins the line rather than floating above it.
                   "-mb-px border-b-2",
                   active
-                    ? "border-sand-900 font-semibold text-sand-900"
+                    ? "border-brand-600 font-semibold text-sand-900"
                     : "border-transparent font-medium text-sand-500 hover:border-sand-300 hover:text-sand-900",
                 )}
               >
@@ -162,7 +165,7 @@ export function ProjectTabs({
                   aria-hidden
                   className={cn(
                     "size-4 shrink-0 transition-colors",
-                    active ? "text-sand-900" : "text-sand-400 group-hover:text-sand-600",
+                    active ? "text-brand-600" : "text-sand-400 group-hover:text-sand-600",
                   )}
                 />
                 {t(section.labelKey)}
@@ -175,7 +178,7 @@ export function ProjectTabs({
     {hiddenLayer ? (
       <div
         role="status"
-        className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
+        className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
       >
         <span>
           {t(

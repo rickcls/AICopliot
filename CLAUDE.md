@@ -670,7 +670,14 @@ Also there, and to be reused rather than re-typed:
 - `buttonClasses()` / `LinkButton` — a navigation styled as a button stays an
   `<a>`. Fourteen links had hand-copied button classes at three heights.
 - `StatCard` (a zero renders neutral whatever its tone) and `ProgressBar` (fed
-  by `percentOf` from `progress.ts`, never a raw `Math.round`).
+  by `percentOf` from `progress.ts`, never a raw `Math.round`). Numbers read
+  together go in one `StatGroup` as `plain` cells rather than a card each: the
+  hairlines between them are the card's fill showing through a `gap-px` grid,
+  so they hold at any column count — but every cell must be filled, or the
+  gap colour shows through the empty one.
+- `FOCUS_RING_INSET` — for a link that fills a cell of a clipped card or a
+  sideways-scrolling strip (stat cells, overview panels, project tabs), where
+  `FOCUS_RING`'s offset ring would be cut off.
 - `FilterChip` (`aria-pressed` carries the state), `SearchField`, and `CHECKBOX`.
 - `PageHeader` — a page's one `h1`, lead, and actions. Pages had written it
   ten ways; new pages use it, and the rest move over page by page.
@@ -678,8 +685,10 @@ Also there, and to be reused rather than re-typed:
   not driven by an options array, because segments hold an icon, a language
   mark (with its own `lang`), or icon and text. Five copies existed.
 - `identityTone(seed)` — one colour per person or project, from its id or
-  email, so it is the same in every list (`Avatar`, the sidebar's project
-  marks).
+  email, so it is the same in every list. `Avatar` uses it, and `ProjectMark`
+  (`project-mark.tsx`) is the one project mark — sidebar, project list, and
+  project header — with a person glyph on the brand tint for someone's own
+  project.
 
 **The look is warm and quiet: paper, not a spreadsheet.** The neutral is
 `sand` (a warm grey whose lightness follows slate step for step, so contrast
@@ -698,14 +707,21 @@ every field a live input; they are now one line (title, the facts that decide
 approval, a source count, inline approve/reject) expanding into the editor and
 sources. Decided items expand into read-only values, not disabled inputs.
 
-Two devices earn their keep in dense rows. **Priority is a coloured flag, not a
-badge** — next to a status pill, two same-shaped pills compete for one glance,
-and `low` is deliberately near-invisible because the column exists to find the
-urgent rows. **A risk's impact and likelihood collapse to one chip coloured by
+Two devices earn their keep in dense rows. **Priority is a `PriorityBadge`
+(`priority-badge.tsx`): a shape, a colour, and the word.** The shape carries
+the level by itself — one, two, or three signal bars, and urgent a filled
+square with "!" — so it reads without colour; urgent is the only solid fill,
+because it is the level that must stand out on a board of tints, and `low` is
+deliberately faint. It replaced a small coloured flag that people did not
+notice (four flags differing only in hue read as one icon), and it is the
+*only* mark of priority: board cards once carried a same-coloured stripe as
+well, two marks saying one thing. It sits among a row's facts — after the
+title on Today, first in a card's facts, in the list's own column — never as
+a leading gutter icon, where its varying width would stagger the titles.
+**A risk's impact and likelihood collapse to one chip coloured by
 whichever is worse**; that is a rule for picking a colour, not a new severity
 scale, and both levels stay named in the chip and again in the expansion.
-Wherever colour replaces a word, the word goes to `sr-only` — see the flag on
-`task-card.tsx`.
+Wherever colour replaces a word, the word goes to `sr-only`.
 
 ## Personal work notes
 
@@ -1183,7 +1199,11 @@ footer; the workspace overview is reached from Projects, so each question has
 one entry.
 `/projects/[id]/documents` remains the project-scoped library.
 
-**The Overview leads somewhere.** Each stat card opens the filtered rows it
+**The Overview leads somewhere, on few surfaces.** It used to draw up to
+sixteen bordered boxes; now the next step and its four discovery stages are
+one card, each section's numbers are one `StatGroup`, and lists read together
+(overdue beside blocked, milestones beside risks) share one card split by a
+hairline. Each stat card opens the filtered rows it
 counts (`/tasks?filter=overdue`, `/requirements?filter=gaps`, …), overdue and
 blocked rows open the task itself, and a "waiting on a decision" banner counts
 `undecidedRequirementWhere` and `pendingPlanRunWhere` from `rules.ts`.
@@ -1331,19 +1351,39 @@ without a z-index arms race. Three rules that are easy to undo by accident:
   `flex` on the element itself leaves it visible when closed.
 
 **Inside it, the layout follows Asana's task pane rather than a form.** The name
-is typed at heading size with no box, the metadata sits in quiet label/value
-rows, and the description gets the remaining height. Two earlier attempts were
+is typed at heading size with no box, the metadata sits in label/value rows
+whose values are pills, and the description gets the page. From `lg` the modal
+is two columns (`max-w-6xl`): the name and description on the left, the
+fields in a tinted side panel on the right. The panel sits between the two in
+the markup and the grid lifts it beside them, so a phone reads name, fields,
+description. The description is the one field that holds prose, so in the
+form and the detail panel alike it is set at reading size (15px, `leading-7`)
+and grows with what is written (`field-sizing-content`) — at least half the
+screen in the form — instead of scrolling inside a small `text-sm` box,
+which is what made it feel cramped. Two earlier attempts were
 worse: a flat `lg:grid-cols-7` gave each `<select>` about 100px — narrower than
 "In progress" or any real milestone title — and the two-column pairs that
 replaced it still drew seven bordered white boxes, so the form read as seven
 competing objects with the description the smallest thing on screen.
 
-- **Metadata controls are chrome-less at rest** (`QUIET_CONTROL`), showing their
-  border and fill only on hover and focus. That is what drops the apparent item
-  count without removing a single field.
-- **The controls are capped at `max-w-sm`, not stretched to the panel.** Empty
-  space to the right of a short value is what makes the block read as a list of
-  facts rather than a wall of inputs — same as the reference.
+- **Each value is a pill** (`property-pill.tsx`), the same in the form and the
+  detail panel: the status in its column's tint, the assignee with their
+  avatar, the priority in its badge's colours, a milestone or date with its
+  icon, and an empty value as a dashed prompt ("Set date"). They were
+  chrome-less selects (`QUIET_CONTROL`), which kept seven fields from reading
+  as seven boxes but made every value read as plain text that nothing said
+  could change. A pill gives a value shape and colour without the form box.
+- **Every pill is the native control underneath** — `<select>`, date, number —
+  so keyboard, platform picker, and screen reader are unchanged. A date pill
+  shows the formatted date — without the year when it is this year, so
+  "30 Oct · 8 days left" fits a side panel — and, on open work's due date,
+  "3 days left" / "2 days overdue" from `daysFromToday`, the same UTC days as
+  `isTaskOverdue`. The date input sits on top, invisible until focused, and a
+  click calls `showPicker()`. A tinted select forces its `<option>`s white:
+  Windows paints the menu in the select's own colours.
+- **Pills hug their value, not the panel.** Empty space to the right of a short
+  value is what makes the block read as a list of facts rather than a wall of
+  inputs — same as the reference.
 - **Start and due are separate rows.** Each carries its own label. One
   "Dates" row left two identical boxes, and the names existed only as
   accessible labels.
@@ -1570,6 +1610,11 @@ and `/* dark-palette:end */` in `src/app/globals.css` inverts each scale
   (`ProjectTaskStatus.color`, the seeded Backlog) and the `STATUS_DOT` /
   `STATUS_PILL` keys that read it — data, so it is never renamed; it maps to
   `sand-*` classes.
+- **Text never sits on a 500 fill.** 500 is the one shade the remap leaves in
+  place while `white` turns dark, so white-on-500 becomes dark-on-mid in the
+  dark theme. A fill carrying white text uses 600 or deeper; a label uses a
+  tint (`bg-*-50 text-*-700`, as `Badge` and `STATUS_PILL` do). A 500 fill
+  with no text — a dot, a Gantt bar — is fine.
 - **Regenerate the block rather than hand-editing it:**
   `node scripts/generate-dark-palette.mjs`. It reads
   `node_modules/tailwindcss/theme.css` plus the families declared in

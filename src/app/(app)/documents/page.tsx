@@ -1,7 +1,7 @@
 import { Search } from "lucide-react";
 import { DocumentSearchResults } from "@/components/document-search-results";
 import { DocumentsPanel } from "@/components/documents-panel";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { MIN_QUERY_LENGTH, searchDocuments } from "@/lib/documents/search";
@@ -45,10 +45,7 @@ export default async function AllDocumentsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("documents.title")}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-sand-600">{t("documents.lead")}</p>
-      </div>
+      <PageHeader title={t("documents.title")} lead={t("documents.lead")} className="mb-0" />
 
       <form action="/documents" method="get" role="search" className="flex max-w-2xl gap-2">
         <label htmlFor="document-search" className="sr-only">

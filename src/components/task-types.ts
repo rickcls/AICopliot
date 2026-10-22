@@ -147,25 +147,23 @@ export const STATUS_DOT: Record<TaskStatusColor, string> = {
   cyan: "bg-cyan-500",
 };
 
-/** Solid rather than pale: a group header is a divider. */
+/**
+ * A list group's heading pill: tinted, with the column's dot beside it.
+ *
+ * It was a solid fill with white text. The dark theme keeps every 500 shade
+ * where it is and turns white into the dark surface, so a solid 500 pill
+ * became dark text on a mid tone; a 50/700 pair inverts cleanly instead.
+ */
 export const STATUS_PILL: Record<TaskStatusColor, string> = {
-  slate: "bg-sand-500",
-  blue: "bg-blue-600",
-  amber: "bg-amber-500",
-  red: "bg-red-600",
-  emerald: "bg-emerald-600",
-  violet: "bg-violet-600",
-  pink: "bg-pink-600",
-  cyan: "bg-cyan-600",
+  slate: "bg-sand-100 text-sand-700 ring-sand-200",
+  blue: "bg-blue-50 text-blue-700 ring-blue-200/70",
+  amber: "bg-amber-50 text-amber-800 ring-amber-200/70",
+  red: "bg-red-50 text-red-700 ring-red-200/70",
+  emerald: "bg-emerald-50 text-emerald-700 ring-emerald-200/70",
+  violet: "bg-violet-50 text-violet-700 ring-violet-200/70",
+  pink: "bg-pink-50 text-pink-700 ring-pink-200/70",
+  cyan: "bg-cyan-50 text-cyan-700 ring-cyan-200/70",
 };
-
-/** Flag icon colour — same scale as the board card stripe. */
-export const PRIORITY_FLAG = {
-  low: "text-sand-400",
-  medium: "text-blue-500",
-  high: "text-amber-500",
-  urgent: "text-red-500",
-} as const;
 
 export function statusColorToken(
   status: Pick<TaskStatusOption, "color" | "category">,
@@ -201,6 +199,15 @@ export function statusColorToken(
 export function isTaskOverdue(task: TaskRow, todayIso: string): boolean {
   if (!task.dueDate || task.status.category === "done") return false;
   return task.dueDate.slice(0, 10) < todayIso.slice(0, 10);
+}
+
+/**
+ * Whole days from the viewer's today to a date-only value: 0 is today,
+ * negative is past. Both are compared as UTC days, like `isTaskOverdue`.
+ */
+export function daysFromToday(dateIso: string, todayIso: string): number {
+  const day = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  return Math.round((day(dateIso) - day(todayIso)) / 86_400_000);
 }
 
 /** `<input type="date">` needs YYYY-MM-DD, not a full ISO timestamp. */

@@ -8,6 +8,7 @@ import {
   DocumentChunkPageLinks,
   DocumentChunkPagination,
 } from "@/components/document-chunk-pagination";
+import { PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getT } from "@/lib/i18n/server";
@@ -86,23 +87,21 @@ export default async function DocumentChunksPage({
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <Link
-        href={`/documents/${document.id}`}
-        className="text-sm text-sand-500 hover:text-sand-900"
-      >
+      <Link href={`/documents/${document.id}`} className="inline-flex items-center gap-1 text-sm text-sand-500 hover:text-sand-900">
         ← {document.originalFilename}
       </Link>
 
-      <div className="mt-4">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("documents.chunks.title")}</h1>
-        <p className="mt-1 text-sm text-sand-500">
-          {totalChunks === 0
+      <PageHeader
+        className="mt-3"
+        title={t("documents.chunks.title")}
+        lead={
+          totalChunks === 0
             ? t("documents.chunks.none")
-            : t("documents.chunks.showing", { first: firstChunk, last: lastChunk, total: totalChunks })}
-        </p>
-      </div>
+            : t("documents.chunks.showing", { first: firstChunk, last: lastChunk, total: totalChunks })
+        }
+      />
 
-      <section className="mt-8 space-y-4">
+      <section className="space-y-4">
         <DocumentChunkList chunks={chunks} t={t} highlightId={target?.id ?? null} />
         <DocumentChunkPagination
           documentId={document.id}

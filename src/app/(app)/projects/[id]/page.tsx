@@ -6,11 +6,12 @@ import { SectionToggle } from "@/components/section-toggle";
 import {
   Badge,
   Card,
-  FOCUS_RING,
+  FOCUS_RING_INSET,
   LinkButton,
   ProgressBar,
   SectionHeader,
   StatCard,
+  StatGroup,
 } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
@@ -39,10 +40,14 @@ const LEVEL_TONE = { low: "neutral", medium: "warning", high: "danger" } as cons
 const HEALTH_TONE = { green: "success", amber: "warning", red: "danger" } as const;
 
 /**
- * One titled card with an optional "see all" link. Every card on this page
+ * One titled list with an optional "see all" link. Every panel on this page
  * answers one question and leads to the tab where it can be acted on.
+ *
+ * A panel is a cell of a shared card (`PanelPair`), not a card of its own: the
+ * page used to draw up to sixteen bordered boxes, and a pair of lists that are
+ * read together reads better on one surface.
  */
-function OverviewCard({
+function OverviewPanel({
   title,
   href,
   linkLabel,
@@ -56,13 +61,13 @@ function OverviewCard({
   return (
     // min-w-0 for the same reason as the dashboard's lists: a grid item is
     // otherwise as wide as its longest truncated title.
-    <Card className="flex min-w-0 flex-col p-5">
+    <div className="flex min-w-0 flex-col bg-white p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold text-sand-900">{title}</h2>
+        <h3 className="text-sm font-semibold text-sand-900">{title}</h3>
         {href ? (
           <Link
             href={href}
-            className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-sand-500 hover:text-sand-900"
+            className="inline-flex shrink-0 items-center gap-1 rounded text-xs font-medium text-sand-500 hover:text-brand-700"
           >
             {linkLabel}
             <ArrowRight className="size-3" aria-hidden />
@@ -70,6 +75,15 @@ function OverviewCard({
         ) : null}
       </div>
       <div className="mt-3 flex-1">{children}</div>
+    </div>
+  );
+}
+
+/** Panels side by side on one card, split by a hairline (see `StatGroup`). */
+function PanelPair({ children }: { children: React.ReactNode }) {
+  return (
+    <Card className="grid gap-px overflow-hidden bg-sand-100 lg:grid-cols-2">
+      {children}
     </Card>
   );
 }
@@ -93,13 +107,12 @@ function DiscoveryStage({
   doneLabel: string;
 }) {
   return (
-    <li>
+    <li className="bg-white">
       <Link
         href={href}
         className={cn(
-          "flex h-full items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition-colors hover:border-sand-300 hover:bg-sand-50",
-          FOCUS_RING,
-          done ? "border-emerald-200" : "border-sand-200",
+          "flex h-full items-start gap-3 p-4 transition-colors hover:bg-sand-50",
+          FOCUS_RING_INSET,
         )}
       >
         <span
@@ -272,7 +285,7 @@ export default async function ProjectOverviewPage({
     byStatus.approved;
 
   const overdueList = (
-    <OverviewCard
+    <OverviewPanel
       title={t("overview.overdueTitle")}
       href={
         summary.overdueTasks > overdueTasks.length
@@ -300,11 +313,11 @@ export default async function ProjectOverviewPage({
           ))}
         </ul>
       )}
-    </OverviewCard>
+    </OverviewPanel>
   );
 
   const blockedList = (
-    <OverviewCard
+    <OverviewPanel
       title={t("overview.blockedTitle")}
       href={
         summary.blockedTasks > blockedTasks.length
@@ -329,7 +342,7 @@ export default async function ProjectOverviewPage({
           ))}
         </ul>
       )}
-    </OverviewCard>
+    </OverviewPanel>
   );
 
   // Layers that are switched off, offered in one card at the bottom rather
@@ -340,15 +353,17 @@ export default async function ProjectOverviewPage({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {project.discoveryEnabled ? (
-        <>
-          <Card className="flex flex-wrap items-center justify-between gap-4 border-sand-300 p-5">
+        // The next step and the four stages it comes from are one card: the
+        // stages used to be four more bordered tiles under it.
+        <Card className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-brand-100/80 bg-brand-50/60 p-6">
             <div className="min-w-0">
-              <p className="text-xs font-medium tracking-wide text-sand-500 uppercase">
+              <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
                 {t("overview.nextStep")}
               </p>
-              <h2 className="mt-1 text-lg font-semibold tracking-tight text-sand-900">
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-sand-900">
                 {next.title}
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-pretty text-sand-600">
@@ -359,11 +374,11 @@ export default async function ProjectOverviewPage({
               {next.cta}
               <ArrowRight className="size-4" aria-hidden />
             </LinkButton>
-          </Card>
+          </div>
 
           <ol
             aria-label={t("overview.discoveryProgress")}
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            className="grid gap-px bg-sand-100 sm:grid-cols-2 lg:grid-cols-4"
           >
             <DiscoveryStage
               index={1}
@@ -410,13 +425,14 @@ export default async function ProjectOverviewPage({
               href={`${base}/requirements?filter=approved`}
             />
           </ol>
-        </>
+        </Card>
       ) : null}
 
       <section aria-label={t("project.tabs.tasks")} className="space-y-4">
         <SectionHeader title={t("project.tabs.tasks")} />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <StatGroup className="sm:grid-cols-3">
           <StatCard
+            plain
             label={t("overview.completion")}
             value={totalTasks === 0 ? "—" : `${completion}%`}
             href={`${base}/tasks`}
@@ -436,6 +452,7 @@ export default async function ProjectOverviewPage({
             }
           />
           <StatCard
+            plain
             label={t("overview.overdueTitle")}
             value={summary.overdueTasks}
             tone="danger"
@@ -447,16 +464,17 @@ export default async function ProjectOverviewPage({
             }
           />
           <StatCard
+            plain
             label={t("overview.blockedTitle")}
             value={summary.blockedTasks}
             tone="warning"
             href={`${base}/tasks?filter=blocked`}
           />
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
+        </StatGroup>
+        <PanelPair>
           {overdueList}
           {blockedList}
-        </div>
+        </PanelPair>
       </section>
 
       {project.deliveryEnabled ? (
@@ -472,10 +490,11 @@ export default async function ProjectOverviewPage({
               variant="ghost"
             />
           </SectionHeader>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <StatGroup className={project.discoveryEnabled ? "sm:grid-cols-3" : undefined}>
             {project.discoveryEnabled ? (
               <>
                 <StatCard
+                  plain
                   label={t("overview.coverage")}
                   value={summary.approvedRequirements === 0 ? "—" : `${coverage}%`}
                   href={`${base}/requirements?filter=approved`}
@@ -498,6 +517,7 @@ export default async function ProjectOverviewPage({
                   }
                 />
                 <StatCard
+                  plain
                   label={t("overview.uncovered")}
                   value={summary.uncoveredRequirements}
                   tone="danger"
@@ -507,15 +527,16 @@ export default async function ProjectOverviewPage({
               </>
             ) : null}
             <StatCard
+              plain
               label={t("overview.openRisks")}
               value={summary.openRisks}
               tone={highRisks > 0 ? "danger" : undefined}
               href={`${base}/risks`}
               hint={highRisks > 0 ? t("overview.highRisks", { count: highRisks }) : undefined}
             />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <OverviewCard
+          </StatGroup>
+          <PanelPair>
+            <OverviewPanel
               title={t("overview.milestonesTitle")}
               href={`${base}/timeline`}
               linkLabel={t("overview.timeline")}
@@ -553,9 +574,9 @@ export default async function ProjectOverviewPage({
                   })}
                 </ul>
               )}
-            </OverviewCard>
+            </OverviewPanel>
 
-            <OverviewCard
+            <OverviewPanel
               title={t("overview.risksTitle")}
               href={`${base}/risks`}
               linkLabel={t("overview.allRisks")}
@@ -577,9 +598,11 @@ export default async function ProjectOverviewPage({
                   ))}
                 </ul>
               )}
-            </OverviewCard>
+            </OverviewPanel>
+          </PanelPair>
 
-            <OverviewCard
+          <Card className="overflow-hidden">
+            <OverviewPanel
               title={t("overview.reportTitle")}
               href={`${base}/reports`}
               linkLabel={report ? t("overview.open") : t("overview.reports")}
@@ -603,14 +626,14 @@ export default async function ProjectOverviewPage({
               ) : (
                 <Quiet>{t("overview.reportEmpty")}</Quiet>
               )}
-            </OverviewCard>
-          </div>
+            </OverviewPanel>
+          </Card>
         </section>
       ) : null}
 
       {offLayers.length > 0 ? (
         <Card className="divide-y divide-sand-100">
-          <h2 className="px-5 pt-5 pb-3 text-sm font-semibold text-sand-900">
+          <h2 className="px-5 pt-5 pb-3 text-base font-semibold text-sand-900">
             {t("project.layers.title")}
           </h2>
           {offLayers.map((layer) => (

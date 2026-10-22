@@ -14,14 +14,14 @@ import {
   MessageSquare,
   NotebookPen,
   Settings,
-  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/brand-mark";
 import { useT } from "@/components/i18n-provider";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Avatar, FOCUS_RING, identityTone } from "@/components/ui";
+import { ProjectMark } from "@/components/project-mark";
+import { Avatar, FOCUS_RING } from "@/components/ui";
 import {
   WorkspaceSwitcher,
   type WorkspaceOption,
@@ -222,27 +222,15 @@ export function AppSidebar({
                         isActive ? cn(CURRENT, "font-semibold") : AT_REST,
                       )}
                     >
-                      {/* Initial stands in for the name on the rail, and gives
-                          the row a fixed anchor once labels appear. Its colour
-                          comes from the project's id, so a project keeps its
-                          colour wherever it is listed. The personal project
-                          carries a person mark instead, so it reads as "mine"
-                          even on the rail. */}
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "grid size-6 shrink-0 place-items-center rounded-lg text-[11px] font-semibold",
-                          project.personal
-                            ? "bg-brand-100 text-brand-700"
-                            : identityTone(project.id),
-                        )}
-                      >
-                        {project.personal ? (
-                          <UserRound className="size-3.5" />
-                        ) : (
-                          project.name.charAt(0).toUpperCase()
-                        )}
-                      </span>
+                      {/* The mark stands in for the name on the rail, and gives
+                          the row a fixed anchor once labels appear. The
+                          personal project carries a person glyph, so it reads
+                          as "mine" even on the rail. */}
+                      <ProjectMark
+                        id={project.id}
+                        name={project.name}
+                        personal={project.personal}
+                      />
                       <span className={cn(LABEL, "truncate")}>
                         {project.name}
                       </span>

@@ -91,7 +91,7 @@ function Day({ cell }: { cell: CalendarCell }) {
     >
       <div className="flex justify-end px-0.5">
         {cell.isToday ? (
-          <span className="inline-flex size-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-semibold text-white tabular-nums">
+          <span className="inline-flex size-5 items-center justify-center rounded-full bg-red-600 text-[11px] font-semibold text-white tabular-nums">
             {cell.dayOfMonth}
           </span>
         ) : (

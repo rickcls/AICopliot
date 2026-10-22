@@ -11,11 +11,16 @@ import {
 } from "lucide-react";
 import {
   Button,
+  CHECKBOX,
+  Card,
   EmptyState,
   ErrorState,
   FOCUS_RING,
+  FilterChip,
   Input,
   SectionHeader,
+  Segment,
+  SegmentedControl,
   Select,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -717,74 +722,52 @@ export function TaskBoard({
           view === "board" ? t("tasks.board.boardHint") : t("tasks.board.listHint")
         }`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* One segmented control for view + status columns. Statuses used to
               be a separate bordered Button beside List, which read as a second
               view toggle competing with Board/List rather than a column
               manager for the same statuses the board already shows. */}
           <div ref={statusesMenuRef} className="relative">
-            <div
-              className="inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5"
-              aria-label={t("tasks.board.viewLabel")}
-              role="group"
-            >
-              <button
-                type="button"
-                aria-pressed={view === "board"}
+            <SegmentedControl label={t("tasks.board.viewLabel")}>
+              <Segment
+                pressed={view === "board" && !statusesOpen}
                 onClick={() => {
                   setView("board");
                   setStatusesOpen(false);
                   clearSelection();
                 }}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                  view === "board" && !statusesOpen
-                    ? "bg-white text-sand-900 shadow-sm"
-                    : "text-sand-500 hover:text-sand-900",
-                )}
+                className="h-8 px-2.5"
               >
                 <LayoutGrid className="size-3.5" aria-hidden />
                 {t("tasks.board.board")}
-              </button>
-              <button
-                type="button"
-                aria-pressed={view === "list"}
+              </Segment>
+              <Segment
+                pressed={view === "list" && !statusesOpen}
                 onClick={() => {
                   setView("list");
                   setStatusesOpen(false);
                 }}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                  view === "list" && !statusesOpen
-                    ? "bg-white text-sand-900 shadow-sm"
-                    : "text-sand-500 hover:text-sand-900",
-                )}
+                className="h-8 px-2.5"
               >
                 <List className="size-3.5" aria-hidden />
                 {t("tasks.board.list")}
-              </button>
-              <button
-                type="button"
+              </Segment>
+              <Segment
                 aria-expanded={statusesOpen}
                 aria-haspopup="dialog"
-                aria-pressed={statusesOpen}
+                pressed={statusesOpen}
                 onClick={() => setStatusesOpen((open) => !open)}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                  statusesOpen
-                    ? "bg-white text-sand-900 shadow-sm"
-                    : "text-sand-500 hover:text-sand-900",
-                )}
+                className="h-8 px-2.5"
               >
                 <Columns3 className="size-3.5" aria-hidden />
                 {t("tasks.board.statuses")}
-              </button>
-            </div>
+              </Segment>
+            </SegmentedControl>
             {statusesOpen ? (
               <div
                 role="dialog"
                 aria-label={t("tasks.board.manageStatuses")}
-                className="absolute right-0 z-20 mt-1.5 w-80 rounded-xl border border-sand-200 bg-white p-3 shadow-lg"
+                className="absolute right-0 z-20 mt-2 w-80 rounded-2xl border border-sand-200/80 bg-white p-3 shadow-xl"
               >
                 <p className="px-1 text-xs text-sand-500">
                   {t("tasks.board.statusesHelp")}
@@ -944,12 +927,14 @@ export function TaskBoard({
                 aria-label={statusLabel(status)}
                 {...groupDropHandlers(status.id)}
                 className={cn(
-                  "flex min-h-40 flex-col rounded-xl border border-transparent bg-sand-50 p-2 transition-colors",
-                  isTarget && "border-sand-400 border-dashed bg-sand-100",
+                  // A tinted lane: the page itself is sand-50, so a sand-50
+                  // column used to have no edge at all.
+                  "flex min-h-40 flex-col rounded-2xl border border-transparent bg-sand-100/70 p-2 transition-colors",
+                  isTarget && "border-brand-300 border-dashed bg-brand-50/60",
                 )}
               >
                 <div className="flex items-center justify-between gap-2 px-1.5 pt-0.5 pb-2">
-                  <h3 className="flex min-w-0 items-center gap-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
+                  <h3 className="flex min-w-0 items-center gap-1.5 text-xs font-semibold tracking-wide text-sand-600 uppercase">
                     <span
                       aria-hidden
                       className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[tone])}
@@ -982,7 +967,10 @@ export function TaskBoard({
                 <button
                   type="button"
                   onClick={() => openCreate(status.id)}
-                  className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-sand-500 transition-colors hover:bg-white hover:text-sand-900"
+                  className={cn(
+                    "mt-2 flex w-full items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-medium text-sand-500 transition-colors hover:bg-white hover:text-sand-900",
+                    FOCUS_RING,
+                  )}
                 >
                   <Plus className="size-3.5" aria-hidden />
                   {t("common.add")}
@@ -992,33 +980,19 @@ export function TaskBoard({
           })}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-sand-200 bg-white shadow-sm">
+        <Card className="overflow-hidden">
           <div
             role="group"
             aria-label={t("tasks.board.filterByStatus")}
             className="flex flex-wrap items-center gap-1.5 border-b border-sand-200 bg-sand-50/60 px-3 py-2.5"
           >
-            <button
-              type="button"
-              aria-pressed={statusFilter === "all"}
+            <FilterChip
+              pressed={statusFilter === "all"}
+              count={matchingTasks.length}
               onClick={() => setStatusFilter("all")}
-              className={cn(
-                "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
-                statusFilter === "all"
-                  ? "border-sand-900 bg-sand-900 text-white"
-                  : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
-              )}
             >
               {t("common.all")}
-              <span
-                className={cn(
-                  "tabular-nums",
-                  statusFilter === "all" ? "text-sand-300" : "text-sand-400",
-                )}
-              >
-                {matchingTasks.length}
-              </span>
-            </button>
+            </FilterChip>
             {statuses.map((status) => {
               const count = matchingTasks.filter(
                 (task) => task.statusId === status.id,
@@ -1027,32 +1001,18 @@ export function TaskBoard({
               const tone = statusColorToken(status);
 
               return (
-                <button
+                <FilterChip
                   key={status.id}
-                  type="button"
-                  aria-pressed={selected}
+                  pressed={selected}
+                  count={count}
                   onClick={() => setStatusFilter(status.id)}
-                  className={cn(
-                    "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
-                    selected
-                      ? "border-sand-900 bg-sand-900 text-white"
-                      : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
-                  )}
                 >
                   <span
                     aria-hidden
                     className={cn("size-1.5 rounded-full", STATUS_DOT[tone])}
                   />
                   {statusLabel(status)}
-                  <span
-                    className={cn(
-                      "tabular-nums",
-                      selected ? "text-sand-300" : "text-sand-400",
-                    )}
-                  >
-                    {count}
-                  </span>
-                </button>
+                </FilterChip>
               );
             })}
           </div>
@@ -1150,7 +1110,7 @@ export function TaskBoard({
                         checked={allVisibleSelected}
                         onChange={toggleSelectAll}
                         aria-label={t("tasks.board.selectAll")}
-                        className="size-3.5 rounded border-sand-300 text-sand-900 focus-visible:ring-sand-900"
+                        className={CHECKBOX}
                       />
                     </th>
                     <th scope="col" className="w-8 px-1 py-2.5">
@@ -1189,7 +1149,7 @@ export function TaskBoard({
                       className={cn(
                         "divide-y divide-sand-100 border-b border-sand-200 last:border-b-0",
                         isTarget &&
-                          "bg-sand-100/80 outline outline-dashed outline-sand-400 -outline-offset-2",
+                          "bg-brand-50/60 outline outline-dashed outline-brand-300 -outline-offset-2",
                       )}
                     >
                       <tr className="bg-sand-50/70">
@@ -1217,10 +1177,14 @@ export function TaskBoard({
                               />
                               <span
                                 className={cn(
-                                  "inline-flex items-center rounded px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white uppercase",
+                                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset",
                                   STATUS_PILL[tone],
                                 )}
                               >
+                                <span
+                                  aria-hidden
+                                  className={cn("size-1.5 rounded-full", STATUS_DOT[tone])}
+                                />
                                 {statusLabel(group.status)}
                               </span>
                               <span className="text-xs text-sand-500 tabular-nums">
@@ -1297,7 +1261,7 @@ export function TaskBoard({
               </table>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {draft ? (
@@ -1317,6 +1281,7 @@ export function TaskBoard({
           saving={saving}
           editing={editingId !== null}
           timeline={timeline}
+          todayIso={nowIso}
           onChange={setDraft}
           onDocumentChange={upsertDocument}
           onCancel={() => {

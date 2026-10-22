@@ -167,7 +167,6 @@ export const overviewZhHant = {
     emptyTitle: "未有專案",
     emptyBody: "建立專案，把相關的文件和工作放在一起，讓答案只引用合適的內容。",
     noDescription: "沒有描述。",
-    open: "開啟專案",
     ask: "提問",
   },
 } satisfies Pick<Dictionary, keyof typeof overviewEn>;

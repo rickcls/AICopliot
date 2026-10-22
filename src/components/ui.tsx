@@ -21,6 +21,14 @@ import { cn } from "@/lib/utils";
 export const FOCUS_RING =
   "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
+/**
+ * The same ring drawn inside the element, for links that fill a cell of a
+ * clipped card (`StatGroup`, the overview panels): an offset ring there would
+ * be cut off by the card's `overflow-hidden`.
+ */
+export const FOCUS_RING_INSET =
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500";
+
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "icon";
 
@@ -39,7 +47,9 @@ export function buttonClasses({
   className?: string;
 } = {}) {
   return cn(
-    "inline-flex items-center justify-center gap-2 font-medium transition-colors",
+    // A label never wraps inside a button: "新增工作" broke into two lines in a
+    // narrow toolbar. The row around it wraps instead.
+    "inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-colors",
     FOCUS_RING,
     "disabled:pointer-events-none disabled:opacity-50",
     size === "sm" && "h-8 rounded-lg px-3 text-sm",
@@ -233,7 +243,7 @@ export function Segment({
       type="button"
       aria-pressed={pressed}
       className={cn(
-        "inline-flex h-7 min-w-7 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors",
+        "inline-flex h-7 min-w-7 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium whitespace-nowrap transition-colors",
         FOCUS_RING,
         "disabled:pointer-events-none disabled:opacity-50",
         // The ring gives the pressed segment an edge in the dark theme, where
@@ -287,9 +297,10 @@ export function SearchField({
  * chrome only appears on hover and focus, so at rest the block reads as a short
  * list of facts, and the description gets the space.
  *
- * Lives here rather than in `task-form.tsx` because the task detail panel and
- * the chat composer use it too, and importing a style constant *through* an
- * unrelated form component is the same drift `SectionHeader` was extracted to fix.
+ * Task fields have since moved to pills (`property-pill.tsx`), where a value
+ * needs to look changeable; this stays for secondary controls that should
+ * recede — the chat composer's pickers, the capture box's language, the
+ * workspace switcher.
  */
 export const QUIET_CONTROL =
   // `w-auto`, not `w-full`: empty space belongs *beside* a short value, not
@@ -545,19 +556,27 @@ export function StatCard({
   tone,
   href,
   hint,
+  plain = false,
 }: {
   label: string;
   value: number | string;
   tone?: "danger" | "warning" | "success";
   href?: string;
   hint?: React.ReactNode;
+  /** A cell inside a `StatGroup` rather than a card of its own. */
+  plain?: boolean;
 }) {
   const alarming = typeof value === "number" ? value > 0 : true;
+  const Frame = plain ? "div" : Card;
   const body = (
-    <Card
+    <Frame
       className={cn(
         "h-full p-5",
-        href && "transition-colors group-hover:border-sand-300 group-hover:bg-sand-50",
+        plain && "bg-white",
+        href &&
+          (plain
+            ? "transition-colors group-hover:bg-sand-50"
+            : "transition-colors group-hover:border-sand-300 group-hover:bg-sand-50"),
       )}
     >
       <p className="text-sm font-medium text-sand-500">{label}</p>
@@ -572,15 +591,39 @@ export function StatCard({
         {value}
       </p>
       {hint ? <div className="mt-1.5 text-xs text-sand-500">{hint}</div> : null}
-    </Card>
+    </Frame>
   );
 
   return href ? (
-    <Link href={href} className={cn("group block rounded-2xl", FOCUS_RING)}>
+    <Link
+      href={href}
+      className={cn("group block", plain ? FOCUS_RING_INSET : cn("rounded-2xl", FOCUS_RING))}
+    >
       {body}
     </Link>
   ) : (
     body
+  );
+}
+
+/**
+ * Several headline numbers in one card, split by hairlines, instead of a card
+ * each. The hairlines are the card's own fill showing through a `gap-px` grid,
+ * so they stay right at every column count; each child paints itself white.
+ * The caller sets the columns and must fill every cell, or the gap colour
+ * shows through the empty one.
+ */
+export function StatGroup({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className={cn("grid gap-px overflow-hidden bg-sand-100", className)}>
+      {children}
+    </Card>
   );
 }
 

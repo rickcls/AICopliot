@@ -81,7 +81,7 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
                   left: `calc(${ROW_LABEL_WIDTH} + (100% - ${ROW_LABEL_WIDTH}) * ${model.todayPct / 100})`,
                 }}
               >
-                <span className="absolute -top-0.5 -left-3.5 rounded-sm bg-red-500 px-1 text-[10px] font-medium text-white">
+                <span className="absolute -top-0.5 -left-3.5 rounded-sm bg-red-600 px-1 text-[10px] font-medium text-white">
                   {t("timeline.todayMarker")}
                 </span>
               </div>

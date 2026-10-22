@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Flag } from "lucide-react";
+import { Check } from "lucide-react";
 import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Button, Spinner } from "@/components/ui";
 import { labelOr, type Translate } from "@/lib/i18n/translate";
-import { PRIORITY_FLAG } from "@/components/task-types";
+import { PriorityBadge } from "@/components/priority-badge";
+import type { TaskPriority } from "@/components/task-types";
 import type { TaskProposal } from "@/lib/schemas";
-import { cn, formatDay } from "@/lib/utils";
+import { formatDay } from "@/lib/utils";
 
 function display(
   field: TaskProposal["field"],
@@ -104,17 +105,7 @@ export function ProposalCard({
         {proposal.field === "description" ? (
           <p className="whitespace-pre-wrap">{String(proposal.value)}</p>
         ) : proposal.field === "priority" ? (
-          <span className="inline-flex items-center gap-1.5 font-medium">
-            <Flag
-              fill="currentColor"
-              aria-hidden
-              className={cn(
-                "size-3.5",
-                PRIORITY_FLAG[proposal.value as keyof typeof PRIORITY_FLAG],
-              )}
-            />
-            {display(proposal.field, proposal.value, t, dateLocale)}
-          </span>
+          <PriorityBadge priority={proposal.value as TaskPriority} />
         ) : (
           <span className="font-medium">
             {display(proposal.field, proposal.value, t, dateLocale)}

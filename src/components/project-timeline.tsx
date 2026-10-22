@@ -10,7 +10,7 @@ import {
 import { GanttChart } from "@/components/gantt-chart";
 import { useDateLocale, useT } from "@/components/i18n-provider";
 import { TimelineCalendar } from "@/components/timeline-calendar";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Segment, SegmentedControl } from "@/components/ui";
 import {
   addUtcMonths,
   buildCalendarMonth,
@@ -21,7 +21,7 @@ import {
 } from "@/lib/pm/calendar";
 import { buildGantt, type GanttInput } from "@/lib/pm/gantt";
 import { isOverdue } from "@/lib/pm/rules";
-import { cn, formatDay } from "@/lib/utils";
+import { formatDay } from "@/lib/utils";
 
 /**
  * Timeline shell: Gantt or month calendar over one set of records.
@@ -169,29 +169,19 @@ export function ProjectTimeline({
             </div>
           ) : null}
 
-          <div
-            role="group"
-            aria-label={t("timeline.viewLabel")}
-            className="inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5"
-          >
+          <SegmentedControl label={t("timeline.viewLabel")}>
             {VIEWS.map(({ id, icon: Icon }) => (
-              <button
+              <Segment
                 key={id}
-                type="button"
-                aria-pressed={view === id}
+                pressed={view === id}
                 onClick={() => setView(id)}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                  view === id
-                    ? "bg-white text-sand-900 shadow-sm"
-                    : "text-sand-500 hover:text-sand-900",
-                )}
+                className="h-8 px-2.5"
               >
                 <Icon className="size-3.5" aria-hidden />
                 {t(`timeline.${id}`)}
-              </button>
+              </Segment>
             ))}
-          </div>
+          </SegmentedControl>
         </div>
       </div>
 
