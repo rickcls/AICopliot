@@ -218,6 +218,43 @@ describe("validateCaptureProposals", () => {
     expect(proposals[2].kind === "create_task" && proposals[2].payload.status).toBeNull();
   });
 
+  it("files a new task in progress only when the line says it is underway", () => {
+    const note = splitCaptureLines("做緊ABC報價\n下星期先處理報價");
+    const { proposals } = validateCaptureProposals(
+      [
+        create({ title: "ABC報價", citations: ["C1"], due: null, status: "open" }),
+        create({ title: "稍後報價", citations: ["C2"], due: null, status: "open", project: null }),
+      ],
+      { ...ctx, lines: note.lines },
+    );
+    expect(proposals[0].kind === "create_task" && proposals[0].payload.status).toBe("open");
+    expect(proposals[1].kind === "create_task" && proposals[1].payload.status).toBeNull();
+  });
+
+  it("moves a To do task to In progress, and leaves one already there", () => {
+    const note = splitCaptureLines("月報做緊");
+    const underway = new Map(tasks);
+    underway.set("T1", { ...tasks.get("T1")!, statusKey: "todo" });
+    underway.set("T4", {
+      id: "task-going",
+      title: "月報",
+      category: "open",
+      dueDate: null,
+      priority: "medium",
+      statusKey: "in_progress",
+    });
+    const { proposals, dropped } = validateCaptureProposals(
+      [
+        { kind: "update_task", task: "T1", status: "open", priority: null, due: null, citations: ["C1"] },
+        { kind: "update_task", task: "T4", status: "open", priority: null, due: null, citations: ["C1"] },
+      ],
+      { ...ctx, lines: note.lines, tasks: underway },
+    );
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]).toMatchObject({ kind: "update_task", taskId: "task-report", payload: { status: "open" } });
+    expect(dropped.map((entry) => entry.reason)).toEqual(["noop"]);
+  });
+
   it("keeps a real status change on the right task", () => {
     const { proposals } = validateCaptureProposals(
       [{ kind: "update_task", task: "T1", status: "done", priority: null, due: null, citations: ["C2"] }],

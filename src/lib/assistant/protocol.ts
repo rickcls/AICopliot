@@ -69,7 +69,7 @@ Rules:
 4. When they ask you to create a task, change one, or add a comment, "proposals" must contain that change. Words in the answer do not save anything. Cite U1 for what they just asked; U1 is their question. Several changes are several proposals.
 5. Shapes, and only these:
    {"kind":"create_task","title":"...","description":"...","project":"P2","priority":null,"status":"blocked","due":{"phrase":"the exact words that state the date","date":"YYYY-MM-DD"},"estimatedHours":null,"citations":["U1"]}
-   A new task's status is "blocked" only when they are waiting on someone and no existing task covers it; otherwise null. Never mark a new task done.
+   A new task's status is "open" when they say the work is already underway (做緊, 進行中, in progress, working on) — that is the In progress column, not To do or Backlog. "blocked" when they are waiting and no existing task covers it. Otherwise null, which files it in the project's starting column. Never mark a new task done.
    ${TASK_TITLE_STYLE} A description is one or two sentences in the same style, or null when the title already says everything.
    {"kind":"update_task","task":"T3","status":null,"priority":"urgent","due":null,"citations":["U1"]}
    Set only the fields they asked to change; the others stay null.
@@ -77,7 +77,7 @@ Rules:
    A comment is add_note: one or two short sentences in the same written style, adding nothing they did not say. Use it for a comment even when you also update the task.
 6. Dates: "phrase" is copied exactly from the cited text (usually U1), and "date" is YYYY-MM-DD worked out from TODAY. Vague timing ("soon", "next week" with no day, "遲啲", "盡快", "ASAP") is null. Never guess a date, and never paraphrase the phrase.
 7. Priority only from explicit words: urgent / ASAP / 急 / 好急 → "urgent"; important / 重要 → "high"; not urgent / 唔急 → "low". Otherwise null.
-8. Status from what they say happened: finished (done, sent, submitted, 搞掂, 完成, 交咗, 寄咗) → "done"; waiting or stuck (waiting for, blocked, on hold, 等緊, 卡住, 未有回覆) → "blocked"; work resumed → "open". Otherwise null.
+8. Status from what they say happened: finished (done, sent, submitted, 搞掂, 完成, 交咗, 寄咗) → "done"; waiting or stuck (waiting for, blocked, on hold, 等緊, 卡住, 未有回覆) → "blocked"; already underway (做緊, 進行中, in progress, working on) or work resumed → "open". Otherwise null. "open" is the In progress column. A task whose column is backlog or todo is not already there, so set "open" to move it. Do not use "todo" as a status value.
 9. "project" is a P label only when they name that project; otherwise null, which files a new task in their personal project.
 10. Change an existing task only when their words are about that same piece of work. Sharing a word is not enough. When they ask for a new task, create one.
 11. Carry out only what they asked. In the answer, say what you are changing. Never say you cannot create or update a task.
@@ -163,6 +163,8 @@ export type AssistantSource =
       projectId: string;
       title: string;
       category: "open" | "blocked" | "done";
+      /** Board column key. Absent only on older fixtures. */
+      statusKey?: string;
       dueDate: string | null;
       priority: "low" | "medium" | "high" | "urgent";
       facts: string;
@@ -349,7 +351,7 @@ export function validateAssistantProposals(
       .all()
       .flatMap((source) =>
         source.kind === "task"
-          ? [[source.label, { id: source.taskId, title: source.title, category: source.category, dueDate: source.dueDate, priority: source.priority }] as const]
+          ? [[source.label, { id: source.taskId, title: source.title, category: source.category, statusKey: source.statusKey, dueDate: source.dueDate, priority: source.priority }] as const]
           : [],
       ),
   );

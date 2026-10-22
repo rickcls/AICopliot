@@ -40,6 +40,24 @@ const envSchema = z.object({
   // registering with Google.
   APP_URL: z.string().url().optional(),
 
+  // Optional. Both must be set before a password-reset email (or a later
+  // alert) can leave the server. Unset, production refuses and development
+  // prints the message in the server log.
+  RESEND_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : undefined;
+    }),
+  EMAIL_FROM: z
+    .string()
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : undefined;
+    }),
+
   // Optional. Unset, the assistant's web-search switch stays disabled.
   TAVILY_API_KEY: z
     .string()

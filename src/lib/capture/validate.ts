@@ -40,8 +40,12 @@ export interface CreateTaskPayload {
   description: string | null;
   projectId: string | null;
   priority: TaskPriority | null;
-  /** Set only when the cited lines say the work is waiting. */
-  status: "blocked" | null;
+  /**
+   * "blocked" when the cited lines say they are waiting, "open" (In progress)
+   * when they say the work is already underway. Null files the task in the
+   * project's starting column.
+   */
+  status: "blocked" | "open" | null;
   dueDate: string | null;
   duePhrase: string | null;
   estimatedHours: number | null;
@@ -75,6 +79,12 @@ export interface CandidateRef {
   /** YYYY-MM-DD or null. */
   dueDate: string | null;
   priority: TaskPriority;
+  /**
+   * The board column key (backlog, todo, in_progress, …). Backlog and To do
+   * are category "open" as well, so a move to In progress is not visible
+   * from the category alone.
+   */
+  statusKey?: string;
 }
 
 export interface CaptureValidationContext {
@@ -122,9 +132,25 @@ function prose(text: string, language: ReplyLanguage): string {
  * status is kept only when one of them is actually in the cited lines.
  */
 const WAITING = /等緊|卡住|未有回覆|\bwaiting for\b|\bblocked\b|\bon hold\b/i;
+/** Already being done. "開始做" is an instruction to start, not proof it has. */
+const UNDERWAY = /做緊|進行中|而家做|\bin progress\b|\bworking on\b/i;
 
 function citedStatesWaiting(text: string): boolean {
   return WAITING.test(text);
+}
+
+function citedStatesUnderway(text: string): boolean {
+  return UNDERWAY.test(text);
+}
+
+/**
+ * "open" means the In progress column. A task in Backlog or To do is already
+ * category open, so category equality alone would throw that move away.
+ */
+function alreadyThere(status: ProposalStatus, task: CandidateRef): boolean {
+  if (status !== task.category) return false;
+  if (status === "open" && task.statusKey && task.statusKey !== "in_progress") return false;
+  return true;
 }
 
 /**
@@ -243,7 +269,12 @@ export function validateCaptureProposals(
             : citations.map((citation) => stripClarificationMarker(citation.text)).join("\n").slice(0, 4000),
           projectId: proposal.project ? (ctx.projects.get(proposal.project) ?? null) : null,
           priority: proposal.priority,
-          status: proposal.status === "blocked" && citedStatesWaiting(citedText) ? "blocked" : null,
+          status:
+            proposal.status === "blocked" && citedStatesWaiting(citedText)
+              ? "blocked"
+              : proposal.status === "open" && citedStatesUnderway(citedText)
+                ? "open"
+                : null,
           dueDate,
           duePhrase,
           estimatedHours: estimate,
@@ -272,7 +303,7 @@ export function validateCaptureProposals(
     const { dueDate, duePhrase } = checkDue(proposal.due, labels, ctx, flags, days);
     // Only real changes survive: "done" for a task already done, or the due
     // date it already has, would be an Apply button that does nothing.
-    const status = proposal.status && proposal.status !== task.category ? proposal.status : null;
+    const status = proposal.status && !alreadyThere(proposal.status, task) ? proposal.status : null;
     const priority = proposal.priority && proposal.priority !== task.priority ? proposal.priority : null;
     const changedDue = dueDate && dueDate !== task.dueDate ? dueDate : null;
     if (!status && !priority && !changedDue) {

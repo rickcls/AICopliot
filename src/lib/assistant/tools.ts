@@ -67,7 +67,7 @@ const inputs = {
 function taskFacts(task: MyOpenTask, today: Date): string {
   const due = task.dueDate ? task.dueDate.toISOString().slice(0, 10) : "none";
   const quiet = daysSinceActivity(activityOf(task), today);
-  return `${task.title} | project ${task.project.name} | status ${task.status.category} | due ${due} | priority ${task.priority} | no update for ${quiet} days`;
+  return `${task.title} | project ${task.project.name} | status ${task.status.category} | column ${task.status.key} | due ${due} | priority ${task.priority} | no update for ${quiet} days`;
 }
 
 function registerTask(ctx: ToolContext, task: MyOpenTask) {
@@ -78,6 +78,7 @@ function registerTask(ctx: ToolContext, task: MyOpenTask) {
     projectId: task.project.id,
     title: task.title,
     category: task.status.category,
+    statusKey: task.status.key,
     dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
     priority: task.priority,
     facts: taskFacts(task, ctx.today),

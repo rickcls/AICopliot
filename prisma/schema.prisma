@@ -61,6 +61,7 @@ model User {
   assistantProposals AssistantProposal[]
 
   accounts                 Account[]
+  passwordResets           PasswordReset[]
   ownedWorkspaces          Workspace[]
   memberships              WorkspaceMember[]
   conversations            ChatConversation[]
@@ -93,6 +94,22 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+}
+
+/// A one-time password reset. The link token is never stored — only its
+/// SHA-256 — and the row is an account record, not a workspace record: the
+/// password belongs to the person. Same bearer-token rules as WorkspaceInvite.
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 // ---------------------------------------------------------------------------

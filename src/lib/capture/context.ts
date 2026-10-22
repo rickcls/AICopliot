@@ -49,12 +49,14 @@ export async function loadCaptureContext(
       category: task.status.category,
       dueDate,
       priority: task.priority,
+      statusKey: task.status.key,
     });
     return {
       label,
       title: task.title,
       projectLabel: projectLabelById.get(task.project.id) ?? null,
       category: task.status.category,
+      statusKey: task.status.key,
       dueDate,
       priority: task.priority,
     };
