@@ -59,13 +59,13 @@ export function SettingsPanel({
   }
 
   return (
-    <Card className="divide-y divide-slate-100">
+    <Card className="divide-y divide-sand-100">
       <div className="grid gap-2 p-5 sm:grid-cols-[1fr_16rem] sm:items-center sm:gap-6">
         <div>
-          <label htmlFor={languageId} className="text-sm font-semibold text-slate-900">
+          <label htmlFor={languageId} className="text-sm font-semibold text-sand-900">
             {t("settings.languageTitle")}
           </label>
-          <p className="mt-0.5 text-xs text-slate-500">{t("settings.languageHint")}</p>
+          <p className="mt-0.5 text-xs text-sand-500">{t("settings.languageHint")}</p>
         </div>
         <Select
           id={languageId}
@@ -83,10 +83,10 @@ export function SettingsPanel({
 
       <div className="grid gap-2 p-5 sm:grid-cols-[1fr_16rem] sm:items-center sm:gap-6">
         <div>
-          <label htmlFor={zoneId} className="text-sm font-semibold text-slate-900">
+          <label htmlFor={zoneId} className="text-sm font-semibold text-sand-900">
             {t("settings.timeZoneTitle")}
           </label>
-          <p className="mt-0.5 text-xs text-slate-500">{t("settings.timeZoneHint")}</p>
+          <p className="mt-0.5 text-xs text-sand-500">{t("settings.timeZoneHint")}</p>
         </div>
         <Select
           id={zoneId}

@@ -36,7 +36,7 @@ function chipTone(item: CalendarInput): string {
     CHIP_TONE[item.status] ??
     (item.kind === "milestone"
       ? "bg-purple-50 text-purple-700"
-      : "bg-slate-100 text-slate-600")
+      : "bg-sand-100 text-sand-600")
   );
 }
 
@@ -82,11 +82,11 @@ function Day({ cell }: { cell: CalendarCell }) {
   return (
     <td
       className={cn(
-        "h-24 border-r border-b border-slate-100 p-1 align-top last:border-r-0",
+        "h-24 border-r border-b border-sand-100 p-1 align-top last:border-r-0",
         // Three distinct levels, so the week structure is readable at a glance:
         // white weekday, tinted weekend, darker filler from the next month over.
-        !cell.inMonth && "bg-slate-100/70",
-        cell.inMonth && cell.isWeekend && "bg-slate-50",
+        !cell.inMonth && "bg-sand-100/70",
+        cell.inMonth && cell.isWeekend && "bg-sand-50",
       )}
     >
       <div className="flex justify-end px-0.5">
@@ -98,7 +98,7 @@ function Day({ cell }: { cell: CalendarCell }) {
           <span
             className={cn(
               "inline-flex size-5 items-center justify-center text-[11px] tabular-nums",
-              cell.inMonth ? "text-slate-500" : "text-slate-300",
+              cell.inMonth ? "text-sand-500" : "text-sand-300",
             )}
           >
             {cell.dayOfMonth}
@@ -137,14 +137,14 @@ export function TimelineCalendar({ month }: { month: CalendarMonth }) {
             {t("timeline.calendarCaption", { month: month.label })}
           </caption>
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/60">
+            <tr className="border-b border-sand-200 bg-sand-50/60">
               {weekdays.map((label, index) => (
                 <th
                   key={label}
                   scope="col"
                   className={cn(
-                    "border-r border-slate-200 px-2 py-1.5 text-[11px] font-medium text-slate-500 last:border-r-0",
-                    index >= 5 && "text-slate-400",
+                    "border-r border-sand-200 px-2 py-1.5 text-[11px] font-medium text-sand-500 last:border-r-0",
+                    index >= 5 && "text-sand-400",
                   )}
                 >
                   {label}
@@ -164,7 +164,7 @@ export function TimelineCalendar({ month }: { month: CalendarMonth }) {
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-sand-200 px-5 py-2.5 text-[11px] text-sand-500">
         <span>{t("timeline.legendPlaced")}</span>
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-blue-500" aria-hidden />{" "}

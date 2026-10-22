@@ -28,7 +28,7 @@ const BAR_TONE: Record<string, string> = {
 
 function barColor(status: string, overdue: boolean): string {
   if (overdue) return "bg-red-500";
-  return BAR_TONE[status] ?? "bg-slate-400";
+  return BAR_TONE[status] ?? "bg-sand-400";
 }
 
 export function GanttChart({ model }: { model: GanttModel | null }) {
@@ -39,8 +39,8 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
   if (!model) {
     return (
       <div className="px-5 py-10 text-center">
-        <p className="text-sm font-medium text-slate-900">{t("timeline.ganttEmptyTitle")}</p>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+        <p className="text-sm font-medium text-sand-900">{t("timeline.ganttEmptyTitle")}</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-sand-500">
           {t("timeline.ganttEmptyBody")}
         </p>
       </div>
@@ -52,19 +52,19 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
       {/* Wide charts scroll inside this container; the page never scrolls sideways. */}
       <div className="overflow-x-auto">
         <div className="min-w-[46rem]">
-          <div className="flex border-b border-slate-200 bg-slate-50/60">
+          <div className="flex border-b border-sand-200 bg-sand-50/60">
             <div
-              className="shrink-0 border-r border-slate-200"
+              className="shrink-0 border-r border-sand-200"
               style={{ width: ROW_LABEL_WIDTH }}
             />
             <div className="relative h-8 flex-1">
               {model.ticks.map((tick) => (
                 <div
                   key={tick.offsetPct}
-                  className="absolute top-0 h-full border-l border-slate-200"
+                  className="absolute top-0 h-full border-l border-sand-200"
                   style={{ left: `${tick.offsetPct}%` }}
                 >
-                  <span className="absolute top-1.5 left-1 text-[11px] whitespace-nowrap text-slate-500">
+                  <span className="absolute top-1.5 left-1 text-[11px] whitespace-nowrap text-sand-500">
                     {tick.label}
                   </span>
                 </div>
@@ -90,25 +90,25 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
             {model.bars.map((bar) => (
               <div
                 key={`${bar.kind}-${bar.id}`}
-                className="flex border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                className="flex border-b border-sand-100 last:border-b-0 hover:bg-sand-50/70"
               >
                 <div
-                  className="shrink-0 truncate border-r border-slate-200 px-3 py-2 text-xs"
+                  className="shrink-0 truncate border-r border-sand-200 px-3 py-2 text-xs"
                   style={{ width: ROW_LABEL_WIDTH }}
                   title={bar.title}
                 >
                   <span
                     className={cn(
                       "mr-1.5 inline-block size-1.5 rounded-full align-middle",
-                      bar.kind === "milestone" ? "bg-purple-500" : "bg-slate-300",
+                      bar.kind === "milestone" ? "bg-purple-500" : "bg-sand-300",
                     )}
                     aria-hidden
                   />
                   <span
                     className={
                       bar.status === "done" || bar.status === "completed"
-                        ? "text-slate-400 line-through"
-                        : "text-slate-700"
+                        ? "text-sand-400 line-through"
+                        : "text-sand-700"
                     }
                   >
                     {bar.title}
@@ -121,7 +121,7 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
                     <div
                       key={tick.offsetPct}
                       aria-hidden
-                      className="absolute inset-y-0 border-l border-slate-100"
+                      className="absolute inset-y-0 border-l border-sand-100"
                       style={{ left: `${tick.offsetPct}%` }}
                     />
                   ))}
@@ -168,7 +168,7 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-sand-200 px-5 py-2.5 text-[11px] text-sand-500">
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-4 rounded-full bg-blue-500" aria-hidden />{" "}
           {t("timeline.legendInProgress")}
@@ -189,7 +189,7 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
           {t("timeline.legendMilestone")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-1 rounded-sm bg-slate-400" aria-hidden />{" "}
+          <span className="h-2.5 w-1 rounded-sm bg-sand-400" aria-hidden />{" "}
           {t("timeline.legendDueOnly")}
         </span>
       </div>

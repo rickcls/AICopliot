@@ -14,15 +14,15 @@ export default async function AppNotFound() {
   const t = await getT();
   return (
     <Card className="mx-auto max-w-lg p-6">
-      <h1 className="text-lg font-semibold text-slate-900">
+      <h1 className="text-lg font-semibold text-sand-900">
         {t("errors.notFoundTitle")}
       </h1>
-      <p className="mt-2 text-sm text-slate-600">{t("errors.notFoundBody")}</p>
+      <p className="mt-2 text-sm text-sand-600">{t("errors.notFoundBody")}</p>
       <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium">
-        <Link href="/today" className="text-slate-900 underline">
+        <Link href="/today" className="text-sand-900 underline">
           {t("errors.goToToday")}
         </Link>
-        <Link href="/projects" className="text-slate-900 underline">
+        <Link href="/projects" className="text-sand-900 underline">
           {t("errors.browseProjects")}
         </Link>
       </div>

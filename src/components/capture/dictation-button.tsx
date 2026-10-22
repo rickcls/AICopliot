@@ -3,7 +3,7 @@
 import { useRef, useState, useSyncExternalStore } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { FOCUS_RING } from "@/components/ui";
+import { buttonClasses } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -150,19 +150,15 @@ export function DictationButton({
         disabled={disabled && !listening}
         aria-pressed={listening}
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
-          FOCUS_RING,
-          listening
-            ? "border-red-200 bg-red-50 text-red-700"
-            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-          "disabled:cursor-not-allowed disabled:opacity-50",
+          buttonClasses({ variant: "secondary", size: "sm", className: "gap-1.5 px-2.5 text-xs" }),
+          listening && "border-red-200 bg-red-50 text-red-700 hover:border-red-200 hover:bg-red-50",
         )}
       >
         {listening ? <MicOff className="size-3.5" aria-hidden /> : <Mic className="size-3.5" aria-hidden />}
         {listening ? t("dictation.stop") : t("dictation.start")}
       </button>
       {listening ? (
-        <span className="min-w-0 truncate text-xs text-slate-500" aria-live="polite">
+        <span className="min-w-0 truncate text-xs text-sand-500" aria-live="polite">
           {interim || t("dictation.listening")}
         </span>
       ) : null}

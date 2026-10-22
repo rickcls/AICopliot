@@ -35,7 +35,7 @@ export function UserTurn({
     <div className="flex flex-col items-end gap-1.5">
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl rounded-br-md bg-slate-100 px-4 py-2.5 text-sm text-pretty whitespace-pre-wrap text-slate-900",
+          "max-w-[85%] rounded-2xl rounded-br-md bg-sand-100 px-4 py-2.5 text-sm text-pretty whitespace-pre-wrap text-sand-900",
           turn.status === "failed" && "bg-red-50 text-red-900",
         )}
       >
@@ -85,7 +85,7 @@ export function AssistantTurn({
     <div className="flex gap-3">
       <span
         aria-hidden
-        className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-slate-900 text-white"
+        className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-sand-900 text-white"
       >
         <Sparkles className="size-3.5" />
       </span>
@@ -100,7 +100,7 @@ export function AssistantTurn({
             </Badge>
           ) : null}
           {turn.latencyMs !== null ? (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-sand-400">
               {(turn.latencyMs / 1000).toFixed(1)}s
             </span>
           ) : null}
@@ -115,7 +115,7 @@ export function AssistantTurn({
         {proposals ? <div className="mt-4">{proposals}</div> : null}
 
         {turn.refused ? (
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-sand-500">
             {projectScoped ? t("chat.turn.refusedProject") : t("chat.turn.refusedDocuments")}
           </p>
         ) : null}
@@ -123,14 +123,14 @@ export function AssistantTurn({
         {turn.citationsUnavailable ? (
           // Never render a historic answer as an uncited assertion, even though
           // it was properly cited when it was produced.
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-sand-500">
             {t("chat.turn.sourcesGone")}
           </p>
         ) : null}
 
         {turn.citations.length > 0 ? (
           <div className="mt-4">
-            <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <h3 className="text-xs font-semibold tracking-wide text-sand-500 uppercase">
               {t("chat.turn.sources", { count: turn.citations.length })}
             </h3>
             <div className="mt-2 space-y-2">
@@ -151,7 +151,7 @@ export function AssistantTurn({
 
         <NextActions citations={turn.citations} />
 
-        <div className="mt-4 border-t border-slate-100 pt-3">
+        <div className="mt-4 border-t border-sand-100 pt-3">
           <FeedbackButtons messageId={turn.id} initialRating={turn.myRating} />
         </div>
       </div>
@@ -209,7 +209,7 @@ export function PendingTurn({
     <div className="flex gap-3">
       <span
         aria-hidden
-        className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-slate-900 text-white"
+        className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-sand-900 text-white"
       >
         <Sparkles className="size-3.5 animate-pulse" />
       </span>
@@ -219,7 +219,7 @@ export function PendingTurn({
           <p
             key={`${progress.phase}-${index}`}
             aria-hidden
-            className="flex items-center gap-2 text-xs text-slate-400"
+            className="flex items-center gap-2 text-xs text-sand-400"
           >
             <Check className="size-3.5 shrink-0 text-emerald-500" />
             {phaseLabel(progress, projectScoped, t)}
@@ -230,7 +230,7 @@ export function PendingTurn({
         <p
           role="status"
           aria-live="polite"
-          className="flex items-center gap-2 text-xs font-medium text-slate-600"
+          className="flex items-center gap-2 text-xs font-medium text-sand-600"
         >
           <Spinner className="size-3.5 shrink-0" />
           {current ? phaseLabel(current, projectScoped, t) : t("chat.turn.starting")}

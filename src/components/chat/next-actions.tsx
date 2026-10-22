@@ -26,7 +26,7 @@ export function NextActions({
 
   return (
     <div className="mt-4">
-      <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+      <h3 className="text-xs font-semibold tracking-wide text-sand-500 uppercase">
         {t("chat.next.title")}
       </h3>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -35,13 +35,13 @@ export function NextActions({
             key={action.href}
             href={action.href}
             className={cn(
-              "inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3",
-              "text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50",
+              "inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-3",
+              "text-sm font-medium text-sand-900 transition-colors hover:bg-sand-50",
               FOCUS_RING,
             )}
           >
             <span className="truncate">{action.label}</span>
-            <ArrowUpRight className="size-3.5 shrink-0 text-slate-400" aria-hidden />
+            <ArrowUpRight className="size-3.5 shrink-0 text-sand-400" aria-hidden />
           </Link>
         ))}
       </div>

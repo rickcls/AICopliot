@@ -123,21 +123,21 @@ export function TaskDocumentsField({
           {linked.map((document) => (
             <li
               key={document.id}
-              className="group flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-slate-50"
+              className="group flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-sand-50"
             >
-              <FileText className="size-4 shrink-0 text-slate-400" aria-hidden />
+              <FileText className="size-4 shrink-0 text-sand-400" aria-hidden />
               <a
                 href={`/documents/${document.id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="min-w-0 flex-1 truncate text-slate-800 hover:underline"
+                className="min-w-0 flex-1 truncate text-sand-800 hover:underline"
               >
                 {document.originalFilename}
               </a>
               {document.status === "failed" ? (
                 <Badge tone="danger">{t("documents.status.failed")}</Badge>
               ) : document.status !== "ready" ? (
-                <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1 text-xs text-sand-500">
                   <Spinner className="size-3" />
                   {t("documents.status.processing")}
                 </span>
@@ -148,7 +148,7 @@ export function TaskDocumentsField({
                 disabled={disabled}
                 aria-label={t("tasks.documents.unlink", { filename: document.originalFilename })}
                 title={t("tasks.documents.unlinkHint")}
-                className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-50"
+                className="shrink-0 rounded p-1 text-sand-400 hover:bg-sand-200 hover:text-sand-700 disabled:opacity-50"
               >
                 <X className="size-3.5" aria-hidden />
               </button>
@@ -161,7 +161,7 @@ export function TaskDocumentsField({
         {unlinked.length > 0 ? (
           <Select
             aria-label={t("tasks.documents.linkLabel")}
-            className={cn(QUIET_CONTROL, "max-w-xs text-slate-500")}
+            className={cn(QUIET_CONTROL, "max-w-xs text-sand-500")}
             value=""
             disabled={disabled}
             onChange={(event) => {
@@ -186,7 +186,7 @@ export function TaskDocumentsField({
             variant: "ghost",
             size: "sm",
             className: cn(
-              "cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-slate-900",
+              "cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-sand-900",
               (disabled || uploading) && "pointer-events-none opacity-50",
             ),
           })}

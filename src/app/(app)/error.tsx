@@ -21,12 +21,12 @@ export default function AppError({
   const t = useT();
   return (
     <Card className="mx-auto max-w-lg p-6">
-      <h2 className="text-sm font-semibold text-slate-900">
+      <h2 className="text-sm font-semibold text-sand-900">
         {t("errors.loadFailedTitle")}
       </h2>
-      <p className="mt-1 text-sm text-slate-600">{t("errors.loadFailedBody")}</p>
+      <p className="mt-1 text-sm text-sand-600">{t("errors.loadFailedBody")}</p>
       {error.digest ? (
-        <p className="mt-2 font-mono text-xs text-slate-400">
+        <p className="mt-2 font-mono text-xs text-sand-400">
           {t("errors.reference", { digest: error.digest })}
         </p>
       ) : null}

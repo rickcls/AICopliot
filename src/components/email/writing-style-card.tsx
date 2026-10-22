@@ -82,8 +82,8 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900">{t("email.style.title")}</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <h2 className="text-sm font-semibold text-sand-900">{t("email.style.title")}</h2>
+          <p className="mt-0.5 text-xs text-sand-500">
             {saved.samples.length > 0
               ? t("email.style.samples", { count: saved.samples.length })
               : t("email.style.lead")}
@@ -95,23 +95,23 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
       </div>
 
       {!open && saved.profile ? (
-        <p className="border-t border-slate-100 px-4 py-3 text-sm whitespace-pre-wrap text-slate-700">{saved.profile}</p>
+        <p className="border-t border-sand-100 px-4 py-3 text-sm whitespace-pre-wrap text-sand-700">{saved.profile}</p>
       ) : null}
 
       {open ? (
-        <div className="space-y-4 border-t border-slate-100 p-4">
-          <p className="text-xs text-slate-500">{t("email.style.lead")}</p>
+        <div className="space-y-4 border-t border-sand-100 p-4">
+          <p className="text-xs text-sand-500">{t("email.style.lead")}</p>
           {samples.map((sample, index) => (
             <div key={index}>
               <div className="mb-1 flex items-center justify-between">
-                <label htmlFor={`${ids}-sample-${index}`} className="text-xs font-medium text-slate-500">
+                <label htmlFor={`${ids}-sample-${index}`} className="text-xs font-medium text-sand-500">
                   {t("email.style.sampleLabel", { index: index + 1 })}
                 </label>
                 {samples.length > 1 ? (
                   <button
                     type="button"
                     onClick={() => setSamples(samples.filter((_, i) => i !== index))}
-                    className="text-xs text-slate-500 hover:text-red-700"
+                    className="text-xs text-sand-500 hover:text-red-700"
                   >
                     {t("email.style.removeSample")}
                   </button>
@@ -136,7 +136,7 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
           ) : null}
 
           <div>
-            <label htmlFor={`${ids}-signature`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-signature`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.style.signature")}
             </label>
             <Textarea
@@ -149,7 +149,7 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
           </div>
 
           <div>
-            <label htmlFor={`${ids}-profile`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-profile`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("email.style.profile")}
             </label>
             <Textarea
@@ -160,7 +160,7 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
               placeholder={t("email.style.noProfile")}
               onChange={(event) => setProfile(event.target.value)}
             />
-            <p className="mt-1 text-xs text-slate-400">{t("email.style.profileHint")}</p>
+            <p className="mt-1 text-xs text-sand-400">{t("email.style.profileHint")}</p>
           </div>
 
           {error ? <ErrorState message={error} /> : null}

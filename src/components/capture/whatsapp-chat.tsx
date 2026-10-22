@@ -82,7 +82,7 @@ export function WhatsAppChat({
 
   return (
     <div className="mt-2 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
-      <p className="flex items-center gap-2 text-sm font-medium text-slate-900">
+      <p className="flex items-center gap-2 text-sm font-medium text-sand-900">
         <MessageCircle className="size-4 text-emerald-600" aria-hidden />
         {t("capture.whatsappDetected", {
           count: chat.messages.length,
@@ -93,7 +93,7 @@ export function WhatsAppChat({
       </p>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label htmlFor={`${ids}-me`} className="flex items-center gap-2 text-xs text-slate-600">
+        <label htmlFor={`${ids}-me`} className="flex items-center gap-2 text-xs text-sand-600">
           {t("capture.whatsappMe")}
           <Select
             id={`${ids}-me`}
@@ -110,7 +110,7 @@ export function WhatsAppChat({
             ))}
           </Select>
         </label>
-        <label htmlFor={`${ids}-range`} className="flex items-center gap-2 text-xs text-slate-600">
+        <label htmlFor={`${ids}-range`} className="flex items-center gap-2 text-xs text-sand-600">
           {t("capture.whatsappRange")}
           <Select
             id={`${ids}-range`}
@@ -126,12 +126,12 @@ export function WhatsAppChat({
             ))}
           </Select>
         </label>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-sand-500">
           {inRange > 0 ? t("capture.whatsappInRange", { count: inRange }) : t("capture.whatsappNoMessages")}
         </span>
       </div>
 
-      <p className="text-xs text-slate-500">{t("capture.whatsappPrivacy")}</p>
+      <p className="text-xs text-sand-500">{t("capture.whatsappPrivacy")}</p>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" size="sm" variant="ghost" disabled={busy !== null} onClick={onCancel}>

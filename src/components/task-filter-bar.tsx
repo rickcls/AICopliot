@@ -111,7 +111,7 @@ export function TaskFilterBar({
 
         {active ? (
           <>
-            <span className="text-xs text-slate-500 tabular-nums" aria-live="polite">
+            <span className="text-xs text-sand-500 tabular-nums" aria-live="polite">
               {t("tasks.filter.shown", { shown, total })}
             </span>
             <Button

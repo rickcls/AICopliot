@@ -12,14 +12,14 @@ export default function ProjectTabLoading() {
     <SkeletonRegion className="space-y-4">
       <div className="space-y-2">
         <Skeleton className="h-5 w-40" />
-        <Skeleton className="h-3 w-64 max-w-full bg-slate-100" />
+        <Skeleton className="h-3 w-64 max-w-full bg-sand-100" />
       </div>
-      <Card className="divide-y divide-slate-100">
+      <Card className="divide-y divide-sand-100">
         {[0, 1, 2, 3, 4].map((index) => (
           <div key={index} className="flex items-center gap-3 px-4 py-3">
-            <Skeleton className="h-4 w-14 bg-slate-100" />
-            <Skeleton className="h-4 flex-1 bg-slate-100" />
-            <Skeleton className="h-4 w-16 bg-slate-100" />
+            <Skeleton className="h-4 w-14 bg-sand-100" />
+            <Skeleton className="h-4 flex-1 bg-sand-100" />
+            <Skeleton className="h-4 w-16 bg-sand-100" />
           </div>
         ))}
       </Card>

@@ -39,15 +39,15 @@ function CitationChip({
         const target = document.getElementById(targetId);
         if (!target) return;
         target.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        target.classList.add("ring-2", "ring-slate-900");
+        target.classList.add("ring-2", "ring-sand-900");
         window.setTimeout(
-          () => target.classList.remove("ring-2", "ring-slate-900"),
+          () => target.classList.remove("ring-2", "ring-sand-900"),
           1200,
         );
       }}
       className={cn(
-        "mx-0.5 inline-flex items-center rounded border border-slate-300 bg-slate-50 px-1 align-baseline",
-        "font-mono text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900",
+        "mx-0.5 inline-flex items-center rounded border border-sand-300 bg-sand-50 px-1 align-baseline",
+        "font-mono text-[10px] font-medium text-sand-600 transition-colors hover:bg-sand-200 hover:text-sand-900",
         FOCUS_RING,
       )}
     >
@@ -79,14 +79,14 @@ function Inlines({
             return (
               <code
                 key={index}
-                className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-800"
+                className="rounded bg-sand-100 px-1 py-0.5 font-mono text-[0.85em] text-sand-800"
               >
                 {inline.value}
               </code>
             );
           case "strong":
             return (
-              <strong key={index} className="font-semibold text-slate-900">
+              <strong key={index} className="font-semibold text-sand-900">
                 {inline.value}
               </strong>
             );
@@ -114,14 +114,14 @@ export function AnswerBody({
   const blocks = parseAnswer(text, knownLabels);
 
   return (
-    <div className="space-y-3 text-sm leading-relaxed text-pretty text-slate-700">
+    <div className="space-y-3 text-sm leading-relaxed text-pretty text-sand-700">
       {blocks.map((block, index) => {
         switch (block.type) {
           case "heading":
             return (
               <h3
                 key={index}
-                className="pt-1 text-xs font-semibold tracking-wide text-slate-900 uppercase"
+                className="pt-1 text-xs font-semibold tracking-wide text-sand-900 uppercase"
               >
                 {block.text}
               </h3>
@@ -130,7 +130,7 @@ export function AnswerBody({
             return (
               <pre
                 key={index}
-                className="overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 font-mono text-xs text-slate-100"
+                className="overflow-x-auto rounded-lg bg-sand-900 px-3 py-2 font-mono text-xs text-sand-100"
               >
                 <code>{block.value}</code>
               </pre>

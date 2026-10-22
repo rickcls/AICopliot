@@ -35,11 +35,11 @@ export default async function ProjectLayout({
   return (
     <div>
       <nav aria-label={t("project.breadcrumbLabel")} className="text-sm">
-        <Link href="/projects" className="text-slate-500 hover:text-slate-900">
+        <Link href="/projects" className="text-sand-500 hover:text-sand-900">
           {t("project.breadcrumb")}
         </Link>
-        <span className="mx-1.5 text-slate-300">/</span>
-        <span className="text-slate-900">{project.name}</span>
+        <span className="mx-1.5 text-sand-300">/</span>
+        <span className="text-sand-900">{project.name}</span>
       </nav>
 
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4 pb-4">
@@ -48,14 +48,14 @@ export default async function ProjectLayout({
             {project.name}
           </h1>
           {project.description ? (
-            <p className="mt-1.5 max-w-2xl text-sm text-pretty text-slate-600">
+            <p className="mt-1.5 max-w-2xl text-sm text-pretty text-sand-600">
               {project.description}
             </p>
           ) : null}
         </div>
         <Link
           href={`/chat?project=${project.id}`}
-          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-sand-900 px-3.5 text-sm font-medium text-white transition-colors hover:bg-sand-700"
         >
           <MessageSquare className="size-4" aria-hidden />
           {t("project.ask")}

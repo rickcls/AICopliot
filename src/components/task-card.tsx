@@ -24,14 +24,14 @@ import { isTaskOverdue } from "@/components/task-types";
  */
 
 const PRIORITY_STRIPE = {
-  low: "bg-slate-300",
+  low: "bg-sand-300",
   medium: "bg-blue-400",
   high: "bg-amber-400",
   urgent: "bg-red-500",
 } as const;
 
 const PRIORITY_FLAG = {
-  low: "text-slate-400",
+  low: "text-sand-400",
   medium: "text-blue-500",
   high: "text-amber-500",
   urgent: "text-red-500",
@@ -52,7 +52,7 @@ function Chip({
       title={title}
       className={cn(
         "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
-        tone === "neutral" && "bg-slate-100 text-slate-600",
+        tone === "neutral" && "bg-sand-100 text-sand-600",
         tone === "danger" && "bg-red-50 text-red-700",
         tone === "info" && "bg-blue-50 text-blue-700",
       )}
@@ -95,8 +95,8 @@ export function TaskCard({
       }}
       onDragEnd={onDragEnd}
       className={cn(
-        "group relative cursor-grab overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-all",
-        "hover:border-slate-300 hover:shadow-md active:cursor-grabbing",
+        "group relative cursor-grab overflow-hidden rounded-lg border border-sand-200 bg-white shadow-sm transition-all",
+        "hover:border-sand-300 hover:shadow-md active:cursor-grabbing",
         dragging && "opacity-40",
         busy && "pointer-events-none opacity-60",
       )}
@@ -124,7 +124,7 @@ export function TaskCard({
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 flex-1 text-left text-sm leading-snug font-medium text-pretty text-slate-900 hover:underline"
+            className="min-w-0 flex-1 text-left text-sm leading-snug font-medium text-pretty text-sand-900 hover:underline"
           >
             {task.title}
           </button>

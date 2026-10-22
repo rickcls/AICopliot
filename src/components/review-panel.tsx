@@ -176,13 +176,13 @@ function CitationList({ citations }: { citations: EvidenceCitation[] }) {
   const t = useT();
   if (citations.length === 0) return null;
   return (
-    <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+    <div className="mt-3 space-y-2 border-t border-sand-100 pt-3">
       {citations.map((citation) => (
-        <div key={citation.id} className="rounded-lg bg-slate-50 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+        <div key={citation.id} className="rounded-lg bg-sand-50 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-sand-500">
             <Link
               href={`/documents/${citation.chunk.document.id}`}
-              className="font-medium text-slate-700 hover:underline"
+              className="font-medium text-sand-700 hover:underline"
             >
               {citation.chunk.document.originalFilename}
             </Link>
@@ -197,7 +197,7 @@ function CitationList({ citations }: { citations: EvidenceCitation[] }) {
             ) : null}
           </div>
           {citation.excerpt ? (
-            <p className="mt-1 text-xs leading-5 text-slate-600">
+            <p className="mt-1 text-xs leading-5 text-sand-600">
               “{citation.excerpt}”
             </p>
           ) : null}
@@ -223,13 +223,13 @@ function SummarySection({
   if (rows.length === 0) return null;
   return (
     <div>
-      <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+      <h3 className="text-xs font-semibold tracking-wide text-sand-500 uppercase">
         {title}
       </h3>
       <ul className="mt-2 space-y-2">
         {rows.map((row, index) => (
-          <li key={`${title}-${index}`} className="rounded-lg bg-slate-50 p-3">
-            <p className="text-sm text-slate-800">{row.text}</p>
+          <li key={`${title}-${index}`} className="rounded-lg bg-sand-50 p-3">
+            <p className="text-sm text-sand-800">{row.text}</p>
             <div className="mt-2 space-y-1.5">
               {row.citations.map((citation) => {
                 const location = locations.get(citation.sourceId);
@@ -249,7 +249,7 @@ function SummarySection({
                         ? ` · ${location.sectionTitle}`
                         : ""}
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-600">
+                    <p className="mt-1 text-xs leading-5 text-sand-600">
                       “{citation.excerpt}”
                     </p>
                   </div>
@@ -340,7 +340,7 @@ function EditRow({
 }) {
   return (
     <div className="grid gap-1 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center sm:gap-x-6">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-slate-500">
+      <label htmlFor={htmlFor} className="text-xs font-medium text-sand-500">
         {label}
       </label>
       <div className="min-w-0">{children}</div>
@@ -513,7 +513,7 @@ function ProposalRow({
       <div
         className={cn(
           "flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 transition-colors",
-          open ? "bg-slate-50" : "hover:bg-slate-50/70",
+          open ? "bg-sand-50" : "hover:bg-sand-50/70",
         )}
       >
         {editable ? (
@@ -538,11 +538,11 @@ function ProposalRow({
           <ChevronRight
             aria-hidden
             className={cn(
-              "size-4 shrink-0 text-slate-400 transition-transform",
+              "size-4 shrink-0 text-sand-400 transition-transform",
               open && "rotate-90",
             )}
           />
-          <span className="min-w-0 truncate text-sm text-slate-900">
+          <span className="min-w-0 truncate text-sm text-sand-900">
             {title}
           </span>
         </button>
@@ -557,11 +557,11 @@ function ProposalRow({
             <Badge tone="danger">{t("planReview.urgent")}</Badge>
           ) : null}
           {dateText ? (
-            <span className="text-xs text-slate-500 tabular-nums">{dateText}</span>
+            <span className="text-xs text-sand-500 tabular-nums">{dateText}</span>
           ) : null}
           {/* A proposal with no evidence cannot exist (validation drops it),
               so the count is information, never a warning. */}
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-sand-400">
             {t("planReview.sources", { count: proposal.citations.length })}
           </span>
           {!editable ? (
@@ -592,7 +592,7 @@ function ProposalRow({
                 aria-label={t("planReview.rejectLabel", { title })}
                 title={t("planReview.reject")}
                 onClick={() => void onReject()}
-                className="text-slate-500 hover:bg-red-50 hover:text-red-700"
+                className="text-sand-500 hover:bg-red-50 hover:text-red-700"
               >
                 <X className="size-4" aria-hidden />
               </Button>
@@ -602,7 +602,7 @@ function ProposalRow({
       </div>
 
       {open ? (
-        <div className="space-y-3 border-t border-slate-100 bg-slate-50/40 px-4 py-4 sm:pl-12">
+        <div className="space-y-3 border-t border-sand-100 bg-sand-50/40 px-4 py-4 sm:pl-12">
           {editable ? (
             <div className="space-y-2.5">
               {proposal.kind === "milestone" || proposal.kind === "task" ? (
@@ -705,7 +705,7 @@ function ProposalRow({
                         disabled={disabled}
                         className="h-9 w-auto"
                       />
-                      <span aria-hidden className="text-slate-400">
+                      <span aria-hidden className="text-sand-400">
                         →
                       </span>
                       <Input
@@ -782,7 +782,7 @@ function ProposalRow({
               {proposal.kind === "task" || proposal.kind === "milestone" ? (
                 <Field name={t("planReview.description")}>
                   {proposal.description || (
-                    <span className="text-slate-400">{t("planReview.none")}</span>
+                    <span className="text-sand-400">{t("planReview.none")}</span>
                   )}
                 </Field>
               ) : null}
@@ -800,7 +800,7 @@ function ProposalRow({
               {proposal.kind === "risk" ? (
                 <Field name={t("planReview.mitigation")}>
                   {proposal.mitigation || (
-                    <span className="text-slate-400">{t("planReview.none")}</span>
+                    <span className="text-sand-400">{t("planReview.none")}</span>
                   )}
                 </Field>
               ) : null}
@@ -984,7 +984,7 @@ export function ReviewPanel({
         ) : (
           <div className="mt-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-slate-600">
+              <p className="text-xs font-medium text-sand-600">
                 {t("planReview.selectedDocuments", { count: documentIds.size, max: 20 })}
               </p>
               {readyDocuments.length > 20 ? (
@@ -1001,7 +1001,7 @@ export function ReviewPanel({
               {readyDocuments.map((document) => (
                 <label
                   key={document.id}
-                  className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm"
+                  className="flex cursor-pointer items-start gap-2 rounded-lg border border-sand-200 p-3 text-sm"
                 >
                   <input
                     type="checkbox"
@@ -1019,10 +1019,10 @@ export function ReviewPanel({
                     className={`mt-0.5 ${CHECKBOX}`}
                   />
                   <span className="min-w-0">
-                    <span className="block truncate font-medium text-slate-800">
+                    <span className="block truncate font-medium text-sand-800">
                       {document.originalFilename}
                     </span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-sand-500">
                       {t("planReview.chunks", { count: document.chunkCount })}
                     </span>
                   </span>
@@ -1042,7 +1042,7 @@ export function ReviewPanel({
         <>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <label htmlFor="review-run" className="mb-1 block text-xs text-slate-500">
+              <label htmlFor="review-run" className="mb-1 block text-xs text-sand-500">
                 {t("planReview.history")}
               </label>
               <Select
@@ -1062,7 +1062,7 @@ export function ReviewPanel({
               </Select>
             </div>
             {run ? (
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-sand-500">
                 <Badge tone={RUN_TONE[run.status]}>{t(`runStatus.${run.status}`)}</Badge>
                 <span>{run.model}</span>
                 {run.latencyMs !== null ? <span>· {(run.latencyMs / 1000).toFixed(1)}s</span> : null}
@@ -1094,7 +1094,7 @@ export function ReviewPanel({
                   <summary className="cursor-pointer text-xs font-medium text-amber-700">
                     {t("planReview.warnings", { count: summary.warnings!.length })}
                   </summary>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-500">
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-sand-500">
                     {summary.warnings!.map((warning, index) => <li key={index}>{warning}</li>)}
                   </ul>
                 </details>
@@ -1148,7 +1148,7 @@ export function ReviewPanel({
                 return (
                   <section key={kind} aria-labelledby={`review-group-${kind}`}>
                     <Card className="overflow-hidden">
-                      <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50/60 px-3 py-2">
+                      <div className="flex items-center gap-2 border-b border-sand-200 bg-sand-50/60 px-3 py-2">
                         {draftKeys.length > 0 ? (
                           <input
                             type="checkbox"
@@ -1174,18 +1174,18 @@ export function ReviewPanel({
                         ) : null}
                         <h2
                           id={`review-group-${kind}`}
-                          className="text-sm font-semibold text-slate-900"
+                          className="text-sm font-semibold text-sand-900"
                         >
                           {title}
                         </h2>
-                        <span className="text-xs text-slate-400 tabular-nums">
+                        <span className="text-xs text-sand-400 tabular-nums">
                           {group.length}
                           {draftKeys.length > 0 && draftKeys.length < group.length
                             ? ` · ${t("planReview.awaiting", { count: draftKeys.length })}`
                             : ""}
                         </span>
                       </div>
-                      <ul className="divide-y divide-slate-100">
+                      <ul className="divide-y divide-sand-100">
                         {group.map((proposal) => {
                           const key = itemKey(proposal);
                           return (

@@ -150,7 +150,7 @@ const STATUS_TONE = {
 } as const;
 
 const STATUS_DOT = {
-  draft: "bg-slate-400",
+  draft: "bg-sand-400",
   needs_clarification: "bg-amber-500",
   validated: "bg-blue-500",
   approved: "bg-emerald-500",
@@ -163,10 +163,10 @@ const STATUS_DOT = {
  * it is the only value that changes what you do next.
  */
 const PRIORITY_STYLE = {
-  must: "bg-slate-900 text-white",
-  should: "bg-slate-100 text-slate-700",
-  could: "bg-slate-50 text-slate-500",
-  wont: "bg-slate-50 text-slate-400 line-through",
+  must: "bg-sand-900 text-white",
+  should: "bg-sand-100 text-sand-700",
+  could: "bg-sand-50 text-sand-500",
+  wont: "bg-sand-50 text-sand-400 line-through",
 } as const;
 
 
@@ -271,12 +271,12 @@ function LinkEditor({
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {links.length === 0 ? (
-        <span className="text-slate-400">{empty}</span>
+        <span className="text-sand-400">{empty}</span>
       ) : (
         links.map((link) => (
           <span
             key={link.id}
-            className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700"
+            className="inline-flex max-w-full items-center gap-1 rounded-md border border-sand-200 bg-white px-2 py-0.5 text-xs text-sand-700"
           >
             {link.done ? (
               <Check
@@ -290,7 +290,7 @@ function LinkEditor({
             <button
               type="button"
               aria-label={t("requirements.links.unlink", { label: link.label })}
-              className="text-slate-400 hover:text-red-700"
+              className="text-sand-400 hover:text-red-700"
               disabled={busy}
               onClick={() => void onUnlink(link.id)}
             >
@@ -745,7 +745,7 @@ export function RequirementsPanel({
           variant: "secondary",
           size: "sm",
           className: cn(
-            "cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-slate-900",
+            "cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-sand-900",
             (uploading !== null || extracting) && "pointer-events-none opacity-50",
           ),
         })}
@@ -764,7 +764,7 @@ export function RequirementsPanel({
           }}
         />
       </label>
-      <span className="text-xs text-slate-500">
+      <span className="text-xs text-sand-500">
         {uploading
           ? t("requirements.extract.uploading", { name: uploading })
           : t("requirements.extract.uploadHint")}
@@ -835,14 +835,14 @@ export function RequirementsPanel({
           type="button"
           onClick={() => setShowExtract((open) => !open)}
           aria-expanded={showExtract}
-          className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-slate-50"
+          className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-sand-50"
         >
-          <Sparkles className="size-4 shrink-0 text-slate-400" />
+          <Sparkles className="size-4 shrink-0 text-sand-400" />
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium text-slate-900">
+            <span className="block text-sm font-medium text-sand-900">
               {t("requirements.extract.title")}
             </span>
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-sand-500">
               {documents.length === 0
                 ? t("requirements.extract.noDocuments")
                 : t("requirements.extract.selected", {
@@ -854,15 +854,15 @@ export function RequirementsPanel({
           </span>
           <ChevronRight
             className={cn(
-              "size-4 shrink-0 text-slate-400 transition-transform",
+              "size-4 shrink-0 text-sand-400 transition-transform",
               showExtract && "rotate-90",
             )}
           />
         </button>
 
         {showExtract ? (
-          <div className="border-t border-slate-100 px-4 py-4">
-            <p className="max-w-2xl text-sm text-slate-600">
+          <div className="border-t border-sand-100 px-4 py-4">
+            <p className="max-w-2xl text-sm text-sand-600">
               {t("requirements.extract.intro")}
               {requirements.length > 0
                 ? ` ${t("requirements.extract.introExisting", { count: requirements.length })}`
@@ -893,7 +893,7 @@ export function RequirementsPanel({
                   {documents.map((document) => (
                     <label
                       key={document.id}
-                      className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-2.5 text-sm hover:border-slate-300"
+                      className="flex cursor-pointer items-start gap-2 rounded-lg border border-sand-200 p-2.5 text-sm hover:border-sand-300"
                     >
                       <input
                         type="checkbox"
@@ -909,13 +909,13 @@ export function RequirementsPanel({
                           else next.delete(document.id);
                           setDocumentIds(next);
                         }}
-                        className="mt-0.5 size-4 rounded border-slate-300"
+                        className="mt-0.5 size-4 rounded border-sand-300"
                       />
                       <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-800">
+                        <span className="block truncate font-medium text-sand-800">
                           {document.originalFilename}
                         </span>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-sand-500">
                           {t("requirements.extract.chunks", { count: document.chunkCount })}
                         </span>
                       </span>
@@ -986,7 +986,7 @@ export function RequirementsPanel({
         <div
           role="group"
           aria-label={t("requirements.register.viewLabel")}
-          className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+          className="inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5"
         >
           {(
             [
@@ -1003,8 +1003,8 @@ export function RequirementsPanel({
                 "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
                 FOCUS_RING,
                 view === value
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900",
+                  ? "bg-white text-sand-900 shadow-sm"
+                  : "text-sand-500 hover:text-sand-900",
               )}
             >
               <Icon className="size-3.5" aria-hidden />
@@ -1050,7 +1050,7 @@ export function RequirementsPanel({
             role="group"
             aria-label={t("requirements.register.shareLabel")}
           >
-            <Download className="size-3.5 text-slate-400" aria-hidden />
+            <Download className="size-3.5 text-sand-400" aria-hidden />
             <a
               href={`/print/requirements/${projectId}?pack=questions`}
               target="_blank"
@@ -1109,7 +1109,7 @@ export function RequirementsPanel({
               <div>
                 <label
                   htmlFor="requirement-type"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("requirements.form.type")}
                 </label>
@@ -1136,7 +1136,7 @@ export function RequirementsPanel({
               <div>
                 <label
                   htmlFor="requirement-priority"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("requirements.form.priority")}
                 </label>
@@ -1163,7 +1163,7 @@ export function RequirementsPanel({
               <div>
                 <label
                   htmlFor="requirement-status"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("requirements.form.status")}
                 </label>
@@ -1190,7 +1190,7 @@ export function RequirementsPanel({
               <div>
                 <label
                   htmlFor="requirement-confidence"
-                  className="mb-1 block text-xs text-slate-500"
+                  className="mb-1 block text-xs text-sand-500"
                 >
                   {t("requirements.form.confidence")}
                 </label>
@@ -1221,7 +1221,7 @@ export function RequirementsPanel({
                 className="mb-1.5 block text-sm font-medium"
               >
                 {t("requirements.form.description")}{" "}
-                <span className="font-normal text-slate-500">
+                <span className="font-normal text-sand-500">
                   {t("requirements.form.optional")}
                 </span>
               </label>
@@ -1243,7 +1243,7 @@ export function RequirementsPanel({
                 className="mb-1.5 block text-sm font-medium"
               >
                 {t("requirements.form.acceptance")}{" "}
-                <span className="font-normal text-slate-500">
+                <span className="font-normal text-sand-500">
                   {t("requirements.form.acceptanceHint")}
                 </span>
               </label>
@@ -1266,7 +1266,7 @@ export function RequirementsPanel({
                   className="mb-1.5 block text-sm font-medium"
                 >
                   {t("requirements.form.assumptions")}{" "}
-                  <span className="font-normal text-slate-500">
+                  <span className="font-normal text-sand-500">
                     {t("requirements.form.optional")}
                   </span>
                 </label>
@@ -1287,7 +1287,7 @@ export function RequirementsPanel({
                   className="mb-1.5 block text-sm font-medium"
                 >
                   {t("requirements.form.stakeholder")}{" "}
-                  <span className="font-normal text-slate-500">
+                  <span className="font-normal text-sand-500">
                     {t("requirements.form.optional")}
                   </span>
                 </label>
@@ -1350,14 +1350,14 @@ export function RequirementsPanel({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-sand-200 bg-white shadow-sm">
           {/* Two groups with a wide gap rather than one row with a divider: a
               `w-px` separator dangles at the end of a wrapped line, and the Gaps
               chip orphaned onto its own row. Grouped, they wrap together. */}
           <div
             role="group"
             aria-label={t("requirements.filters.label")}
-            className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
+            className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-sand-200 bg-sand-50/60 px-3 py-2.5"
           >
             <div className="flex flex-wrap items-center gap-1.5">
             {statusFilters.map((entry) => {
@@ -1376,8 +1376,8 @@ export function RequirementsPanel({
                   className={cn(
                     "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
                     selectedFilter
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+                      ? "border-sand-900 bg-sand-900 text-white"
+                      : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
                   )}
                 >
                   {dot ? (
@@ -1387,7 +1387,7 @@ export function RequirementsPanel({
                   <span
                     className={cn(
                       "tabular-nums",
-                      selectedFilter ? "text-slate-300" : "text-slate-400",
+                      selectedFilter ? "text-sand-300" : "text-sand-400",
                     )}
                   >
                     {entry.count}
@@ -1410,14 +1410,14 @@ export function RequirementsPanel({
                   ? "border-red-700 bg-red-700 text-white"
                   : uncoveredCount > 0
                     ? "border-red-200 bg-white text-red-700 hover:border-red-300"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                    : "border-sand-200 bg-white text-sand-600 hover:border-sand-300",
               )}
             >
               {t("requirements.filters.gaps")}
               <span
                 className={cn(
                   "tabular-nums",
-                  filter === "gaps" ? "text-red-200" : "text-slate-400",
+                  filter === "gaps" ? "text-red-200" : "text-sand-400",
                 )}
               >
                 {uncoveredCount}
@@ -1429,7 +1429,7 @@ export function RequirementsPanel({
           <div
             role="search"
             aria-label={t("requirements.filters.searchRegion")}
-            className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2"
+            className="flex flex-wrap items-center gap-2 border-b border-sand-200 px-3 py-2"
           >
             <SearchField
               label={t("requirements.filters.search")}
@@ -1516,7 +1516,7 @@ export function RequirementsPanel({
           {/* Reviewing a whole extraction is the point of this page, so the
               batch path is first-class rather than 19 individual dropdowns. */}
           {selectedVisible.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-900 px-3 py-2 text-white">
+            <div className="flex flex-wrap items-center gap-2 border-b border-sand-200 bg-sand-900 px-3 py-2 text-white">
               <span className="text-xs font-medium">
                 {t("requirements.bulk.selected", { count: selectedVisible.length })}
               </span>
@@ -1563,7 +1563,7 @@ export function RequirementsPanel({
           ) : null}
 
           {visible.length === 0 ? (
-            <div className="px-6 py-12 text-center text-sm text-slate-500">
+            <div className="px-6 py-12 text-center text-sm text-sand-500">
               {refineActive
                 ? t("requirements.list.noSearchMatch")
                 : filter === "gaps"
@@ -1575,7 +1575,7 @@ export function RequirementsPanel({
           ) : (
             <>
             {/* Aligned with the row checkboxes so the column reads as a column. */}
-            <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/40 px-3 py-1.5">
+            <div className="flex items-center gap-2 border-b border-sand-100 bg-sand-50/40 px-3 py-1.5">
               <input
                 type="checkbox"
                 aria-label={
@@ -1590,9 +1590,9 @@ export function RequirementsPanel({
                   if (node) node.indeterminate = someVisibleSelected;
                 }}
                 onChange={toggleSelectAll}
-                className="size-4 shrink-0 rounded border-slate-300"
+                className="size-4 shrink-0 rounded border-sand-300"
               />
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-sand-500">
                 {selectedVisible.length > 0
                   ? t("requirements.list.selectedOf", {
                       selected: selectedVisible.length,
@@ -1606,7 +1606,7 @@ export function RequirementsPanel({
                       })}
               </span>
             </div>
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-sand-100">
               {visible.map((requirement) => {
                 const links = taskLinks(requirement);
                 const busy = busyId === requirement.id;
@@ -1626,7 +1626,7 @@ export function RequirementsPanel({
                     <div
                       className={cn(
                         "flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 transition-colors",
-                        open ? "bg-slate-50" : "hover:bg-slate-50/70",
+                        open ? "bg-sand-50" : "hover:bg-sand-50/70",
                       )}
                     >
                       <input
@@ -1645,14 +1645,14 @@ export function RequirementsPanel({
                         <ChevronRight
                           aria-hidden
                           className={cn(
-                            "size-3.5 shrink-0 text-slate-400 transition-transform",
+                            "size-3.5 shrink-0 text-sand-400 transition-transform",
                             open && "rotate-90",
                           )}
                         />
-                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-400">
+                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-sand-400">
                           {code}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-sand-900">
                           {requirement.title}
                         </span>
                       </button>
@@ -1683,7 +1683,7 @@ export function RequirementsPanel({
                     </div>
 
                     {open ? (
-                      <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-3 pl-12">
+                      <div className="border-t border-sand-100 bg-sand-50/50 px-3 py-3 pl-12">
                         <DescriptionList labelWidth="8rem">
                           <Field name={t("requirements.row.description")}>
                             {requirement.description ? (
@@ -1691,7 +1691,7 @@ export function RequirementsPanel({
                                 {requirement.description}
                               </p>
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-sand-400">—</span>
                             )}
                           </Field>
 
@@ -1705,7 +1705,7 @@ export function RequirementsPanel({
                                 {t("requirements.row.noAcceptance")}
                               </span>
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-sand-400">—</span>
                             )}
                           </Field>
 
@@ -1718,7 +1718,7 @@ export function RequirementsPanel({
                           ) : null}
 
                           <Field name={t("requirements.row.classification")}>
-                            <span className="text-slate-600">
+                            <span className="text-sand-600">
                               {t(`requirementType.${requirement.type}`)} ·{" "}
                               <span
                                 className={cn(
@@ -1827,9 +1827,9 @@ export function RequirementsPanel({
                                   <li key={citation.id}>
                                     <a
                                       href={`/documents/${citation.chunk.document.id}`}
-                                      className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 hover:underline"
+                                      className="inline-flex items-center gap-1.5 text-xs font-medium text-sand-700 hover:text-sand-900 hover:underline"
                                     >
-                                      <FileText className="size-3 shrink-0 text-slate-400" />
+                                      <FileText className="size-3 shrink-0 text-sand-400" />
                                       {citation.chunk.document.originalFilename}
                                       {citation.chunk.pageNumber
                                         ? ` · ${t("common.page", { page: citation.chunk.pageNumber })}`
@@ -1839,7 +1839,7 @@ export function RequirementsPanel({
                                         : ""}
                                     </a>
                                     {citation.excerpt ? (
-                                      <p className="mt-0.5 max-w-3xl border-l-2 border-slate-200 pl-2 text-xs text-slate-500 italic">
+                                      <p className="mt-0.5 max-w-3xl border-l-2 border-sand-200 pl-2 text-xs text-sand-500 italic">
                                         {citation.excerpt}
                                       </p>
                                     ) : null}
@@ -1850,7 +1850,7 @@ export function RequirementsPanel({
                           ) : null}
                         </DescriptionList>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-sand-200 pt-3">
                           <Select
                             aria-label={t("requirements.row.statusFor", { code })}
                             className="h-8 text-xs"
@@ -1881,7 +1881,7 @@ export function RequirementsPanel({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="ml-auto text-slate-400 hover:bg-red-50 hover:text-red-700"
+                            className="ml-auto text-sand-400 hover:bg-red-50 hover:text-red-700"
                             disabled={busy}
                             onClick={() => void remove(requirement)}
                           >

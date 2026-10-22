@@ -74,7 +74,7 @@ export function ProposalCard({
           {t(`chat.proposal.proposed.${proposal.field}`)}
         </span>
         {known && !applied ? (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-sand-500">
             {t("chat.proposal.now", {
               value:
                 proposal.field === "description"
@@ -100,7 +100,7 @@ export function ProposalCard({
         </span>
       </div>
 
-      <div className="mt-2 text-slate-800">
+      <div className="mt-2 text-sand-800">
         {proposal.field === "description" ? (
           <p className="whitespace-pre-wrap">{String(proposal.value)}</p>
         ) : proposal.field === "priority" ? (
@@ -123,10 +123,10 @@ export function ProposalCard({
       </div>
 
       {proposal.citations.length > 0 ? (
-        <ul className="mt-2 space-y-1 border-t border-violet-200/70 pt-2 text-xs text-slate-600">
+        <ul className="mt-2 space-y-1 border-t border-violet-200/70 pt-2 text-xs text-sand-600">
           {proposal.citations.map((citation) => (
             <li key={`${citation.label}-${citation.excerpt}`}>
-              <span className="font-medium text-slate-500">[{citation.label}]</span>{" "}
+              <span className="font-medium text-sand-500">[{citation.label}]</span>{" "}
               <span className="italic">“{citation.excerpt}”</span>
             </li>
           ))}

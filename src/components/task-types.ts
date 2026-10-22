@@ -137,7 +137,7 @@ export const TASK_PRIORITIES: TaskPriority[] = [
 ];
 
 export const STATUS_DOT: Record<TaskStatusColor, string> = {
-  slate: "bg-slate-400",
+  slate: "bg-sand-400",
   blue: "bg-blue-500",
   amber: "bg-amber-500",
   red: "bg-red-500",
@@ -149,7 +149,7 @@ export const STATUS_DOT: Record<TaskStatusColor, string> = {
 
 /** Solid rather than pale: a group header is a divider. */
 export const STATUS_PILL: Record<TaskStatusColor, string> = {
-  slate: "bg-slate-500",
+  slate: "bg-sand-500",
   blue: "bg-blue-600",
   amber: "bg-amber-500",
   red: "bg-red-600",
@@ -161,7 +161,7 @@ export const STATUS_PILL: Record<TaskStatusColor, string> = {
 
 /** Flag icon colour — same scale as the board card stripe. */
 export const PRIORITY_FLAG = {
-  low: "text-slate-400",
+  low: "text-sand-400",
   medium: "text-blue-500",
   high: "text-amber-500",
   urgent: "text-red-500",

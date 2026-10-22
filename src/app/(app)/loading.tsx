@@ -14,13 +14,13 @@ export default function AppLoading() {
     <SkeletonRegion className="space-y-6">
       <div className="space-y-2">
         <Skeleton className="h-7 w-48" />
-        <Skeleton className="h-4 w-80 max-w-full bg-slate-100" />
+        <Skeleton className="h-4 w-80 max-w-full bg-sand-100" />
       </div>
       <Card className="p-5">
         <div className="space-y-3">
-          <Skeleton className="h-4 w-full bg-slate-100" />
-          <Skeleton className="h-4 w-11/12 bg-slate-100" />
-          <Skeleton className="h-4 w-4/5 bg-slate-100" />
+          <Skeleton className="h-4 w-full bg-sand-100" />
+          <Skeleton className="h-4 w-11/12 bg-sand-100" />
+          <Skeleton className="h-4 w-4/5 bg-sand-100" />
         </div>
       </Card>
     </SkeletonRegion>

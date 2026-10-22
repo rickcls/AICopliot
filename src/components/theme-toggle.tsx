@@ -3,8 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { FOCUS_RING } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { Segment, SegmentedControl } from "@/components/ui";
 
 type ThemeChoice = "system" | "light" | "dark";
 
@@ -52,36 +51,22 @@ export function ThemeToggle({ className }: { className?: string }) {
   const choice = useSyncExternalStore(subscribe, readChoice, () => "system");
 
   return (
-    <div
-      role="group"
-      aria-label={t("theme.label")}
-      className={cn(
-        "inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5",
-        className,
-      )}
-    >
+    <SegmentedControl label={t("theme.label")} className={className}>
       {OPTIONS.map(({ value, labelKey, Icon }) => {
         const label = t(labelKey);
         return (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={choice === value}
-          title={label}
-          onClick={() => applyChoice(value)}
-          className={cn(
-            "grid size-7 place-items-center rounded-md transition-colors",
-            FOCUS_RING,
-            choice === value
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-400 hover:text-slate-900",
-          )}
-        >
-          <Icon className="size-3.5" aria-hidden />
-          <span className="sr-only">{label}</span>
-        </button>
+          <Segment
+            key={value}
+            pressed={choice === value}
+            title={label}
+            onClick={() => applyChoice(value)}
+            className="px-0"
+          >
+            <Icon className="size-3.5" aria-hidden />
+            <span className="sr-only">{label}</span>
+          </Segment>
         );
       })}
-    </div>
+    </SegmentedControl>
   );
 }

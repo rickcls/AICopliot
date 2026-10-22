@@ -118,12 +118,12 @@ export function ProjectTimeline({
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-slate-200 px-5 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-sand-200 px-5 py-3">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-tight text-slate-900">
+          <h2 className="text-base font-semibold tracking-tight text-sand-900">
             {t("timeline.schedule")}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-sand-500">
             {view === "calendar"
               ? t("timeline.dueInMonth", { count: calendar.inMonthCount, month: calendar.label })
               : gantt
@@ -172,7 +172,7 @@ export function ProjectTimeline({
           <div
             role="group"
             aria-label={t("timeline.viewLabel")}
-            className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+            className="inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5"
           >
             {VIEWS.map(({ id, icon: Icon }) => (
               <button
@@ -183,8 +183,8 @@ export function ProjectTimeline({
                 className={cn(
                   "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
                   view === id
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900",
+                    ? "bg-white text-sand-900 shadow-sm"
+                    : "text-sand-500 hover:text-sand-900",
                 )}
               >
                 <Icon className="size-3.5" aria-hidden />
@@ -202,15 +202,15 @@ export function ProjectTimeline({
       )}
 
       {undated.length > 0 ? (
-        <div className="border-t border-slate-200 px-5 py-3">
-          <p className="text-xs font-medium text-slate-600">
+        <div className="border-t border-sand-200 px-5 py-3">
+          <p className="text-xs font-medium text-sand-600">
             {t("timeline.notScheduled", { count: undated.length })}
           </p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {undated.map((item) => (
               <li
                 key={`${item.kind}-${item.id}`}
-                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
+                className="rounded-full bg-sand-100 px-2 py-0.5 text-xs text-sand-600"
               >
                 {item.title}
               </li>

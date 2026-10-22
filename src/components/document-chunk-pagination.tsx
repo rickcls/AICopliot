@@ -22,9 +22,9 @@ export function DocumentChunkPagination({
   return (
     <nav
       aria-label={t("documents.chunks.pages")}
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-sand-100 pt-4"
     >
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-sand-500">
         {totalPages > 1 ? <>{t("documents.chunks.pageOf", { page, total: totalPages })} · </> : null}
         {t("documents.chunks.count", { count: totalChunks })}
       </p>
@@ -93,8 +93,8 @@ export function DocumentChunkPageLinks({
               className={cn(
                 buttonClasses({ size: "icon", variant: "ghost" }),
                 active
-                  ? "bg-slate-900 text-white"
-                  : "hover:text-slate-900",
+                  ? "bg-sand-900 text-white"
+                  : "hover:text-sand-900",
               )}
             >
               {pageNumber}

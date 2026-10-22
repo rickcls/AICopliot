@@ -218,8 +218,8 @@ export function ProposalList({
   return (
     <>
       {unflagged.length > 1 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2">
-          <span className="text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sand-100 px-4 py-2">
+          <span className="text-xs text-sand-500">
             {unflagged.length < pending.length ? t("capture.applyAllHint") : null}
           </span>
           <Button
@@ -234,12 +234,12 @@ export function ProposalList({
         </div>
       ) : null}
       {notice ? (
-        <p className="flex items-start gap-1.5 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600">
-          <Paperclip className="mt-0.5 size-3.5 shrink-0 text-slate-400" aria-hidden />
+        <p className="flex items-start gap-1.5 border-b border-sand-100 bg-sand-50 px-4 py-2 text-xs text-sand-600">
+          <Paperclip className="mt-0.5 size-3.5 shrink-0 text-sand-400" aria-hidden />
           {notice}
         </p>
       ) : null}
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-sand-100">
         {proposals.map((proposal) => (
           <ProposalRow
             key={proposal.id}
@@ -340,7 +340,7 @@ function ProposalRow({
         : values.title;
 
   return (
-    <li className={cn(decided && "bg-slate-50/60")}>
+    <li className={cn(decided && "bg-sand-50/60")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 sm:flex-nowrap">
         <button
           type="button"
@@ -348,12 +348,12 @@ function ProposalRow({
           aria-expanded={expanded}
           aria-controls={`${ids}-detail`}
           title={t("capture.edit")}
-          className={cn("shrink-0 rounded text-slate-400 hover:text-slate-900", FOCUS_RING)}
+          className={cn("shrink-0 rounded text-sand-400 hover:text-sand-900", FOCUS_RING)}
         >
           {expanded ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
           <span className="sr-only">{t("capture.edit")}</span>
         </button>
-        <span title={t(KIND_KEY[proposal.kind])} className="shrink-0 text-slate-400">
+        <span title={t(KIND_KEY[proposal.kind])} className="shrink-0 text-sand-400">
           <Icon className="size-4" aria-hidden />
           <span className="sr-only">{t(KIND_KEY[proposal.kind])}</span>
         </span>
@@ -364,10 +364,10 @@ function ProposalRow({
           </span>
         ) : null}
         <div className="min-w-0 flex-1">
-          <p className={cn("truncate text-sm font-medium", decided ? "text-slate-500" : "text-slate-900")}>
+          <p className={cn("truncate text-sm font-medium", decided ? "text-sand-500" : "text-sand-900")}>
             {headline}
           </p>
-          <p className="truncate text-xs text-slate-500">
+          <p className="truncate text-xs text-sand-500">
             {[...changes, projectName(values.projectId)].filter(Boolean).join(" · ")}
           </p>
         </div>
@@ -393,7 +393,7 @@ function ProposalRow({
               {proposal.appliedTaskId && proposal.appliedTaskProjectId ? (
                 <Link
                   href={`/projects/${proposal.appliedTaskProjectId}/tasks?task=${proposal.appliedTaskId}`}
-                  className="text-xs font-medium text-slate-600 underline-offset-2 hover:underline"
+                  className="text-xs font-medium text-sand-600 underline-offset-2 hover:underline"
                 >
                   {t("capture.openTask")}
                 </Link>
@@ -413,7 +413,7 @@ function ProposalRow({
       {error ? <p className="px-4 pb-2 text-xs text-red-700">{error}</p> : null}
 
       {expanded ? (
-        <div id={`${ids}-detail`} className="space-y-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:pl-12">
+        <div id={`${ids}-detail`} className="space-y-3 border-t border-sand-100 bg-sand-50/50 px-4 py-3 sm:pl-12">
           {proposal.kind === "create_task" ? (
             <>
               <FieldRow label={t("capture.fieldTitle")} id={`${ids}-title`}>
@@ -548,8 +548,8 @@ function ProposalRow({
             <p className={ROW_LABEL}>{t("capture.sources")}</p>
             <ul className="mt-1 space-y-1">
               {proposal.citations.map((citation) => (
-                <li key={citation.label} className="text-sm text-slate-700">
-                  <span className="mr-1.5 font-mono text-xs text-slate-400">{citation.label}</span>
+                <li key={citation.label} className="text-sm text-sand-700">
+                  <span className="mr-1.5 font-mono text-xs text-sand-400">{citation.label}</span>
                   <Highlighted text={citation.text} phrase={duePhrase} />
                 </li>
               ))}
@@ -558,7 +558,7 @@ function ProposalRow({
 
           {onRevise ? (
             <form
-              className="space-y-2 border-t border-slate-100 pt-3"
+              className="space-y-2 border-t border-sand-100 pt-3"
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (instruction.trim().length < 2) return;
@@ -590,7 +590,7 @@ function ProposalRow({
                   {revising ? <Spinner /> : <Sparkles className="size-3.5" aria-hidden />}
                   {revising ? t("capture.revising") : t("capture.revise")}
                 </Button>
-                <span className="text-xs text-slate-500">{t("capture.reviseHint")}</span>
+                <span className="text-xs text-sand-500">{t("capture.reviseHint")}</span>
               </div>
             </form>
           ) : null}

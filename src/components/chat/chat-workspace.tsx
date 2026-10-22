@@ -307,12 +307,12 @@ export function ChatWorkspace({
                 {conversation?.conversation.title ?? t("chat.title")}
               </h1>
               {focus.kind === "task" ? (
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-sand-600">
                   {t("chat.aboutTaskBefore")}{" "}
                   {focus.taskId && projectId ? (
                     <a
                       href={`/projects/${projectId}/tasks?task=${focus.taskId}`}
-                      className="font-medium text-slate-900 underline"
+                      className="font-medium text-sand-900 underline"
                     >
                       {focus.taskTitle}
                     </a>
@@ -322,16 +322,16 @@ export function ChatWorkspace({
                   {t("chat.aboutTaskAfter")}
                 </p>
               ) : focus.kind === "documents" ? (
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-sand-600">
                   {t("chat.onlyFrom")}{" "}
-                  <span className="font-medium text-slate-900">
+                  <span className="font-medium text-sand-900">
                     {focus.documents.length === 1
                       ? focus.documents[0].filename
                       : t("chat.chosenDocuments", { count: focus.documents.length })}
                   </span>
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-slate-600">{t("chat.lead")}</p>
+                <p className="mt-1 text-sm text-sand-600">{t("chat.lead")}</p>
               )}
             </div>
             {/* Below lg the rail has no room beside the 56px icon sidebar, so
@@ -342,7 +342,7 @@ export function ChatWorkspace({
               className="shrink-0 lg:hidden"
               onClick={() => setThreadsOpen(true)}
             >
-              <MessagesSquare className="size-4 text-slate-400" aria-hidden />
+              <MessagesSquare className="size-4 text-sand-400" aria-hidden />
               {t("chat.threads", { count: threads.length })}
             </Button>
           </div>
@@ -411,7 +411,7 @@ export function ChatWorkspace({
             onSubmit={() => ask(question)}
             // The negative margin lets the sticky bar cover content edge to
             // edge instead of letting text slide through the gutter beside it.
-            className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-4 sm:-mx-6 sm:px-6"
+            className="sticky bottom-0 -mx-4 border-t border-sand-200 bg-white px-4 pt-3 pb-4 sm:-mx-6 sm:px-6"
           />
           )}
         </div>

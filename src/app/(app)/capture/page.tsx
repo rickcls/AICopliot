@@ -43,7 +43,7 @@ export default async function CapturePage({
     <div className="mx-auto max-w-4xl">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("capture.title")}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">{t("capture.lead")}</p>
+        <p className="mt-1 max-w-2xl text-sm text-sand-600">{t("capture.lead")}</p>
       </div>
       {notice ? (
         <p

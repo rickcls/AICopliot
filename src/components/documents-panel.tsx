@@ -313,7 +313,7 @@ export function DocumentsPanel({
         }}
         className={cn(
           "flex flex-wrap items-end justify-between gap-4 border-dashed p-4 transition-colors",
-          dragging ? "border-slate-900 bg-slate-100" : undefined,
+          dragging ? "border-sand-900 bg-sand-100" : undefined,
         )}
       >
         <div className="min-w-0">
@@ -324,7 +324,7 @@ export function DocumentsPanel({
                 ? t("documents.uploadTo", { project: fixedProject.name })
                 : t("documents.uploadTitle")}
           </p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-sand-500">
             {t("documents.uploadHint", {
               types: UPLOAD_EXTENSIONS.join(", "),
               size: MAX_UPLOAD_MB,
@@ -334,7 +334,7 @@ export function DocumentsPanel({
         <div className="flex flex-wrap items-end gap-3">
           {!fixedProject ? (
             <div>
-              <label htmlFor="upload-project" className="mb-1 block text-xs text-slate-500">
+              <label htmlFor="upload-project" className="mb-1 block text-xs text-sand-500">
                 {t("documents.project")}
               </label>
               <Select
@@ -397,7 +397,7 @@ export function DocumentsPanel({
         ) : null}
         {!fixedProject ? (
           <div className="flex items-center gap-2">
-            <label htmlFor="project-filter" className="text-xs text-slate-500">
+            <label htmlFor="project-filter" className="text-xs text-sand-500">
               {t("documents.filterLabel")}
             </label>
             <Select
@@ -459,7 +459,7 @@ export function DocumentsPanel({
           <EmptyState title={t("documents.noneInProject")} description={t("documents.noneInProjectBody")} />
         )
       ) : (
-        <Card className="divide-y divide-slate-100">
+        <Card className="divide-y divide-sand-100">
           {visibleDocuments.map((doc) => {
             const busy = busyIds.has(doc.id);
             const meta = [
@@ -479,10 +479,10 @@ export function DocumentsPanel({
                   >
                     {doc.title ?? doc.originalFilename}
                   </Link>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                  <p className="mt-0.5 truncate text-xs text-sand-500">
                     {meta.join(" · ")}
                     {doc.tags.length > 0 ? (
-                      <span className="ml-2 text-slate-400">
+                      <span className="ml-2 text-sand-400">
                         {doc.tags.slice(0, 4).map((tag) => `#${tag}`).join(" ")}
                       </span>
                     ) : null}

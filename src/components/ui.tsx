@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * with no focus indicator at all.
  */
 export const FOCUS_RING =
-  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "icon";
@@ -39,16 +39,16 @@ export function buttonClasses({
   className?: string;
 } = {}) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors",
+    "inline-flex items-center justify-center gap-2 font-medium transition-colors",
     FOCUS_RING,
     "disabled:pointer-events-none disabled:opacity-50",
-    size === "sm" && "h-8 px-3 text-sm",
-    size === "md" && "h-10 px-4 text-sm",
-    size === "icon" && "size-8 shrink-0 p-0",
-    variant === "primary" && "bg-slate-900 text-white hover:bg-slate-700",
+    size === "sm" && "h-8 rounded-lg px-3 text-sm",
+    size === "md" && "h-10 rounded-xl px-4 text-sm",
+    size === "icon" && "size-8 shrink-0 rounded-lg p-0",
+    variant === "primary" && "bg-brand-600 text-white shadow-xs hover:bg-brand-700",
     variant === "secondary" &&
-      "border border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
-    variant === "ghost" && "text-slate-600 hover:bg-slate-100",
+      "border border-sand-200 bg-white text-sand-800 shadow-xs hover:border-sand-300 hover:bg-sand-50",
+    variant === "ghost" && "text-sand-600 hover:bg-sand-100 hover:text-sand-900",
     variant === "danger" && "bg-red-600 text-white hover:bg-red-700",
     className,
   );
@@ -93,10 +93,10 @@ export function Input({
   return (
     <input
       className={cn(
-        "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900",
-        "placeholder:text-slate-400 focus-visible:border-slate-900",
+        "h-10 w-full rounded-xl border border-sand-300 bg-white px-3 text-sm text-sand-900",
+        "placeholder:text-sand-400 focus-visible:border-brand-500",
         FOCUS_RING,
-        "disabled:cursor-not-allowed disabled:bg-slate-50",
+        "disabled:cursor-not-allowed disabled:bg-sand-50",
         className,
       )}
       {...props}
@@ -113,8 +113,8 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900",
-        "placeholder:text-slate-400 focus-visible:border-slate-900",
+        "w-full rounded-xl border border-sand-300 bg-white px-3 py-2 text-sm text-sand-900",
+        "placeholder:text-sand-400 focus-visible:border-brand-500",
         FOCUS_RING,
         className,
       )}
@@ -130,10 +130,10 @@ export function Select({
   return (
     <select
       className={cn(
-        "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900",
-        "focus-visible:border-slate-900",
+        "h-10 rounded-xl border border-sand-300 bg-white px-3 text-sm text-sand-900",
+        "focus-visible:border-brand-500",
         FOCUS_RING,
-        "disabled:cursor-not-allowed disabled:bg-slate-50",
+        "disabled:cursor-not-allowed disabled:bg-sand-50",
         className,
       )}
       {...props}
@@ -143,7 +143,7 @@ export function Select({
 
 /**
  * A toggle chip in a filter bar. `aria-pressed` carries the state, so the
- * inverted fill is never the only signal.
+ * tinted fill is never the only signal.
  */
 export function FilterChip({
   pressed,
@@ -164,15 +164,15 @@ export function FilterChip({
       type="button"
       aria-pressed={pressed}
       className={cn(
-        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
+        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
         FOCUS_RING,
         pressed
           ? alarming
             ? "border-red-700 bg-red-700 text-white"
-            : "border-slate-900 bg-slate-900 text-white"
+            : "border-brand-200 bg-brand-50 text-brand-800"
           : alarming
             ? "border-red-200 bg-white text-red-700 hover:border-red-300"
-            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+            : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
         className,
       )}
       {...props}
@@ -182,13 +182,69 @@ export function FilterChip({
         <span
           className={cn(
             "tabular-nums",
-            pressed ? "text-white/70" : "text-slate-400",
+            pressed ? (alarming ? "text-white/70" : "text-brand-700/70") : "text-sand-400",
           )}
         >
           {count}
         </span>
       ) : null}
     </button>
+  );
+}
+
+/**
+ * A small set of mutually exclusive choices drawn as one control: theme,
+ * language, board/list. A group of `aria-pressed` buttons rather than radios,
+ * because each press acts at once instead of being submitted.
+ *
+ * Composed from `Segment`s rather than driven by an options array: the copies
+ * this replaces put an icon, a language mark, or icon and text inside, and
+ * some segments need their own `lang` or `title`.
+ */
+export function SegmentedControl({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={cn("inline-flex items-center gap-0.5 rounded-xl bg-sand-100 p-0.5", className)}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function Segment({
+  pressed,
+  className,
+  ...props
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-pressed"> & {
+  pressed: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      className={cn(
+        "inline-flex h-7 min-w-7 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors",
+        FOCUS_RING,
+        "disabled:pointer-events-none disabled:opacity-50",
+        // The ring gives the pressed segment an edge in the dark theme, where
+        // white and the track are only a step apart.
+        pressed
+          ? "bg-white text-sand-900 shadow-xs ring-1 ring-sand-200/80"
+          : "text-sand-500 hover:text-sand-900",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
@@ -203,7 +259,7 @@ export function SearchField({
       <svg
         aria-hidden
         viewBox="0 0 16 16"
-        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-sand-400"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.75"
@@ -241,20 +297,20 @@ export const QUIET_CONTROL =
   // select to `max-w-sm` made Assignee look like a wide empty bar while
   // Status/Priority (coloured) hug their labels — the jagged edge that made
   // the task form look broken.
-  "w-auto max-w-sm border-transparent bg-transparent hover:bg-slate-100 focus-visible:border-slate-900 focus-visible:bg-white disabled:bg-transparent";
+  "w-auto max-w-sm border-transparent bg-transparent hover:bg-sand-100 focus-visible:border-brand-500 focus-visible:bg-white disabled:bg-transparent";
 
 /**
  * Native checkboxes keep their platform rendering (and so their forced-colors
  * behaviour); this only aligns size, tint, and the focus ring with the rest of
  * the controls.
  */
-export const CHECKBOX = `size-4 shrink-0 rounded border-slate-300 accent-slate-900 ${FOCUS_RING}`;
+export const CHECKBOX = `size-4 shrink-0 rounded border-sand-300 accent-brand-600 ${FOCUS_RING}`;
 
 /** Fixed gutter for the leading icon on a quiet metadata row. */
 export const ROW_ICON =
-  "grid size-6 shrink-0 place-items-center text-slate-400";
+  "grid size-6 shrink-0 place-items-center text-sand-400";
 
-export const ROW_LABEL = "text-xs font-medium text-slate-500";
+export const ROW_LABEL = "text-xs font-medium text-sand-500";
 
 export function Card({
   className,
@@ -263,7 +319,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-slate-200 bg-white shadow-sm",
+        "rounded-2xl border border-sand-200/70 bg-white shadow-soft",
         className,
       )}
       {...props}
@@ -278,7 +334,7 @@ export function Card({
  * row without nudging its neighbours.
  */
 const BADGE_TONES = {
-  neutral: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
+  neutral: "bg-sand-100 text-sand-700 ring-1 ring-inset ring-sand-200",
   info: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/70",
   success: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/70",
   warning: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/70",
@@ -307,6 +363,48 @@ export function Badge({
 }
 
 /**
+ * The heading a page opens with: its one `h1`, a lead, and actions on the right.
+ *
+ * Pages wrote this by hand in ten slightly different ways — three spacings,
+ * two lead colours, actions aligned three ways — which is a large part of why
+ * moving between pages felt like moving between apps.
+ */
+export function PageHeader({
+  title,
+  lead,
+  actions,
+  className,
+}: {
+  title: React.ReactNode;
+  lead?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <header
+      className={cn(
+        "mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3",
+        className,
+      )}
+    >
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight text-balance text-sand-900 sm:text-3xl">
+          {title}
+        </h1>
+        {lead ? (
+          <div className="mt-2 max-w-2xl text-[15px] leading-relaxed text-sand-600">
+            {lead}
+          </div>
+        ) : null}
+      </div>
+      {actions ? (
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      ) : null}
+    </header>
+  );
+}
+
+/**
  * The title/description/actions row every panel opens with.
  *
  * Extracted because each panel had grown its own near-identical version, and
@@ -317,20 +415,36 @@ export function Badge({
 export function SectionHeader({
   title,
   description,
+  icon,
+  count,
   children,
 }: {
   title: string;
   description?: React.ReactNode;
+  /** A small glyph before the title; decorative, so it is hidden from AT. */
+  icon?: React.ReactNode;
+  /** Shown as a quiet pill after the title rather than typed into it. */
+  count?: number;
   children?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        <h2 className="text-base font-semibold tracking-tight text-slate-900">
-          {title}
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-sand-900">
+          {icon ? (
+            <span aria-hidden className="flex shrink-0">
+              {icon}
+            </span>
+          ) : null}
+          <span className="min-w-0">{title}</span>
+          {count !== undefined ? (
+            <span className="rounded-full bg-sand-200/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-sand-600">
+              {count}
+            </span>
+          ) : null}
         </h2>
         {description ? (
-          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+          <p className="mt-1 text-sm text-sand-500">{description}</p>
         ) : null}
       </div>
       {children ? (
@@ -356,8 +470,8 @@ export function Field({
 }) {
   return (
     <>
-      <dt className="text-xs font-medium text-slate-500">{name}</dt>
-      <dd className="min-w-0 text-sm text-slate-700">{children}</dd>
+      <dt className="text-xs font-medium text-sand-500">{name}</dt>
+      <dd className="min-w-0 text-sm text-sand-700">{children}</dd>
     </>
   );
 }
@@ -411,7 +525,7 @@ export function ProgressBar({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
-      className={cn("h-1.5 overflow-hidden rounded-full bg-slate-100", className)}
+      className={cn("h-1.5 overflow-hidden rounded-full bg-sand-100", className)}
     >
       <div
         className="h-full rounded-full bg-emerald-500 transition-[width]"
@@ -442,14 +556,14 @@ export function StatCard({
   const body = (
     <Card
       className={cn(
-        "h-full p-4",
-        href && "transition-colors group-hover:border-slate-300 group-hover:bg-slate-50",
+        "h-full p-5",
+        href && "transition-colors group-hover:border-sand-300 group-hover:bg-sand-50",
       )}
     >
-      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="text-sm font-medium text-sand-500">{label}</p>
       <p
         className={cn(
-          "mt-1 text-2xl font-semibold tabular-nums text-slate-900",
+          "mt-1.5 text-3xl font-semibold tracking-tight tabular-nums text-sand-900",
           alarming && tone === "danger" && "text-red-700",
           alarming && tone === "warning" && "text-amber-700",
           alarming && tone === "success" && "text-emerald-700",
@@ -457,12 +571,12 @@ export function StatCard({
       >
         {value}
       </p>
-      {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
+      {hint ? <div className="mt-1.5 text-xs text-sand-500">{hint}</div> : null}
     </Card>
   );
 
   return href ? (
-    <Link href={href} className={cn("group block rounded-xl", FOCUS_RING)}>
+    <Link href={href} className={cn("group block rounded-2xl", FOCUS_RING)}>
       {body}
     </Link>
   ) : (
@@ -482,11 +596,11 @@ function initialsFor(name: string | null, email: string): string {
 }
 
 /**
- * Small circular avatar. Colour is derived from the identity rather than
- * assigned at random, so the same person is the same colour on every screen and
- * in every list — that consistency is what makes an avatar scannable at all.
+ * Colour derived from an identity rather than assigned at random, so the same
+ * person — or project — is the same colour on every screen and in every list.
+ * That consistency is what makes an avatar or a project mark scannable at all.
  */
-const AVATAR_TONES = [
+const IDENTITY_TONES = [
   "bg-blue-100 text-blue-700",
   "bg-emerald-100 text-emerald-700",
   "bg-amber-100 text-amber-800",
@@ -494,6 +608,12 @@ const AVATAR_TONES = [
   "bg-rose-100 text-rose-700",
   "bg-cyan-100 text-cyan-700",
 ] as const;
+
+export function identityTone(seed: string): string {
+  let hash = 0;
+  for (const character of seed) hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  return IDENTITY_TONES[Math.abs(hash) % IDENTITY_TONES.length];
+}
 
 export function Avatar({
   name,
@@ -504,16 +624,12 @@ export function Avatar({
   email: string;
   className?: string;
 }) {
-  let hash = 0;
-  for (const character of email) hash = (hash * 31 + character.charCodeAt(0)) | 0;
-  const tone = AVATAR_TONES[Math.abs(hash) % AVATAR_TONES.length];
-
   return (
     <span
       title={name ?? email}
       className={cn(
         "grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold",
-        tone,
+        identityTone(email),
         className,
       )}
     >
@@ -527,7 +643,7 @@ export function Spinner({ className }: { className?: string }) {
     <span
       role="status"
       className={cn(
-        "inline-block size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900",
+        "inline-block size-4 animate-spin rounded-full border-2 border-sand-200 border-t-brand-600",
         className,
       )}
     >
@@ -547,7 +663,7 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn("animate-pulse rounded bg-slate-200", className)}
+      className={cn("animate-pulse rounded bg-sand-200", className)}
     />
   );
 }
@@ -573,17 +689,28 @@ export function SkeletonRegion({
 export function EmptyState({
   title,
   description,
+  icon,
   action,
 }: {
   title: string;
   description: string;
+  /** A glyph in a soft brand circle above the title; decorative. */
+  icon?: React.ReactNode;
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/50 px-6 py-12 text-center">
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>
-      {action ? <div className="mt-4">{action}</div> : null}
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-sand-300 bg-white/60 px-6 py-14 text-center">
+      {icon ? (
+        <span
+          aria-hidden
+          className="mb-4 grid size-11 place-items-center rounded-full bg-brand-50 text-brand-600"
+        >
+          {icon}
+        </span>
+      ) : null}
+      <h3 className="text-base font-semibold text-sand-900">{title}</h3>
+      <p className="mt-1.5 max-w-md text-sm text-sand-500">{description}</p>
+      {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
 }
@@ -592,7 +719,7 @@ export function ErrorState({ message }: { message: string }) {
   return (
     <div
       role="alert"
-      className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
     >
       {message}
     </div>

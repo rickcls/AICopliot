@@ -45,10 +45,10 @@ function MailboxRow({ kind, status }: { kind: MailboxKind; status: MailboxStatus
   return (
     <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
       <div className="flex min-w-0 items-center gap-3">
-        <Mail className="size-4 shrink-0 text-slate-400" aria-hidden />
+        <Mail className="size-4 shrink-0 text-sand-400" aria-hidden />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-900">{t(`${kind}.title`)}</p>
-          <p className="truncate text-xs text-slate-500">
+          <p className="text-sm font-medium text-sand-900">{t(`${kind}.title`)}</p>
+          <p className="truncate text-xs text-sand-500">
             {!status.configured
               ? t(`${kind}.notConfigured`)
               : status.connected && status.email

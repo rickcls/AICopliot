@@ -4,9 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
-import { FOCUS_RING } from "@/components/ui";
+import { Segment, SegmentedControl } from "@/components/ui";
 import { LOCALES, type Locale } from "@/lib/i18n/locales";
-import { cn } from "@/lib/utils";
 
 /** Short marks on the buttons; the full language name is the accessible name. */
 const MARK: Record<Locale, string> = { "zh-Hant": "中", en: "EN" };
@@ -46,35 +45,21 @@ export function LocaleSwitcher({ className }: { className?: string }) {
   }
 
   return (
-    <div
-      role="group"
-      aria-label={t("locale.label")}
-      className={cn(
-        "inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5",
-        className,
-      )}
-    >
+    <SegmentedControl label={t("locale.label")} className={className}>
       {LOCALES.map((locale) => (
-        <button
+        <Segment
           key={locale}
-          type="button"
           lang={locale === "zh-Hant" ? "zh-Hant-HK" : "en"}
-          aria-pressed={current === locale}
+          pressed={current === locale}
           title={t(NAME_KEY[locale])}
           disabled={saving}
           onClick={() => void choose(locale)}
-          className={cn(
-            "grid h-7 min-w-7 place-items-center rounded-md px-1.5 text-xs font-medium transition-colors",
-            FOCUS_RING,
-            current === locale
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-400 hover:text-slate-900",
-          )}
+          className="px-1.5"
         >
           <span aria-hidden>{MARK[locale]}</span>
           <span className="sr-only">{t(NAME_KEY[locale])}</span>
-        </button>
+        </Segment>
       ))}
-    </div>
+    </SegmentedControl>
   );
 }

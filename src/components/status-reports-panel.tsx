@@ -53,12 +53,12 @@ function ReportSection({
     <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <span className="text-xs text-slate-400 tabular-nums">{items.length}</span>
+        <span className="text-xs text-sand-400 tabular-nums">{items.length}</span>
       </div>
       {items.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-400">{t("reports.nothingInPeriod")}</p>
+        <p className="mt-2 text-sm text-sand-400">{t("reports.nothingInPeriod")}</p>
       ) : (
-        <ul className="mt-3 divide-y divide-slate-100">
+        <ul className="mt-3 divide-y divide-sand-100">
           {items.map((item) => (
             <li key={`${item.kind}-${item.id}`} className="py-2.5 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
@@ -68,13 +68,13 @@ function ReportSection({
                 <Badge tone={item.kind === "risk" ? "warning" : "neutral"}>
                   {t(`reports.kinds.${item.kind}`)}
                 </Badge>
-                <span className="text-xs text-slate-500">{reportItemStatus(item, t)}</span>
+                <span className="text-xs text-sand-500">{reportItemStatus(item, t)}</span>
                 {item.date ? (
-                  <span className="ml-auto text-xs text-slate-500">{item.date}</span>
+                  <span className="ml-auto text-xs text-sand-500">{item.date}</span>
                 ) : null}
               </div>
               {item.detail ? (
-                <p className="mt-1 text-xs text-pretty text-slate-500">{item.detail}</p>
+                <p className="mt-1 text-xs text-pretty text-sand-500">{item.detail}</p>
               ) : null}
             </li>
           ))}
@@ -141,7 +141,7 @@ function ReportView({ run }: { run: ReportRun }) {
               <Badge tone={HEALTH_TONE[report.health]}>
                 {t("reports.health", { health: t(`reportHealth.${report.health}`) })}
               </Badge>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-sand-500">
                 {report.period.start} – {report.period.end}
               </span>
             </div>
@@ -162,10 +162,10 @@ function ReportView({ run }: { run: ReportRun }) {
             </Button>
           </div>
         </div>
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-pretty text-slate-700">
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-pretty text-sand-700">
           {report.narrative}
         </p>
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-sand-400">
           {t("reports.generatedMeta", {
             date: formatDate(run.createdAt, dateLocale, timeZone),
             model: run.model,
@@ -180,7 +180,7 @@ function ReportView({ run }: { run: ReportRun }) {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         {stats.map(([label, value]) => (
           <Card key={label} className="p-3">
-            <p className="text-xs text-slate-500">{label}</p>
+            <p className="text-xs text-sand-500">{label}</p>
             <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
           </Card>
         ))}
@@ -199,7 +199,7 @@ function ReportView({ run }: { run: ReportRun }) {
       </div>
 
       <Card className="p-4">
-        <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+        <h3 className="text-xs font-semibold tracking-wide text-sand-500 uppercase">
           {t("reports.narrativeSources")}
         </h3>
         <div className="mt-3 space-y-2">
@@ -213,11 +213,11 @@ function ReportView({ run }: { run: ReportRun }) {
                 <Link href={citation.href} className="text-xs font-medium hover:underline">
                   {citation.title}
                 </Link>
-                <span className="ml-auto text-xs text-slate-400">
+                <span className="ml-auto text-xs text-sand-400">
                   {t("reports.observed", { date: formatDate(citation.observedAt, dateLocale, timeZone) })}
                 </span>
               </div>
-              <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-slate-600 italic">
+              <blockquote className="mt-2 border-l-2 border-blue-300 pl-3 text-xs text-sand-600 italic">
                 {citation.excerpt}
               </blockquote>
             </div>
@@ -302,7 +302,7 @@ export function StatusReportsPanel({
 
       {runs.length > 0 ? (
         <Card className="p-3">
-          <p className="px-1 pb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+          <p className="px-1 pb-2 text-xs font-semibold tracking-wide text-sand-500 uppercase">
             {t("reports.history")}
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -315,14 +315,14 @@ export function StatusReportsPanel({
                 onClick={() => setSelectedId(run.id)}
                 className={`min-w-48 rounded-lg border px-3 py-2 text-left text-xs transition-colors disabled:opacity-60 ${FOCUS_RING} ${
                   selectedId === run.id
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
+                    ? "border-sand-900 bg-sand-900 text-white"
+                    : "border-sand-200 bg-white hover:bg-sand-50"
                 }`}
               >
                 <span className="block font-medium">
                   {formatDate(run.createdAt, dateLocale, timeZone)}
                 </span>
-                <span className={selectedId === run.id ? "text-slate-300" : "text-slate-500"}>
+                <span className={selectedId === run.id ? "text-sand-300" : "text-sand-500"}>
                   {run.report
                     ? `${run.report.period.start} – ${run.report.period.end}`
                     : `${labelOr(t, `runStatus.${run.status}`, run.status)}: ${

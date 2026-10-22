@@ -281,7 +281,7 @@ export function TaskForm({
             // The focus ring is deliberately *not* removed with the border: it
             // is the app's one focus treatment, and a borderless field with no
             // ring gives a keyboard user nothing to locate.
-            className="h-auto border-transparent bg-transparent px-0 py-1 text-2xl font-semibold tracking-tight text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus-visible:border-transparent disabled:bg-transparent"
+            className="h-auto border-transparent bg-transparent px-0 py-1 text-2xl font-semibold tracking-tight text-sand-900 placeholder:font-medium placeholder:text-sand-400 focus-visible:border-transparent disabled:bg-transparent"
           />
 
           <div className="mt-2">
@@ -331,7 +331,7 @@ export function TaskForm({
               {assignee ? (
                 <Avatar name={assignee.name} email={assignee.email} />
               ) : (
-                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-slate-100")}>
+                <span aria-hidden className={cn(ROW_ICON, "rounded-full bg-sand-100")}>
                   <UserRound className="size-3.5" />
                 </span>
               )}
@@ -495,7 +495,7 @@ export function TaskForm({
                 }
                 disabled={busy}
               />
-              <span className="text-xs text-slate-400">{t("tasks.fields.hours")}</span>
+              <span className="text-xs text-sand-400">{t("tasks.fields.hours")}</span>
             </div>
 
             {/* Starts at the top rather than centred: the value grows a line
@@ -540,7 +540,7 @@ export function TaskForm({
             // Only once a date exists. Explaining how dates draw on the
             // timeline to someone who has not entered one is a line of text
             // earning nothing.
-            <p className="mt-2 text-xs text-slate-500">{t("tasks.form.timelineHint")}</p>
+            <p className="mt-2 text-xs text-sand-500">{t("tasks.form.timelineHint")}</p>
           ) : null}
 
           {/* The one field that needs room to think in, so it gets the space
@@ -548,7 +548,7 @@ export function TaskForm({
           <div className="mt-5">
             <label
               htmlFor="task-description"
-              className="mb-1.5 block text-xs font-medium text-slate-500"
+              className="mb-1.5 block text-xs font-medium text-sand-500"
             >
               {t("tasks.fields.description")}
             </label>

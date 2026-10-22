@@ -187,7 +187,7 @@ export function ProjectsPanel({
               className="mb-1.5 block text-sm font-medium"
             >
               {t("projects.description")}{" "}
-              <span className="font-normal text-slate-500">{t("projects.optional")}</span>
+              <span className="font-normal text-sand-500">{t("projects.optional")}</span>
             </label>
             <Textarea
               id="project-description"
@@ -231,17 +231,17 @@ export function ProjectsPanel({
               >
                 {project.name}
               </Link>
-              <p className="mt-1 flex-1 text-sm text-pretty text-slate-600">
+              <p className="mt-1 flex-1 text-sm text-pretty text-sand-600">
                 {project.description || t("projects.noDescription")}
               </p>
-              <p className="mt-4 text-xs text-slate-500">
+              <p className="mt-4 text-xs text-sand-500">
                 {[
                   t("projects.nouns.document", { count: project.documentCount }),
                   t("projects.nouns.task", { count: project.taskCount }),
                   t("projects.nouns.risk", { count: project.riskCount }),
                 ].join(" · ")}
               </p>
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-sand-100 pt-4">
                 <LinkButton href={`/projects/${project.id}`} size="sm">
                   {t("projects.open")}
                 </LinkButton>

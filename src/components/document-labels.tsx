@@ -108,9 +108,9 @@ export function DocumentLabels({
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">
+        <h2 className="text-sm font-semibold text-sand-900">
           {t("documents.detail.labels")}
-          <span className="ml-2 text-xs font-normal text-slate-500">{source}</span>
+          <span className="ml-2 text-xs font-normal text-sand-500">{source}</span>
         </h2>
         {!editing ? (
           <div className="flex gap-2">
@@ -135,7 +135,7 @@ export function DocumentLabels({
           }}
           className="mt-3 grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:items-center"
         >
-          <label htmlFor={`${ids}-title`} className="text-xs font-medium text-slate-500">
+          <label htmlFor={`${ids}-title`} className="text-xs font-medium text-sand-500">
             {t("documents.detail.fieldTitle")}
           </label>
           <Input
@@ -144,7 +144,7 @@ export function DocumentLabels({
             maxLength={120}
             onChange={(event) => setDraft({ ...draft, title: event.target.value })}
           />
-          <label htmlFor={`${ids}-type`} className="text-xs font-medium text-slate-500">
+          <label htmlFor={`${ids}-type`} className="text-xs font-medium text-sand-500">
             {t("documents.detail.fieldType")}
           </label>
           <Select
@@ -160,7 +160,7 @@ export function DocumentLabels({
               </option>
             ))}
           </Select>
-          <label htmlFor={`${ids}-tags`} className="text-xs font-medium text-slate-500">
+          <label htmlFor={`${ids}-tags`} className="text-xs font-medium text-sand-500">
             {t("documents.detail.fieldTags")}
           </label>
           <div>
@@ -169,7 +169,7 @@ export function DocumentLabels({
               value={draft.tags}
               onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
             />
-            <p className="mt-1 text-xs text-slate-400">{t("documents.detail.tagsHint")}</p>
+            <p className="mt-1 text-xs text-sand-400">{t("documents.detail.tagsHint")}</p>
           </div>
           <div className="flex gap-2 sm:col-start-2">
             <Button type="submit" size="sm" disabled={busy !== null}>
@@ -186,12 +186,12 @@ export function DocumentLabels({
           {docType ? <Badge tone="neutral">{t(`documents.docType.${docType}` as MessageKey)}</Badge> : null}
           {tags.length > 0 ? (
             tags.map((tag) => (
-              <span key={tag} className="text-xs text-slate-500">
+              <span key={tag} className="text-xs text-sand-500">
                 #{tag}
               </span>
             ))
           ) : (
-            <span className="text-xs text-slate-400">{t("documents.detail.noTags")}</span>
+            <span className="text-xs text-sand-400">{t("documents.detail.noTags")}</span>
           )}
         </div>
       )}

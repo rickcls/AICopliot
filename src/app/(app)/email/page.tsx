@@ -40,7 +40,7 @@ export default async function EmailPage({
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{t("email.title")}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">{t("email.lead")}</p>
+        <p className="mt-1 max-w-2xl text-sm text-sand-600">{t("email.lead")}</p>
       </div>
       <WritingStyleCard initial={style} />
       <EmailComposer

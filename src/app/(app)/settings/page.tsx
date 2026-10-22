@@ -40,7 +40,7 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t("settings.lead")}</p>
+        <p className="mt-1 text-sm text-sand-600">{t("settings.lead")}</p>
       </div>
       <SettingsPanel
         locale={locale}

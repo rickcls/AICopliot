@@ -531,6 +531,27 @@ export const zhHant = {
     title: "今日",
     lead: "跨所有專案、指派給你的未完成工作。",
     soloLead: "跨所有專案的未完成工作——工作區只有你一人，所有工作都屬於你。",
+    greeting: {
+      morning: "早安",
+      afternoon: "午安",
+      evening: "晚上好",
+    },
+    greetingNamed: "{greeting}，{name}",
+    summary: {
+      overdue: {
+        one: "{count} 項已逾期",
+        other: "{count} 項已逾期",
+      },
+      dueToday: {
+        one: "{count} 項今日到期",
+        other: "{count} 項今日到期",
+      },
+      blocked: {
+        one: "{count} 項受阻",
+        other: "{count} 項受阻",
+      },
+      sentence: "今日有 {items}。",
+    },
     overdue: "已逾期",
     dueToday: "今日到期",
     blocked: "受阻",

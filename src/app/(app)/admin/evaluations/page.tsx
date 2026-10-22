@@ -42,7 +42,7 @@ export default async function EvaluationsPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("evaluations.title")}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t("evaluations.lead")}</p>
+        <p className="mt-1 text-sm text-sand-600">{t("evaluations.lead")}</p>
       </div>
       <EvaluationsPanel
         projects={projects}

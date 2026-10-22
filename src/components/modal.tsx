@@ -64,7 +64,7 @@ export function Modal({
       className={cn(
         // Wide enough that the paired fields get a real measure each, and
         // capped by the viewport clause so it still fits a phone.
-        "m-auto w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-xl",
+        "m-auto w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-sand-200 bg-white p-0 text-sand-900 shadow-xl",
         // Leaves a margin at both ends on a short viewport, so the panel never
         // runs off the top where its header — and the close button — would be
         // unreachable.
@@ -78,13 +78,13 @@ export function Modal({
           would leave a closed dialog visible. `inherit` picks up the cap above
           so the body has a bounded height to scroll within. */}
       <div className="flex max-h-[inherit] flex-col">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-3.5">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-sand-200 px-5 py-3.5">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-sm font-semibold text-slate-900">
+            <h2 id={titleId} className="text-sm font-semibold text-sand-900">
               {title}
             </h2>
             {description ? (
-              <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+              <p className="mt-0.5 text-xs text-sand-500">{description}</p>
             ) : null}
           </div>
           <button
@@ -92,7 +92,7 @@ export function Modal({
             onClick={onClose}
             aria-label={t("common.close")}
             className={cn(
-              "-mr-1.5 -mt-0.5 grid size-7 shrink-0 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900",
+              "-mr-1.5 -mt-0.5 grid size-7 shrink-0 place-items-center rounded-md text-sand-400 transition-colors hover:bg-sand-100 hover:text-sand-900",
               FOCUS_RING,
             )}
           >
@@ -127,7 +127,7 @@ export function ModalFooter({
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/60 px-5 py-3",
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-sand-200 bg-sand-50/60 px-5 py-3",
         className,
       )}
       {...props}

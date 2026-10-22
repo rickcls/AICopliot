@@ -1,8 +1,18 @@
+import {
+  Ban,
+  CalendarClock,
+  CalendarPlus,
+  CircleAlert,
+  CircleCheck,
+  ListTodo,
+  MessageCircle,
+  Sun,
+} from "lucide-react";
 import { CaptureWorkspace } from "@/components/capture/capture-workspace";
 import { DayPlanCard } from "@/components/today/day-plan-card";
 import { TodayTaskRow, type TodayRowTask } from "@/components/today/today-task-row";
-import { Card, EmptyState, LinkButton, SectionHeader } from "@/components/ui";
-import { requireWorkspace } from "@/lib/auth-guard";
+import { Card, EmptyState, LinkButton, PageHeader, SectionHeader } from "@/components/ui";
+import { getSessionUser, requireWorkspace } from "@/lib/auth-guard";
 import { getCaptureProjectOptions, listCaptures } from "@/lib/capture/service";
 import { toCaptureView } from "@/lib/capture/view";
 import { intlLocale } from "@/lib/i18n/locales";
@@ -17,9 +27,10 @@ import {
 } from "@/lib/pm/my-work";
 import { daysSinceActivity, isStale } from "@/lib/pm/rules";
 import { bucketMyTasks, undatedToShow } from "@/lib/pm/today";
+import { greetingPeriod } from "@/lib/time";
 import { getDayPlan } from "@/lib/today/plan-service";
 import { formatDay } from "@/lib/utils";
-import { getViewerToday } from "@/lib/viewer";
+import { getViewerTimeZone, getViewerToday } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +39,9 @@ export const dynamic = "force-dynamic";
  * using the viewer's own calendar day so a task due today in Hong Kong is due
  * today here, not tomorrow until 08:00.
  *
- * Top to bottom: tell the assistant something (capture), the day's suggested
- * order (plan), then the work itself in buckets. Only buckets with something
+ * Top to bottom: a greeting that says in one sentence what is waiting, tell
+ * the assistant something (capture), the day's suggested order (plan), then
+ * the work itself in buckets. Only buckets with something
  * in them are drawn. Work gone quiet is badged where it already appears, and
  * listed under "Needs an update" only when no other bucket shows it, so no
  * task is listed twice.
@@ -38,9 +50,11 @@ export default async function TodayPage() {
   const access = await requireWorkspace();
   const { workspaceId, userId } = access;
   const today = await getViewerToday();
-  const [t, locale, solo, tasks, waiting, captureOptions, plan] = await Promise.all([
+  const [t, locale, timeZone, user, solo, tasks, waiting, captureOptions, plan] = await Promise.all([
     getT(),
     getLocale(),
+    getViewerTimeZone(),
+    getSessionUser(),
     isSoloWorkspace(workspaceId),
     getMyOpenTasks(workspaceId, userId),
     listCaptures(access, { pendingOnly: true, limit: 3 }),
@@ -57,14 +71,57 @@ export default async function TodayPage() {
   }).format(today);
 
   const buckets = bucketMyTasks(tasks, today);
+
+  // The greeting reads the real clock in the viewer's zone; `today` is a
+  // midnight date anchor and would always say "good evening".
+  const greeting = t(`today.greeting.${greetingPeriod(timeZone, new Date())}`);
+  const name = user?.name?.trim();
+  const title = name ? t("today.greetingNamed", { greeting, name }) : greeting;
+  const waitingOn = [
+    buckets.overdue.length > 0 ? t("today.summary.overdue", { count: buckets.overdue.length }) : null,
+    buckets.dueToday.length > 0 ? t("today.summary.dueToday", { count: buckets.dueToday.length }) : null,
+    buckets.blocked.length > 0 ? t("today.summary.blocked", { count: buckets.blocked.length }) : null,
+  ].filter((item): item is string => item !== null);
+  const summary =
+    waitingOn.length > 0
+      ? t("today.summary.sentence", {
+          items: new Intl.ListFormat(dateLocale, { type: "conjunction" }).format(waitingOn),
+        })
+      : t("today.allClearTitle");
+
   const toRow = (task: MyOpenTask, overdue: boolean) =>
     rowFor(task, { t, dateLocale, today, overdue });
 
-  const allSections: { key: string; title: MessageKey; rows: TodayRowTask[] }[] = [
-    { key: "overdue", title: "today.overdue", rows: buckets.overdue.map((task) => toRow(task, true)) },
-    { key: "dueToday", title: "today.dueToday", rows: buckets.dueToday.map((task) => toRow(task, false)) },
-    { key: "blocked", title: "today.blocked", rows: buckets.blocked.map((task) => toRow(task, false)) },
-    { key: "dueSoon", title: "today.dueSoon", rows: buckets.dueSoon.map((task) => toRow(task, false)) },
+  const allSections: {
+    key: string;
+    title: MessageKey;
+    icon: React.ReactNode;
+    rows: TodayRowTask[];
+  }[] = [
+    {
+      key: "overdue",
+      title: "today.overdue",
+      icon: <CircleAlert className="size-4.5 text-red-600" />,
+      rows: buckets.overdue.map((task) => toRow(task, true)),
+    },
+    {
+      key: "dueToday",
+      title: "today.dueToday",
+      icon: <Sun className="size-4.5 text-brand-600" />,
+      rows: buckets.dueToday.map((task) => toRow(task, false)),
+    },
+    {
+      key: "blocked",
+      title: "today.blocked",
+      icon: <Ban className="size-4.5 text-sand-500" />,
+      rows: buckets.blocked.map((task) => toRow(task, false)),
+    },
+    {
+      key: "dueSoon",
+      title: "today.dueSoon",
+      icon: <CalendarClock className="size-4.5 text-sand-500" />,
+      rows: buckets.dueSoon.map((task) => toRow(task, false)),
+    },
   ];
   const sections = allSections.filter((section) => section.rows.length > 0);
   const quietLater = buckets.later
@@ -78,16 +135,25 @@ export default async function TodayPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("today.title")}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          <span className="font-medium text-slate-900">{heading}</span>
-          <span className="mx-1.5 text-slate-300">·</span>
-          {solo ? t("today.soloLead") : t("today.lead")}
-        </p>
-      </div>
+      <PageHeader
+        title={title}
+        lead={
+          <>
+            <p>
+              <span className="font-medium text-sand-900">{heading}</span>
+              <span aria-hidden className="mx-2 text-sand-300">
+                ·
+              </span>
+              {summary}
+            </p>
+            <p className="mt-1 text-sm text-sand-500">
+              {solo ? t("today.soloLead") : t("today.lead")}
+            </p>
+          </>
+        }
+      />
 
-      <div className="mb-8">
+      <div className="mb-10">
         <CaptureWorkspace
           compact
           initialCaptures={waiting.map(toCaptureView)}
@@ -99,12 +165,13 @@ export default async function TodayPage() {
 
       {tasks.length === 0 ? (
         <EmptyState
+          icon={<ListTodo className="size-5" />}
           title={t("today.noTasksTitle")}
           description={t("today.noTasksBody")}
           action={<LinkButton href="/projects">{t("today.openProjects")}</LinkButton>}
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-10">
           {/* Keyed on the plan's marks: a check-in anywhere on the page refreshes
               the server data, and the card then starts again from it. */}
           <DayPlanCard
@@ -113,11 +180,19 @@ export default async function TodayPage() {
           />
 
           {sections.length === 0 && quietLater.length === 0 && undatedRows.length === 0 ? (
-            <Card className="p-5">
-              <h2 className="text-sm font-semibold text-slate-900">
-                {t("today.allClearTitle")}
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">{t("today.allClearBody")}</p>
+            <Card className="flex items-start gap-4 p-6">
+              <span
+                aria-hidden
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-600"
+              >
+                <CircleCheck className="size-5" />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold text-sand-900">
+                  {t("today.allClearTitle")}
+                </h2>
+                <p className="mt-1 text-sm text-sand-600">{t("today.allClearBody")}</p>
+              </div>
             </Card>
           ) : null}
 
@@ -125,7 +200,8 @@ export default async function TodayPage() {
             <TaskSection
               key={section.key}
               id={`today-${section.key}`}
-              title={`${t(section.title)} · ${section.rows.length}`}
+              title={t(section.title)}
+              icon={section.icon}
               rows={section.rows}
             />
           ))}
@@ -133,7 +209,8 @@ export default async function TodayPage() {
           {quietLater.length > 0 ? (
             <TaskSection
               id="today-needs-update"
-              title={`${t("today.needsUpdate")} · ${quietLater.length}`}
+              title={t("today.needsUpdate")}
+              icon={<MessageCircle className="size-4.5 text-amber-600" />}
               description={t("today.needsUpdateLead")}
               rows={quietLater}
             />
@@ -142,14 +219,16 @@ export default async function TodayPage() {
           {undatedRows.length > 0 ? (
             <TaskSection
               id="today-undated"
-              title={`${t("today.undatedTitle")} · ${undatedCount}`}
+              title={t("today.undatedTitle")}
+              icon={<CalendarPlus className="size-4.5 text-sand-500" />}
+              count={undatedCount}
               description={t("today.undatedLead")}
               rows={undatedRows}
             />
           ) : null}
 
           {laterCount > 0 ? (
-            <p className="text-sm text-slate-500">{t("today.later", { count: laterCount })}</p>
+            <p className="text-sm text-sand-500">{t("today.later", { count: laterCount })}</p>
           ) : null}
         </div>
       )}
@@ -161,20 +240,30 @@ function TaskSection({
   id,
   title,
   description,
+  icon,
+  count,
   rows,
 }: {
   id: string;
   title: string;
   description?: string;
+  icon: React.ReactNode;
+  /** Defaults to the rows shown; "No due date" counts more than it lists. */
+  count?: number;
   rows: TodayRowTask[];
 }) {
   return (
     <section aria-labelledby={id}>
       <div id={id}>
-        <SectionHeader title={title} description={description} />
+        <SectionHeader
+          title={title}
+          description={description}
+          icon={icon}
+          count={count ?? rows.length}
+        />
       </div>
-      <Card className="mt-2 overflow-hidden">
-        <ul className="divide-y divide-slate-100">
+      <Card className="mt-3 overflow-hidden">
+        <ul className="divide-y divide-sand-100">
           {rows.map((row) => (
             <TodayTaskRow key={row.id} task={row} />
           ))}

@@ -26,8 +26,8 @@ import {
 import { cn, formatDay } from "@/lib/utils";
 
 const PRIORITY_TEXT = {
-  low: "text-slate-400",
-  medium: "text-slate-600",
+  low: "text-sand-400",
+  medium: "text-sand-600",
   high: "text-amber-700",
   urgent: "font-semibold text-red-700",
 } as const;
@@ -196,10 +196,10 @@ export function TaskListRow({
     <tr
       aria-selected={selected}
       className={cn(
-        "group transition-colors hover:bg-slate-50",
+        "group transition-colors hover:bg-sand-50",
         disabled && "pointer-events-none opacity-60",
         dragging && "opacity-40",
-        selected && "bg-slate-100 hover:bg-slate-100",
+        selected && "bg-sand-100 hover:bg-sand-100",
       )}
     >
       <td className="px-2 py-2.5">
@@ -210,7 +210,7 @@ export function TaskListRow({
           onChange={(event) =>
             onToggleSelect((event.nativeEvent as MouseEvent).shiftKey)
           }
-          className="size-3.5 rounded border-slate-300 text-slate-900 focus-visible:ring-slate-900"
+          className="size-3.5 rounded border-sand-300 text-sand-900 focus-visible:ring-sand-900"
         />
       </td>
       <td className="px-1 py-2.5">
@@ -230,7 +230,7 @@ export function TaskListRow({
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           className={cn(
-            "inline-flex size-7 cursor-grab items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-200/80 hover:text-slate-500 active:cursor-grabbing",
+            "inline-flex size-7 cursor-grab items-center justify-center rounded-md text-sand-300 transition-colors hover:bg-sand-200/80 hover:text-sand-500 active:cursor-grabbing",
             FOCUS_RING,
           )}
         >
@@ -264,11 +264,11 @@ export function TaskListRow({
               />
             ) : (
               <>
-                <span className="block truncate font-medium text-slate-900">
+                <span className="block truncate font-medium text-sand-900">
                   {task.title}
                 </span>
                 {task.description ? (
-                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                  <span className="mt-0.5 block truncate text-xs text-sand-500">
                     {task.description}
                   </span>
                 ) : null}
@@ -282,7 +282,7 @@ export function TaskListRow({
               aria-label={t("tasks.row.openDetails", { title: task.title })}
               title={t("tasks.row.openDetailsShort")}
               className={cn(
-                "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-200/80 hover:text-slate-700",
+                "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sand-400 transition-colors hover:bg-sand-200/80 hover:text-sand-700",
                 FOCUS_RING,
               )}
             >
@@ -292,7 +292,7 @@ export function TaskListRow({
           {task.dependencies.length > 0 && editing !== "title" ? (
             <span
               title={t("tasks.card.dependsOn", { count: task.dependencies.length })}
-              className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 tabular-nums"
+              className="inline-flex shrink-0 items-center gap-1 rounded bg-sand-100 px-1.5 py-0.5 text-[11px] text-sand-600 tabular-nums"
             >
               <GitBranch className="size-3" aria-hidden />
               {task.dependencies.length}
@@ -331,12 +331,12 @@ export function TaskListRow({
               email={task.assignee.email}
               className="size-5"
             />
-            <span className="min-w-0 truncate text-xs text-slate-600">
+            <span className="min-w-0 truncate text-xs text-sand-600">
               {task.assignee.name ?? task.assignee.email}
             </span>
           </span>
         ) : (
-          <span className="text-xs text-slate-400">{t("common.unassigned")}</span>
+          <span className="text-xs text-sand-400">{t("common.unassigned")}</span>
         )}
       </td>
       <td
@@ -383,7 +383,7 @@ export function TaskListRow({
       <td
         className={cn(
           "cursor-default px-3 py-2.5 text-xs whitespace-nowrap",
-          overdue ? "font-medium text-red-700" : "text-slate-600",
+          overdue ? "font-medium text-red-700" : "text-sand-600",
         )}
         title={t("tasks.row.doubleClick")}
         onDoubleClick={() => beginEdit("dueDate")}
@@ -412,11 +412,11 @@ export function TaskListRow({
             {overdue ? ` · ${t("tasks.fields.overdue")}` : ""}
           </span>
         ) : (
-          <span className="text-slate-300">—</span>
+          <span className="text-sand-300">—</span>
         )}
       </td>
       <td
-        className="cursor-default px-4 py-2.5 text-right text-xs whitespace-nowrap text-slate-600 tabular-nums"
+        className="cursor-default px-4 py-2.5 text-right text-xs whitespace-nowrap text-sand-600 tabular-nums"
         title={t("tasks.row.doubleClick")}
         onDoubleClick={() => beginEdit("estimatedHours")}
       >
@@ -436,7 +436,7 @@ export function TaskListRow({
             className="ml-auto h-8 w-20 max-w-none text-xs"
           />
         ) : task.estimatedHours === null ? (
-          <span className="text-slate-300">—</span>
+          <span className="text-sand-300">—</span>
         ) : (
           <span className="inline-flex items-center justify-end gap-1.5">
             <Timer className="size-3.5" aria-hidden />

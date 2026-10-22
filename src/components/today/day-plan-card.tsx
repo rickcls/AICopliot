@@ -2,10 +2,20 @@
 
 import { Fragment, useId, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, Check, RefreshCw } from "lucide-react";
+import { CalendarClock, Check, CircleCheck, RefreshCw } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { CheckInStrip, type CheckInAction } from "@/components/today/check-in-strip";
-import { Badge, Button, Card, ErrorState, FOCUS_RING, Input, Spinner } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorState,
+  FOCUS_RING,
+  Input,
+  SectionHeader,
+  Spinner,
+  buttonClasses,
+} from "@/components/ui";
 import type { PlanItemState } from "@/lib/today/plan";
 import type { DayPlanView } from "@/lib/today/plan-service";
 import { cn } from "@/lib/utils";
@@ -95,25 +105,26 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <CalendarClock className="size-4 text-slate-400" aria-hidden />
-            {t("plan.title")}
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {plan && !editing
+      {/* The tinted band marks this card as the assistant's suggestion, set
+          apart from the person's own work listed below it. */}
+      <div className="border-b border-brand-100/80 bg-brand-50/60 px-5 py-4">
+        <SectionHeader
+          title={t("plan.title")}
+          icon={<CalendarClock className="size-4.5 text-brand-600" />}
+          description={
+            plan && !editing
               ? t("plan.total", { used, available: plan.availableMinutes })
               : mode === "next"
                 ? t("plan.nextLead")
-                : t("plan.lead")}
-          </p>
-        </div>
-        {plan && !editing ? (
-          <Button type="button" size="sm" variant="ghost" onClick={() => open("replace")}>
-            {t("plan.replan")}
-          </Button>
-        ) : null}
+                : t("plan.lead")
+          }
+        >
+          {plan && !editing ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => open("replace")}>
+              {t("plan.replan")}
+            </Button>
+          ) : null}
+        </SectionHeader>
       </div>
 
       {editing ? (
@@ -122,11 +133,11 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
             event.preventDefault();
             void make();
           }}
-          className="flex flex-wrap items-end gap-3 p-4"
+          className="flex flex-wrap items-end gap-3 p-5"
         >
-          {plan && mode === "replace" ? <p className="w-full text-xs text-slate-500">{t("plan.replaces")}</p> : null}
+          {plan && mode === "replace" ? <p className="w-full text-xs text-sand-500">{t("plan.replaces")}</p> : null}
           <div>
-            <label htmlFor={`${ids}-hours`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-hours`} className="mb-1 block text-xs font-medium text-sand-500">
               {mode === "next" ? t("plan.nextHours") : t("plan.hours")}
             </label>
             <Input
@@ -141,7 +152,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
             />
           </div>
           <div className="min-w-0 flex-1 basis-64">
-            <label htmlFor={`${ids}-note`} className="mb-1 block text-xs font-medium text-slate-500">
+            <label htmlFor={`${ids}-note`} className="mb-1 block text-xs font-medium text-sand-500">
               {t("plan.note")}
             </label>
             <Input
@@ -173,21 +184,21 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
       ) : null}
 
       {plan && !editing ? (
-        <div className="p-4">
+        <div className="p-5">
           {plan.summary || plan.note ? (
-            <div className="mb-3 space-y-1">
-              {plan.summary ? <p className="text-sm text-pretty text-slate-700">{plan.summary}</p> : null}
-              {plan.note ? <p className="text-sm text-slate-500">{plan.note}</p> : null}
+            <div className="mb-4 space-y-1">
+              {plan.summary ? <p className="text-sm text-pretty text-sand-700">{plan.summary}</p> : null}
+              {plan.note ? <p className="text-sm text-sand-500">{plan.note}</p> : null}
             </div>
           ) : null}
-          <ol className="space-y-2">
+          <ol className="space-y-3">
             {plan.items.map((item, index) => {
               const firstOfBatch = item.batch > 1 && plan.items[index - 1]?.batch !== item.batch;
               const stripId = `${ids}-check-${item.taskId}`;
               return (
                 <Fragment key={item.taskId}>
                   {firstOfBatch ? (
-                    <li aria-hidden className="pt-2 text-xs font-medium text-slate-400">
+                    <li aria-hidden className="pt-2 text-xs font-medium text-sand-400">
                       {t("plan.batch", { count: item.batch })}
                     </li>
                   ) : null}
@@ -199,19 +210,20 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
                           <Link
                             href={`/projects/${item.projectId}/tasks?task=${item.taskId}`}
                             className={cn(
-                              "text-sm font-medium hover:underline",
-                              item.state === "done" ? "text-slate-400 line-through" : "text-slate-900",
+                              "rounded text-[15px] font-medium underline-offset-2 hover:underline",
+                              FOCUS_RING,
+                              item.state === "done" ? "text-sand-400 line-through" : "text-sand-900",
                             )}
                           >
                             {item.title}
                           </Link>
                           {item.state === "done" ? <span className="sr-only">{t("plan.done")}</span> : null}
                           {item.state === "updated" ? <Badge tone="info">{t("plan.updated")}</Badge> : null}
-                          <span className="text-xs text-slate-500 tabular-nums">
+                          <span className="text-xs text-sand-500 tabular-nums">
                             {t("plan.minutes", { count: item.minutes })} · {item.projectName}
                           </span>
                         </div>
-                        {item.reason ? <p className="text-xs text-slate-500">{item.reason}</p> : null}
+                        {item.reason ? <p className="text-xs text-sand-500">{item.reason}</p> : null}
                       </div>
                       {item.state !== "done" ? (
                         <button
@@ -220,10 +232,11 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
                           aria-expanded={checkingIn === item.taskId}
                           aria-controls={stripId}
                           aria-label={t("checkIn.actions", { title: item.title })}
-                          className={cn(
-                            "shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-                            FOCUS_RING,
-                          )}
+                          className={buttonClasses({
+                            variant: checkingIn === item.taskId ? "ghost" : "secondary",
+                            size: "sm",
+                            className: "h-7 shrink-0 px-2.5 text-xs",
+                          })}
                         >
                           {checkingIn === item.taskId ? t("checkIn.close") : t("checkIn.open")}
                         </button>
@@ -235,7 +248,7 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
                         taskId={item.taskId}
                         allowSnooze={false}
                         onSaved={(action) => checkedIn(item.taskId, action)}
-                        className="mt-2 ml-8 rounded-lg bg-slate-50 px-3 py-2"
+                        className="mt-2 ml-9 rounded-xl bg-sand-50 px-3 py-2.5"
                       />
                     ) : null}
                   </li>
@@ -245,8 +258,11 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
           </ol>
 
           {allHandled ? (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-              <p className="text-sm text-emerald-900">{t("plan.allHandled")}</p>
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-sand-100 pt-4">
+              <p className="flex items-center gap-2 text-sm text-sand-700">
+                <CircleCheck aria-hidden className="size-4.5 shrink-0 text-emerald-600" />
+                {t("plan.allHandled")}
+              </p>
               <Button type="button" size="sm" onClick={() => open("next")}>
                 {t("plan.nextBatch")}
               </Button>
@@ -263,12 +279,12 @@ function StateMark({ state, index }: { state: PlanItemState; index: number }) {
     <span
       aria-hidden
       className={cn(
-        "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold",
+        "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold",
         state === "done"
           ? "bg-emerald-600 text-white"
           : state === "updated"
             ? "bg-blue-100 text-blue-700"
-            : "bg-slate-100 text-slate-600",
+            : "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200/70",
       )}
     >
       {state === "done" ? (

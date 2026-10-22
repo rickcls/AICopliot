@@ -57,8 +57,8 @@ export function AssistantMessage({
       ) : null}
 
       {message.steps.length > 0 ? (
-        <details className="text-xs text-slate-500">
-          <summary className={cn("cursor-pointer select-none hover:text-slate-800", FOCUS_RING)}>
+        <details className="text-xs text-sand-500">
+          <summary className={cn("cursor-pointer select-none hover:text-sand-800", FOCUS_RING)}>
             <Search className="mr-1 inline size-3" aria-hidden />
             {t("assistant.steps")} ({message.steps.length})
           </summary>
@@ -66,8 +66,8 @@ export function AssistantMessage({
             {message.steps.map((step, index) => (
               <li key={index}>
                 {t(`assistant.tool.${step.tool}` as MessageKey)}
-                {step.input ? <span className="text-slate-400"> · {step.input}</span> : null}
-                <span className="text-slate-400"> → {step.summary}</span>
+                {step.input ? <span className="text-sand-400"> · {step.input}</span> : null}
+                <span className="text-sand-400"> → {step.summary}</span>
               </li>
             ))}
           </ul>
@@ -84,10 +84,10 @@ export function AssistantMessage({
                   key={source.label}
                   href={sourceHref(source)}
                   title={source.excerpt}
-                  className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 hover:bg-slate-200"
+                  className="inline-flex items-center gap-1 rounded-md bg-sand-100 px-1.5 py-0.5 text-xs text-sand-700 hover:bg-sand-200"
                 >
                   <BookOpen className="size-3" aria-hidden />
-                  <span className="font-mono text-[11px] text-slate-500">{source.label}</span>
+                  <span className="font-mono text-[11px] text-sand-500">{source.label}</span>
                   <span className="max-w-48 truncate">{source.filename}</span>
                 </Link>
               ) : null,
@@ -107,10 +107,10 @@ export function AssistantMessage({
                   target="_blank"
                   rel="noopener noreferrer"
                   title={source.excerpt}
-                  className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 hover:bg-slate-200"
+                  className="inline-flex items-center gap-1 rounded-md bg-sand-100 px-1.5 py-0.5 text-xs text-sand-700 hover:bg-sand-200"
                 >
                   <ExternalLink className="size-3" aria-hidden />
-                  <span className="font-mono text-[11px] text-slate-500">{source.label}</span>
+                  <span className="font-mono text-[11px] text-sand-500">{source.label}</span>
                   <span className="max-w-48 truncate">{source.title}</span>
                 </a>
               ) : null,
@@ -121,17 +121,17 @@ export function AssistantMessage({
       {message.drafts.map((draft) => (
         <Card key={draft.id} className="space-y-2 p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Mail className="size-4 text-slate-400" aria-hidden />
-            <span className="text-xs font-medium text-slate-500">{t("assistant.draft")}</span>
+            <Mail className="size-4 text-sand-400" aria-hidden />
+            <span className="text-xs font-medium text-sand-500">{t("assistant.draft")}</span>
             {draft.flags.length > 0 ? <Badge tone="warning">{t("email.checkTitle")}: {draft.flags.length}</Badge> : null}
           </div>
-          <p className="text-sm font-medium text-slate-900">{draft.subject}</p>
-          <p className="line-clamp-6 text-sm whitespace-pre-wrap text-slate-700">{draft.body}</p>
+          <p className="text-sm font-medium text-sand-900">{draft.subject}</p>
+          <p className="line-clamp-6 text-sm whitespace-pre-wrap text-sand-700">{draft.body}</p>
           <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
             <button
               type="button"
               onClick={() => void copy(draft.id, `${draft.subject}\n\n${draft.body}`)}
-              className={cn("inline-flex items-center gap-1 text-slate-600 hover:text-slate-900", FOCUS_RING)}
+              className={cn("inline-flex items-center gap-1 text-sand-600 hover:text-sand-900", FOCUS_RING)}
             >
               {copied === draft.id ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
               {copied === draft.id ? t("email.copied") : t("email.copy")}
@@ -140,12 +140,12 @@ export function AssistantMessage({
               href={gmailComposeUrl({ to: recipientAddress(draft.recipient), subject: draft.subject, body: draft.body })}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900"
+              className="inline-flex items-center gap-1 text-sand-600 hover:text-sand-900"
             >
               <ExternalLink className="size-3.5" aria-hidden />
               {t("email.openGmail")}
             </a>
-            <Link href={`/email?draft=${draft.id}`} className="text-slate-600 hover:text-slate-900">
+            <Link href={`/email?draft=${draft.id}`} className="text-sand-600 hover:text-sand-900">
               {t("assistant.openDraft")}
             </Link>
           </div>
@@ -154,7 +154,7 @@ export function AssistantMessage({
 
       {message.proposals.length > 0 ? (
         <Card className="overflow-hidden">
-          <p className="border-b border-slate-100 px-4 py-2 text-xs font-medium text-slate-500">
+          <p className="border-b border-sand-100 px-4 py-2 text-xs font-medium text-sand-500">
             {t("assistant.suggestions")}
           </p>
           <ProposalList

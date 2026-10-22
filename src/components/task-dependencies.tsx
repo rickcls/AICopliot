@@ -90,13 +90,13 @@ export function TaskDependencies({
   return (
     <div>
       {task.dependencies.length === 0 ? (
-        <p className="text-xs text-slate-500">{t("tasks.dependencies.none")}</p>
+        <p className="text-xs text-sand-500">{t("tasks.dependencies.none")}</p>
       ) : (
         <ul className="space-y-1">
           {task.dependencies.map((dependency) => (
             <li
               key={dependency.id}
-              className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs"
+              className="rounded-lg border border-sand-200 px-2.5 py-2 text-xs"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5">
@@ -123,7 +123,7 @@ export function TaskDependencies({
                 </span>
                 <button
                   type="button"
-                  className="shrink-0 text-slate-500 hover:text-red-700 disabled:opacity-50"
+                  className="shrink-0 text-sand-500 hover:text-red-700 disabled:opacity-50"
                   disabled={busy}
                   onClick={() => void removeDependency(dependency.id)}
                   aria-label={t("tasks.dependencies.removeLabel", {
@@ -134,12 +134,12 @@ export function TaskDependencies({
                 </button>
               </div>
               {dependency.citations.length > 0 ? (
-                <ul className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+                <ul className="mt-2 space-y-1.5 border-t border-sand-100 pt-2">
                   {dependency.citations.map((citation) => (
-                    <li key={citation.id} className="text-slate-600">
+                    <li key={citation.id} className="text-sand-600">
                       <a
                         href={`/documents/${citation.chunk.document.id}`}
-                        className="font-medium text-slate-700 underline hover:text-slate-900"
+                        className="font-medium text-sand-700 underline hover:text-sand-900"
                       >
                         {citation.chunk.document.originalFilename}
                         {citation.chunk.pageNumber !== null
@@ -163,7 +163,7 @@ export function TaskDependencies({
 
       {neededFor.length > 0 ? (
         <div className="mt-3">
-          <p className="mb-1 text-xs font-medium text-slate-500">
+          <p className="mb-1 text-xs font-medium text-sand-500">
             {t("tasks.dependencies.neededFor")}
           </p>
           <ul className="space-y-1">
@@ -171,7 +171,7 @@ export function TaskDependencies({
               <li key={other.id}>
                 <button
                   type="button"
-                  className="flex w-full min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-left text-xs hover:bg-slate-50"
+                  className="flex w-full min-w-0 items-center gap-1.5 rounded-lg border border-sand-200 px-2.5 py-2 text-left text-xs hover:bg-sand-50"
                   onClick={() => onOpenTask(other.id)}
                 >
                   <span
@@ -191,7 +191,7 @@ export function TaskDependencies({
       ) : null}
 
       {candidates.length === 0 ? (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-sand-500">
           {t("tasks.dependencies.noCandidates")}
         </p>
       ) : (

@@ -87,16 +87,16 @@ export function MailboxPanel({
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <Mail className="size-4 text-slate-400" aria-hidden />
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-sand-900">
+            <Mail className="size-4 text-sand-400" aria-hidden />
             {t(`${kind}.title`)}
             {status.connected && status.email ? (
-              <span className="text-xs font-normal text-slate-500">
+              <span className="text-xs font-normal text-sand-500">
                 {t(`${kind}.connectedAs`, { email: status.email })}
               </span>
             ) : null}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-sand-500">
             {needsReconnect ? t(`${kind}.needsReconnect`) : t(`${kind}.lead`)}
           </p>
         </div>
@@ -121,16 +121,16 @@ export function MailboxPanel({
 
       {messages ? (
         messages.length === 0 ? (
-          <p className="border-t border-slate-100 px-4 py-3 text-sm text-slate-500">{t(`${kind}.empty`)}</p>
+          <p className="border-t border-sand-100 px-4 py-3 text-sm text-sand-500">{t(`${kind}.empty`)}</p>
         ) : (
-          <ul className="divide-y divide-slate-100 border-t border-slate-100">
+          <ul className="divide-y divide-sand-100 border-t border-sand-100">
             {messages.map((message) => (
               <li key={message.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:flex-nowrap">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900">{message.subject || "—"}</p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-sm font-medium text-sand-900">{message.subject || "—"}</p>
+                  <p className="truncate text-xs text-sand-500">
                     {message.from}
-                    {message.snippet ? <span className="text-slate-400"> · {message.snippet}</span> : null}
+                    {message.snippet ? <span className="text-sand-400"> · {message.snippet}</span> : null}
                   </p>
                 </div>
                 {message.captureId ? (

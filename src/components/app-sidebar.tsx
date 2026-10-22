@@ -17,9 +17,11 @@ import {
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/brand-mark";
 import { useT } from "@/components/i18n-provider";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Avatar, FOCUS_RING, identityTone } from "@/components/ui";
 import {
   WorkspaceSwitcher,
   type WorkspaceOption,
@@ -69,6 +71,16 @@ const GLOBAL_LINKS = [
 /** Hidden on the rail, shown once there is room for text. */
 const LABEL = "hidden md:inline";
 
+/**
+ * The current page is a soft terracotta tint, the same "selected" language as
+ * a pressed filter chip (one step deeper, since the rail is tinted itself). It used to be a solid black block, the loudest thing
+ * on screen, on the one item the viewer already knows they are on. A tint also
+ * holds up in the dark theme, where a white "raised" row would sit only a step
+ * away from the rail behind it.
+ */
+const CURRENT = "bg-brand-100/70 text-brand-800";
+const AT_REST = "text-sand-600 hover:bg-sand-200/60 hover:text-sand-900";
+
 function NavItem({
   href,
   label,
@@ -88,16 +100,20 @@ function NavItem({
       title={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors",
+        "group flex items-center gap-2.5 rounded-xl text-sm font-medium transition-colors",
+        FOCUS_RING,
         // Centred while it is an icon rail, left-aligned once labels appear.
         "justify-center px-2 py-2 md:justify-start md:px-3",
-        active
-          ? "bg-slate-900 text-white"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+        active ? CURRENT : AT_REST,
         className,
       )}
     >
-      <Icon className="size-4.5 shrink-0" />
+      <Icon
+        className={cn(
+          "size-4.5 shrink-0 transition-colors",
+          active ? "text-brand-600" : "text-sand-500 group-hover:text-sand-700",
+        )}
+      />
       <span className={LABEL}>{label}</span>
     </Link>
   );
@@ -108,6 +124,7 @@ export function AppSidebar({
   workspaceId,
   workspaceName,
   workspaces,
+  userName,
   userEmail,
   isAdmin,
 }: {
@@ -116,6 +133,7 @@ export function AppSidebar({
   workspaceName: string;
   /** Every workspace the viewer belongs to; a switcher appears with two or more. */
   workspaces: WorkspaceOption[];
+  userName: string | null;
   userEmail: string;
   isAdmin: boolean;
 }) {
@@ -124,15 +142,20 @@ export function AppSidebar({
   const activeProjectId = /^\/projects\/([^/]+)/.exec(pathname)?.[1];
 
   return (
-    <aside className="sticky top-0 z-30 flex h-dvh w-14 shrink-0 flex-col border-r border-slate-200 bg-white md:w-64">
-      <div className="flex h-14 shrink-0 items-center justify-center px-2 md:justify-start md:px-4">
-        <Link href="/today" title={`${t("app.name")} — ${t("app.tagline")}`}>
-          <span className="text-sm font-semibold tracking-tight md:hidden">
-            SP
-          </span>
-          <span className="hidden text-sm font-semibold tracking-tight md:inline">
+    // A tinted surface rather than a white panel behind a hard rule: the rail
+    // reads as the edge of the desk, and the page as the paper on it.
+    <aside className="sticky top-0 z-30 flex h-dvh w-14 shrink-0 flex-col border-r border-sand-200/60 bg-sand-100/70 md:w-64">
+      <div className="flex h-16 shrink-0 items-center justify-center px-2 md:justify-start md:px-5">
+        <Link
+          href="/today"
+          title={`${t("app.name")} — ${t("app.tagline")}`}
+          className={cn("flex items-center gap-2.5 rounded-lg", FOCUS_RING)}
+        >
+          <BrandMark />
+          <span className="hidden text-[15px] font-semibold tracking-tight text-sand-900 md:inline">
             ScopePilot
           </span>
+          <span className="sr-only md:hidden">ScopePilot</span>
         </Link>
       </div>
 
@@ -141,7 +164,7 @@ export function AppSidebar({
         // `min-h-0` is what lets this actually scroll: a column flex child
         // defaults to `min-height: auto`, so without it a long project list
         // grows past the rail and slides under the footer instead of scrolling.
-        className="min-h-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto px-2 pb-4 md:px-3"
+        className="min-h-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-2 pt-1 pb-4 md:px-3"
       >
         <ul className="space-y-1">
           {GLOBAL_LINKS.map((link) => (
@@ -174,14 +197,14 @@ export function AppSidebar({
           <div>
             <p
               className={cn(
-                "pb-1.5 text-xs font-semibold tracking-wide text-slate-400 uppercase",
+                "pb-2 text-xs font-semibold tracking-wide text-sand-500 uppercase",
                 "hidden px-3 md:block",
               )}
             >
               {t("nav.projectsHeading")}
             </p>
             {/* On the rail a divider stands in for the heading. */}
-            <div className="mx-2 mb-2 border-t border-slate-200 md:hidden" />
+            <div className="mx-2 mb-2 border-t border-sand-200/80 md:hidden" />
 
             <ul className="space-y-0.5">
               {projects.map((project) => {
@@ -193,24 +216,25 @@ export function AppSidebar({
                       title={project.name}
                       aria-current={isActive ? "true" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-lg text-sm transition-colors",
-                        "justify-center px-2 py-2 md:justify-start md:px-2 md:py-1.5",
-                        isActive
-                          ? "bg-slate-100 font-semibold text-slate-900"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                        "flex items-center gap-2.5 rounded-xl text-sm transition-colors",
+                        FOCUS_RING,
+                        "justify-center px-2 py-2 md:justify-start md:px-2.5 md:py-1.5",
+                        isActive ? cn(CURRENT, "font-semibold") : AT_REST,
                       )}
                     >
                       {/* Initial stands in for the name on the rail, and gives
-                          the row a fixed anchor once labels appear. The
-                          personal project carries a person mark instead, so
-                          it reads as "mine" even on the rail. */}
+                          the row a fixed anchor once labels appear. Its colour
+                          comes from the project's id, so a project keeps its
+                          colour wherever it is listed. The personal project
+                          carries a person mark instead, so it reads as "mine"
+                          even on the rail. */}
                       <span
                         aria-hidden
                         className={cn(
-                          "grid size-5.5 shrink-0 place-items-center rounded-md text-[10px] font-semibold transition-colors",
-                          isActive
-                            ? "bg-slate-900 text-white"
-                            : "bg-slate-200 text-slate-600",
+                          "grid size-6 shrink-0 place-items-center rounded-lg text-[11px] font-semibold",
+                          project.personal
+                            ? "bg-brand-100 text-brand-700"
+                            : identityTone(project.id),
                         )}
                       >
                         {project.personal ? (
@@ -231,17 +255,22 @@ export function AppSidebar({
         ) : null}
       </nav>
 
-      <div className="shrink-0 border-t border-slate-200 p-2 md:p-3">
-        <div className="hidden md:block">
-          {workspaces.length > 1 ? (
-            <WorkspaceSwitcher current={workspaceId} workspaces={workspaces} />
-          ) : (
-            <p className="truncate px-1 text-xs font-medium text-slate-900">
-              {workspaceName}
-            </p>
-          )}
-          <p className="truncate px-1 text-xs text-slate-500">{userEmail}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="shrink-0 border-t border-sand-200/80 p-2 md:p-3">
+        <div className="hidden space-y-3 md:block">
+          <div className="flex items-center gap-2.5 px-1">
+            <Avatar name={userName} email={userEmail} className="size-8 text-xs" />
+            <div className="min-w-0 flex-1">
+              {workspaces.length > 1 ? (
+                <WorkspaceSwitcher current={workspaceId} workspaces={workspaces} />
+              ) : (
+                <p className="truncate text-sm font-medium text-sand-900">
+                  {workspaceName}
+                </p>
+              )}
+              <p className="truncate text-xs text-sand-500">{userName ?? userEmail}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <ThemeToggle />
             <LocaleSwitcher />
           </div>
@@ -251,18 +280,23 @@ export function AppSidebar({
           label={t("nav.settings")}
           icon={Settings}
           active={pathname === "/settings"}
-          className="md:mt-2 md:px-1"
+          className="md:mt-2"
         />
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}
           title={t("nav.signOutAs", { email: userEmail })}
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900",
-            "justify-center px-2 py-2 md:justify-start md:px-1",
+            "group flex w-full items-center gap-2.5 rounded-xl text-sm font-medium transition-colors",
+            AT_REST,
+            FOCUS_RING,
+            "justify-center px-2 py-2 md:justify-start md:px-3",
           )}
         >
-          <LogOut className="size-4 shrink-0" aria-hidden />
+          <LogOut
+            className="size-4.5 shrink-0 text-sand-500 transition-colors group-hover:text-sand-700"
+            aria-hidden
+          />
           <span className={LABEL}>{t("nav.signOut")}</span>
         </button>
       </div>

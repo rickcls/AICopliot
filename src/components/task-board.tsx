@@ -724,7 +724,7 @@ export function TaskBoard({
               manager for the same statuses the board already shows. */}
           <div ref={statusesMenuRef} className="relative">
             <div
-              className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+              className="inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5"
               aria-label={t("tasks.board.viewLabel")}
               role="group"
             >
@@ -739,8 +739,8 @@ export function TaskBoard({
                 className={cn(
                   "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
                   view === "board" && !statusesOpen
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900",
+                    ? "bg-white text-sand-900 shadow-sm"
+                    : "text-sand-500 hover:text-sand-900",
                 )}
               >
                 <LayoutGrid className="size-3.5" aria-hidden />
@@ -756,8 +756,8 @@ export function TaskBoard({
                 className={cn(
                   "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
                   view === "list" && !statusesOpen
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900",
+                    ? "bg-white text-sand-900 shadow-sm"
+                    : "text-sand-500 hover:text-sand-900",
                 )}
               >
                 <List className="size-3.5" aria-hidden />
@@ -772,8 +772,8 @@ export function TaskBoard({
                 className={cn(
                   "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
                   statusesOpen
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900",
+                    ? "bg-white text-sand-900 shadow-sm"
+                    : "text-sand-500 hover:text-sand-900",
                 )}
               >
                 <Columns3 className="size-3.5" aria-hidden />
@@ -784,9 +784,9 @@ export function TaskBoard({
               <div
                 role="dialog"
                 aria-label={t("tasks.board.manageStatuses")}
-                className="absolute right-0 z-20 mt-1.5 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
+                className="absolute right-0 z-20 mt-1.5 w-80 rounded-xl border border-sand-200 bg-white p-3 shadow-lg"
               >
-                <p className="px-1 text-xs text-slate-500">
+                <p className="px-1 text-xs text-sand-500">
                   {t("tasks.board.statusesHelp")}
                 </p>
                 <ul className="mt-2 max-h-56 space-y-0.5 overflow-y-auto">
@@ -798,15 +798,15 @@ export function TaskBoard({
                     return (
                       <li
                         key={status.id}
-                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50"
+                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-sand-50"
                       >
                         <span
                           aria-hidden
                           className={cn("size-1.5 rounded-full", STATUS_DOT[tone])}
                         />
-                        <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
+                        <span className="min-w-0 flex-1 truncate text-sm text-sand-800">
                           {statusLabel(status)}
-                          <span className="ml-1.5 text-[11px] text-slate-400">
+                          <span className="ml-1.5 text-[11px] text-sand-400">
                             {t(`statusCategory.${status.category}`)}
                             {taskCount > 0 ? ` · ${taskCount}` : ""}
                           </span>
@@ -817,7 +817,7 @@ export function TaskBoard({
                           aria-label={t("tasks.board.removeStatusLabel", { label: statusLabel(status) })}
                           onClick={() => void removeStatus(status)}
                           className={cn(
-                            "inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50",
+                            "inline-flex size-7 items-center justify-center rounded-md text-sand-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50",
                             FOCUS_RING,
                           )}
                         >
@@ -828,7 +828,7 @@ export function TaskBoard({
                   })}
                 </ul>
                 <form
-                  className="mt-2 space-y-2 border-t border-slate-100 pt-2"
+                  className="mt-2 space-y-2 border-t border-sand-100 pt-2"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void createStatus();
@@ -944,19 +944,19 @@ export function TaskBoard({
                 aria-label={statusLabel(status)}
                 {...groupDropHandlers(status.id)}
                 className={cn(
-                  "flex min-h-40 flex-col rounded-xl border border-transparent bg-slate-50 p-2 transition-colors",
-                  isTarget && "border-slate-400 border-dashed bg-slate-100",
+                  "flex min-h-40 flex-col rounded-xl border border-transparent bg-sand-50 p-2 transition-colors",
+                  isTarget && "border-sand-400 border-dashed bg-sand-100",
                 )}
               >
                 <div className="flex items-center justify-between gap-2 px-1.5 pt-0.5 pb-2">
-                  <h3 className="flex min-w-0 items-center gap-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  <h3 className="flex min-w-0 items-center gap-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
                     <span
                       aria-hidden
                       className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[tone])}
                     />
                     <span className="truncate">{statusLabel(status)}</span>
                   </h3>
-                  <span className="rounded-full bg-white px-1.5 text-xs text-slate-500 tabular-nums">
+                  <span className="rounded-full bg-white px-1.5 text-xs text-sand-500 tabular-nums">
                     {columnTasks.length}
                   </span>
                 </div>
@@ -982,7 +982,7 @@ export function TaskBoard({
                 <button
                   type="button"
                   onClick={() => openCreate(status.id)}
-                  className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-white hover:text-slate-900"
+                  className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-sand-500 transition-colors hover:bg-white hover:text-sand-900"
                 >
                   <Plus className="size-3.5" aria-hidden />
                   {t("common.add")}
@@ -992,11 +992,11 @@ export function TaskBoard({
           })}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-sand-200 bg-white shadow-sm">
           <div
             role="group"
             aria-label={t("tasks.board.filterByStatus")}
-            className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5"
+            className="flex flex-wrap items-center gap-1.5 border-b border-sand-200 bg-sand-50/60 px-3 py-2.5"
           >
             <button
               type="button"
@@ -1005,15 +1005,15 @@ export function TaskBoard({
               className={cn(
                 "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
                 statusFilter === "all"
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+                  ? "border-sand-900 bg-sand-900 text-white"
+                  : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
               )}
             >
               {t("common.all")}
               <span
                 className={cn(
                   "tabular-nums",
-                  statusFilter === "all" ? "text-slate-300" : "text-slate-400",
+                  statusFilter === "all" ? "text-sand-300" : "text-sand-400",
                 )}
               >
                 {matchingTasks.length}
@@ -1035,8 +1035,8 @@ export function TaskBoard({
                   className={cn(
                     "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
                     selected
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+                      ? "border-sand-900 bg-sand-900 text-white"
+                      : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
                   )}
                 >
                   <span
@@ -1047,7 +1047,7 @@ export function TaskBoard({
                   <span
                     className={cn(
                       "tabular-nums",
-                      selected ? "text-slate-300" : "text-slate-400",
+                      selected ? "text-sand-300" : "text-sand-400",
                     )}
                   >
                     {count}
@@ -1058,8 +1058,8 @@ export function TaskBoard({
           </div>
 
           {selectedIds.size > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-100 px-3 py-2">
-              <span className="text-xs font-medium text-slate-700">
+            <div className="flex flex-wrap items-center gap-2 border-b border-sand-200 bg-sand-100 px-3 py-2">
+              <span className="text-xs font-medium text-sand-700">
                 {t("tasks.board.selected", { count: selectedIds.size })}
               </span>
               <Select
@@ -1130,17 +1130,17 @@ export function TaskBoard({
 
           {taskGroups.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-sm font-medium text-sand-900">
                 {t("tasks.board.noStatuses")}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-sand-500">
                 {t("tasks.board.noStatusesBody")}
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px] table-fixed border-collapse text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                <thead className="border-b border-sand-200 bg-sand-50 text-xs text-sand-500">
                   <tr>
                     <th scope="col" className="w-10 px-2 py-2.5">
                       <span className="sr-only">{t("tasks.board.selectColumn")}</span>
@@ -1150,7 +1150,7 @@ export function TaskBoard({
                         checked={allVisibleSelected}
                         onChange={toggleSelectAll}
                         aria-label={t("tasks.board.selectAll")}
-                        className="size-3.5 rounded border-slate-300 text-slate-900 focus-visible:ring-slate-900"
+                        className="size-3.5 rounded border-sand-300 text-sand-900 focus-visible:ring-sand-900"
                       />
                     </th>
                     <th scope="col" className="w-8 px-1 py-2.5">
@@ -1187,12 +1187,12 @@ export function TaskBoard({
                       key={group.status.id}
                       {...groupDropHandlers(group.status.id)}
                       className={cn(
-                        "divide-y divide-slate-100 border-b border-slate-200 last:border-b-0",
+                        "divide-y divide-sand-100 border-b border-sand-200 last:border-b-0",
                         isTarget &&
-                          "bg-slate-100/80 outline outline-dashed outline-slate-400 -outline-offset-2",
+                          "bg-sand-100/80 outline outline-dashed outline-sand-400 -outline-offset-2",
                       )}
                     >
-                      <tr className="bg-slate-50/70">
+                      <tr className="bg-sand-50/70">
                         <th
                           scope="colgroup"
                           colSpan={7}
@@ -1204,14 +1204,14 @@ export function TaskBoard({
                               aria-expanded={!collapsed}
                               onClick={() => toggleGroup(group.status.id)}
                               className={cn(
-                                "inline-flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-200/70",
+                                "inline-flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-sand-200/70",
                                 FOCUS_RING,
                               )}
                             >
                               <ChevronRight
                                 aria-hidden
                                 className={cn(
-                                  "size-3.5 shrink-0 text-slate-400 transition-transform",
+                                  "size-3.5 shrink-0 text-sand-400 transition-transform",
                                   !collapsed && "rotate-90",
                                 )}
                               />
@@ -1223,7 +1223,7 @@ export function TaskBoard({
                               >
                                 {statusLabel(group.status)}
                               </span>
-                              <span className="text-xs text-slate-500 tabular-nums">
+                              <span className="text-xs text-sand-500 tabular-nums">
                                 {group.tasks.length}
                               </span>
                             </button>
@@ -1231,7 +1231,7 @@ export function TaskBoard({
                               type="button"
                               onClick={() => openCreate(group.status.id)}
                               className={cn(
-                                "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-200/70 hover:text-slate-900",
+                                "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sand-500 transition-colors hover:bg-sand-200/70 hover:text-sand-900",
                                 FOCUS_RING,
                               )}
                             >
@@ -1285,7 +1285,7 @@ export function TaskBoard({
                         <tr>
                           <td
                             colSpan={7}
-                            className="px-4 py-6 text-center text-xs text-slate-400"
+                            className="px-4 py-6 text-center text-xs text-sand-400"
                           >
                             {t("tasks.board.dropHere")}
                           </td>

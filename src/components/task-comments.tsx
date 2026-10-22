@@ -116,10 +116,10 @@ export function TaskComments({
 
   return (
     <div>
-      <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+      <h3 className="mb-2 text-xs font-semibold tracking-wide text-sand-500 uppercase">
         {t("tasks.comments.title")}
         {comments && comments.length > 0 ? (
-          <span className="ml-1.5 font-normal text-slate-400 tabular-nums">
+          <span className="ml-1.5 font-normal text-sand-400 tabular-nums">
             {comments.length}
           </span>
         ) : null}
@@ -132,11 +132,11 @@ export function TaskComments({
       ) : null}
 
       {comments === null ? (
-        <p className="mb-3 flex items-center gap-2 text-xs text-slate-400">
+        <p className="mb-3 flex items-center gap-2 text-xs text-sand-400">
           <Spinner /> {t("tasks.comments.loading")}
         </p>
       ) : comments.length === 0 ? (
-        <p className="mb-3 text-xs text-slate-400">{t("tasks.comments.empty")}</p>
+        <p className="mb-3 text-xs text-sand-400">{t("tasks.comments.empty")}</p>
       ) : (
         <ul className="mb-3 space-y-3">
           {comments.map((comment) => {
@@ -159,14 +159,14 @@ export function TaskComments({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="text-xs font-semibold text-slate-900">
+                    <span className="text-xs font-semibold text-sand-900">
                       {comment.author?.name ??
                         comment.author?.email ??
                         t("tasks.comments.formerMember")}
                     </span>
                     <time
                       dateTime={comment.createdAt}
-                      className="text-[11px] text-slate-400"
+                      className="text-[11px] text-sand-400"
                     >
                       {formatDate(comment.createdAt, dateLocale, timeZone)}
                     </time>
@@ -174,7 +174,7 @@ export function TaskComments({
                       <button
                         type="button"
                         onClick={() => void remove(comment)}
-                        className="text-[11px] text-slate-400 transition-colors hover:text-red-700"
+                        className="text-[11px] text-sand-400 transition-colors hover:text-red-700"
                       >
                         {t("common.delete")}
                       </button>
@@ -182,7 +182,7 @@ export function TaskComments({
                   </div>
                   {/* `whitespace-pre-wrap` so the paragraph breaks somebody
                       typed are the paragraph breaks everybody reads. */}
-                  <p className="mt-0.5 text-sm whitespace-pre-wrap text-slate-700">
+                  <p className="mt-0.5 text-sm whitespace-pre-wrap text-sand-700">
                     {comment.body}
                   </p>
                 </div>
@@ -210,8 +210,8 @@ export function TaskComments({
           disabled={posting}
           aria-label={t("tasks.comments.label")}
           className={cn(
-            "w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700",
-            "placeholder:text-slate-400 focus-visible:border-slate-900 focus-visible:outline-hidden",
+            "w-full rounded-lg border border-sand-200 bg-white px-2.5 py-2 text-sm text-sand-700",
+            "placeholder:text-sand-400 focus-visible:border-sand-900 focus-visible:outline-hidden",
           )}
         />
         {body.trim() ? (

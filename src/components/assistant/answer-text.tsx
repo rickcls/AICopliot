@@ -60,11 +60,11 @@ export function AnswerText({ content, sources }: { content: string; sources: Pub
     last = at + match[0].length;
   }
   if (last < content.length) parts.push(content.slice(last));
-  return <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-800">{parts}</p>;
+  return <p className="text-sm leading-relaxed whitespace-pre-wrap text-sand-800">{parts}</p>;
 }
 
 const CHIP =
-  "mx-0.5 inline-flex rounded bg-slate-100 px-1 align-baseline font-mono text-[11px] text-slate-600 hover:bg-slate-200 hover:text-slate-900";
+  "mx-0.5 inline-flex rounded bg-sand-100 px-1 align-baseline font-mono text-[11px] text-sand-600 hover:bg-sand-200 hover:text-sand-900";
 
 function Citation({ source, label }: { source: PublicSource; label: string }) {
   if (source.kind === "web") {

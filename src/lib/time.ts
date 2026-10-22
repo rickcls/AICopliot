@@ -42,3 +42,25 @@ export function localDateString(timeZone: string, now: Date): string {
 export function localToday(timeZone: string, now: Date = new Date()): Date {
   return new Date(`${localDateString(timeZone, now)}T00:00:00.000Z`);
 }
+
+export type GreetingPeriod = "morning" | "afternoon" | "evening";
+
+/**
+ * Which greeting fits the hour where the viewer is. `now` is the real instant,
+ * not the `localToday` date anchor — that anchor is midnight by construction,
+ * so it would greet everyone with "good evening" all day.
+ */
+export function greetingPeriod(timeZone: string, now: Date): GreetingPeriod {
+  const zone = isValidTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
+  const hour =
+    Number(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: zone,
+        hour: "numeric",
+        hourCycle: "h23",
+      }).format(now),
+    ) % 24;
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 18) return "afternoon";
+  return "evening";
+}

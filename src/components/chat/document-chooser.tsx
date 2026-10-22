@@ -63,14 +63,14 @@ export function DocumentChooser({
           data-autofocus
         />
         {documents.length === 0 ? (
-          <p className="text-sm text-slate-500">{t("chat.chooser.empty")}</p>
+          <p className="text-sm text-sand-500">{t("chat.chooser.empty")}</p>
         ) : (
           <ul className="max-h-80 space-y-0.5 overflow-y-auto">
             {visible.map((document) => {
               const checked = selected.has(document.id);
               return (
                 <li key={document.id}>
-                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-sand-50">
                     <input
                       type="checkbox"
                       className={CHECKBOX}
@@ -78,20 +78,20 @@ export function DocumentChooser({
                       disabled={!checked && atLimit}
                       onChange={() => toggle(document.id)}
                     />
-                    <FileText className="size-4 shrink-0 text-slate-400" aria-hidden />
+                    <FileText className="size-4 shrink-0 text-sand-400" aria-hidden />
                     <span className="min-w-0 truncate">{document.filename}</span>
                   </label>
                 </li>
               );
             })}
             {visible.length === 0 ? (
-              <li className="px-2 py-1.5 text-sm text-slate-500">{t("chat.chooser.noMatch")}</li>
+              <li className="px-2 py-1.5 text-sm text-sand-500">{t("chat.chooser.noMatch")}</li>
             ) : null}
           </ul>
         )}
       </ModalBody>
       <ModalFooter>
-        <span className="mr-auto text-xs text-slate-500">
+        <span className="mr-auto text-xs text-sand-500">
           {t("chat.chooser.selected", { count: selected.size })}
           {atLimit ? ` ${t("chat.chooser.limit", { max: MAX_FOCUS_DOCUMENTS })}` : ""}
         </span>

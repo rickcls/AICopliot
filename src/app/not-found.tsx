@@ -10,13 +10,13 @@ export default async function NotFound() {
   const t = await getT();
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-      <p className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+      <p className="text-xs font-semibold tracking-wide text-sand-400 uppercase">
         404
       </p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-sand-900">
         {t("errors.publicNotFoundTitle")}
       </h1>
-      <p className="mt-2 max-w-md text-sm text-slate-600">
+      <p className="mt-2 max-w-md text-sm text-sand-600">
         {t("errors.publicNotFoundBody")}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">

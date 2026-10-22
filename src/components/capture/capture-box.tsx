@@ -13,7 +13,7 @@ import {
 import { VoiceRecorder } from "@/components/capture/voice-recorder";
 import { WhatsAppChat } from "@/components/capture/whatsapp-chat";
 import { useT } from "@/components/i18n-provider";
-import { Button, ErrorState, Spinner, Textarea } from "@/components/ui";
+import { Button, ErrorState, QUIET_CONTROL, Select, Spinner, Textarea } from "@/components/ui";
 import type { CaptureView } from "@/lib/capture/view";
 import { MAIL_FILE, MAX_MAIL_FILE_BYTES, mailFileToCaptureText } from "@/lib/mail/file";
 import { cn } from "@/lib/utils";
@@ -209,25 +209,36 @@ export function CaptureBox({
         setDragging(false);
         if (busy === null) void captureFile(file);
       }}
+      // One soft card with the writing area borderless inside it: a bordered
+      // field inside a bordered box read as a form to fill in, not a place to
+      // talk. The card itself shows focus, so the field can drop its ring.
       className={cn(
-        "rounded-xl border bg-white p-4 shadow-sm",
-        dragging ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-200",
+        "overflow-hidden rounded-2xl border bg-white shadow-soft transition-shadow",
+        dragging
+          ? "border-brand-400 ring-4 ring-brand-100"
+          : "border-sand-200/80 focus-within:border-brand-300 focus-within:ring-4 focus-within:ring-brand-100/70",
       )}
     >
-      <label htmlFor={inputId} className="text-sm font-semibold text-slate-900">
+      <label
+        htmlFor={inputId}
+        className="flex items-center gap-2 px-5 pt-4 text-sm font-semibold text-sand-900"
+      >
+        <Sparkles aria-hidden className="size-4 text-brand-600" />
         {t("capture.inputLabel")}
       </label>
       {chat ? (
-        <WhatsAppChat
-          chat={chat.parsed}
-          busy={busy}
-          onSend={(body) => void sendChat(body)}
-          onUseAsText={() => {
-            setText((current) => (current ? `${current}\n${chat.raw}` : chat.raw));
-            setChat(null);
-          }}
-          onCancel={() => setChat(null)}
-        />
+        <div className="px-5 pb-4">
+          <WhatsAppChat
+            chat={chat.parsed}
+            busy={busy}
+            onSend={(body) => void sendChat(body)}
+            onUseAsText={() => {
+              setText((current) => (current ? `${current}\n${chat.raw}` : chat.raw));
+              setChat(null);
+            }}
+            onCancel={() => setChat(null)}
+          />
+        </div>
       ) : null}
       {/* While a chat is being chosen, it is the only thing to send. */}
       {chat ? null : (
@@ -254,27 +265,29 @@ export function CaptureBox({
                 void submit();
               }
             }}
-            className="mt-2"
+            className="mt-1 resize-none rounded-none border-0 bg-transparent px-5 py-2 text-[15px] leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0"
           />
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-sand-100 bg-sand-50/60 px-3 py-2.5">
+            {/* Full width on a phone, so the input tools share one row and the
+                send button takes the next, instead of each tool on its own line. */}
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:flex-1">
               <label htmlFor={languageId} className="sr-only">
                 {t("voice.language")}
               </label>
-              <select
+              <Select
                 id={languageId}
                 value={speechLanguage}
                 disabled={listening}
                 onChange={(event) => setSpeechLanguage(event.target.value as DictationLanguage)}
-                className="h-8 rounded-lg border border-transparent bg-transparent px-1.5 text-xs text-slate-600 hover:bg-slate-100"
+                className={cn(QUIET_CONTROL, "h-8 rounded-lg px-1.5 text-xs text-sand-600")}
               >
                 {DICTATION_LANGUAGES.map((option) => (
                   <option key={option} value={option}>
                     {t(LANGUAGE_KEY[option])}
                   </option>
                 ))}
-              </select>
+              </Select>
               <DictationButton
                 language={speechLanguage}
                 disabled={busy !== null}
@@ -309,8 +322,8 @@ export function CaptureBox({
                 {t("capture.fromFile")}
               </Button>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden text-xs text-slate-400 sm:inline">
+            <div className="ml-auto flex items-center gap-3">
+              <span className="hidden text-xs text-sand-400 sm:inline">
                 {t("capture.shortcutHint", { key: "Ctrl/⌘" })}
               </span>
               <Button type="submit" disabled={busy !== null || listening || text.trim().length < 3}>
@@ -323,11 +336,13 @@ export function CaptureBox({
       )}
 
       {dictationSupported && !chat ? (
-        <p className="mt-2 text-xs text-slate-400">{t("voice.privacy")}</p>
+        <p className="bg-sand-50/60 px-5 pb-2.5 text-xs text-sand-500">
+          {t("voice.privacy")}
+        </p>
       ) : null}
 
       {error ? (
-        <div className="mt-3">
+        <div className="px-5 pb-4">
           <ErrorState message={error} />
         </div>
       ) : null}

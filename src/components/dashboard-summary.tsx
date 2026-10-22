@@ -42,7 +42,7 @@ function WorkList({
     <Card id={id} className="min-w-0 scroll-mt-6 p-5">
       <h2 className="text-sm font-semibold">{title}</h2>
       {tasks.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-400">{empty}</p>
+        <p className="mt-2 text-sm text-sand-400">{empty}</p>
       ) : (
         <ul className="mt-3 space-y-2">
           {tasks.map((task) => (
@@ -56,7 +56,7 @@ function WorkList({
               >
                 {task.title}
               </Link>
-              <span className="shrink-0 text-xs text-slate-500">
+              <span className="shrink-0 text-xs text-sand-500">
                 {task.project.name}
                 {task.dueDate ? (
                   <>
@@ -87,7 +87,7 @@ function WorkList({
 function ProjectHealthList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate }) {
   return (
     <Card className="overflow-hidden">
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-sand-100">
         {rows.map((row) => {
           const total = row.openTasks + row.doneTasks;
           const percent = percentOf(row.doneTasks, total);
@@ -98,7 +98,7 @@ function ProjectHealthList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate
             >
               <Link
                 href={`/projects/${row.id}`}
-                className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 hover:underline"
+                className="min-w-0 flex-1 truncate text-sm font-medium text-sand-900 hover:underline"
               >
                 {row.name}
               </Link>
@@ -134,7 +134,7 @@ function ProjectHealthList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate
               </div>
               <div className="flex w-full items-center gap-2 sm:w-44">
                 {total === 0 ? (
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-sand-400">
                     {t("workspaceOverview.noTasks")}
                   </span>
                 ) : (
@@ -144,7 +144,7 @@ function ProjectHealthList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate
                       label={t("workspaceOverview.tasksDone", { name: row.name })}
                       className="flex-1"
                     />
-                    <span className="w-16 text-right text-xs text-slate-500 tabular-nums">
+                    <span className="w-16 text-right text-xs text-sand-500 tabular-nums">
                       {t("workspaceOverview.doneFraction", { done: row.doneTasks, total })}
                     </span>
                   </>
@@ -166,7 +166,7 @@ function ProjectHealthList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate
 function DiscoveryList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate }) {
   return (
     <Card className="overflow-hidden">
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-sand-100">
         {rows.map((row) => {
           const live = row.toReview + row.askClient + row.validated + row.agreed;
           return (
@@ -176,7 +176,7 @@ function DiscoveryList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate }) 
             >
               <Link
                 href={`/projects/${row.id}`}
-                className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 hover:underline"
+                className="min-w-0 flex-1 truncate text-sm font-medium text-sand-900 hover:underline"
               >
                 {row.name}
               </Link>
@@ -198,7 +198,7 @@ function DiscoveryList({ rows, t }: { rows: ProjectHealthRow[]; t: Translate }) 
                   </Link>
                 ) : null}
               </div>
-              <span className="w-full text-xs text-slate-500 tabular-nums sm:w-36 sm:text-right">
+              <span className="w-full text-xs text-sand-500 tabular-nums sm:w-36 sm:text-right">
                 {live === 0
                   ? t("workspaceOverview.noRequirements")
                   : t("workspaceOverview.agreedOf", { agreed: row.agreed, total: live })}
@@ -361,7 +361,7 @@ export async function DashboardSummary({
                     >
                       {milestone.title}
                     </Link>
-                    <span className="shrink-0 text-xs text-slate-500">
+                    <span className="shrink-0 text-xs text-sand-500">
                       {milestone.project.name} ·{" "}
                       {milestone.targetDate
                         ? formatDay(milestone.targetDate, dateLocale)

@@ -90,9 +90,9 @@ function MetricsSummary({ metrics }: { metrics: Metrics }) {
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {tiles.map((tile) => (
         <Card key={tile.label} className="p-4">
-          <p className="text-xs text-slate-500">{tile.label}</p>
+          <p className="text-xs text-sand-500">{tile.label}</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{tile.value}</p>
-          <p className="mt-0.5 text-xs text-slate-400">{tile.hint}</p>
+          <p className="mt-0.5 text-xs text-sand-400">{tile.hint}</p>
         </Card>
       ))}
     </div>
@@ -293,7 +293,7 @@ export function EvaluationsPanel({
             <div>
               <label htmlFor="eval-keywords" className="mb-1.5 block text-sm font-medium">
                 {t("evaluations.keywords")}{" "}
-                <span className="font-normal text-slate-500">
+                <span className="font-normal text-sand-500">
                   {t("evaluations.keywordsHint")}
                 </span>
               </label>
@@ -304,7 +304,7 @@ export function EvaluationsPanel({
                 placeholder={t("evaluations.keywordsPlaceholder")}
                 disabled={running || shouldRefuse}
               />
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1.5 text-xs text-sand-500">
                 {t("evaluations.keywordsRule")}
               </p>
             </div>
@@ -313,7 +313,7 @@ export function EvaluationsPanel({
               <span className="mb-1.5 block text-sm font-medium">
                 {t("evaluations.expectation")}
               </span>
-              <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+              <label className="flex items-center gap-2 rounded-lg border border-sand-300 bg-white px-3 py-2 text-sm">
                 <input
                   type="checkbox"
                   checked={shouldRefuse}
@@ -323,7 +323,7 @@ export function EvaluationsPanel({
                 />
                 {t("evaluations.shouldRefuse")}
               </label>
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1.5 text-xs text-sand-500">
                 {t("evaluations.shouldRefuseRule")}
               </p>
             </div>
@@ -332,7 +332,7 @@ export function EvaluationsPanel({
           <div>
             <label htmlFor="eval-notes" className="mb-1.5 block text-sm font-medium">
               {t("evaluations.notes")}{" "}
-              <span className="font-normal text-slate-500">{t("evaluations.optional")}</span>
+              <span className="font-normal text-sand-500">{t("evaluations.optional")}</span>
             </label>
             <Textarea
               id="eval-notes"
@@ -405,7 +405,7 @@ export function EvaluationsPanel({
                 </div>
               </div>
 
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-sand-500">
                 {[
                   formatDate(row.createdAt, dateLocale, timeZone),
                   row.modelName,
@@ -426,7 +426,7 @@ export function EvaluationsPanel({
 
               {row.expectedKeywords.length > 0 ? (
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-slate-500">{t("evaluations.expects")}</span>
+                  <span className="text-xs text-sand-500">{t("evaluations.expects")}</span>
                   {row.expectedKeywords.map((keyword) => {
                     const found = (row.actualAnswer ?? "")
                       .toLowerCase()
@@ -442,26 +442,26 @@ export function EvaluationsPanel({
 
               {row.expectedAnswerNotes ? (
                 <div className="mt-3">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase">
+                  <h3 className="text-xs font-semibold text-sand-500 uppercase">
                     {t("evaluations.notesHeading")}
                   </h3>
-                  <p className="mt-1 text-sm text-pretty text-slate-600">
+                  <p className="mt-1 text-sm text-pretty text-sand-600">
                     {row.expectedAnswerNotes}
                   </p>
                 </div>
               ) : null}
 
               <div className="mt-3">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase">
+                <h3 className="text-xs font-semibold text-sand-500 uppercase">
                   {t("evaluations.actual")}
                 </h3>
-                <p className="mt-1 text-sm whitespace-pre-wrap text-pretty text-slate-700">
+                <p className="mt-1 text-sm whitespace-pre-wrap text-pretty text-sand-700">
                   {row.actualAnswer ?? "—"}
                 </p>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-                <span className="text-xs text-slate-500">
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-sand-100 pt-4">
+                <span className="text-xs text-sand-500">
                   {row.autoScore !== null ? t("evaluations.override") : t("evaluations.markAs")}
                 </span>
                 <Button
