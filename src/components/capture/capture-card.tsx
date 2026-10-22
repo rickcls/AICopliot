@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText, Mail, MessageCircle, Mic, PenLine, Trash2 } from "lucide-react";
 import {
   ProposalList,
   type ColleagueOption,
@@ -25,6 +25,19 @@ const SOURCE_KEY = {
   email: "capture.sourceEmail",
   whatsapp: "capture.sourceWhatsApp",
 } as const;
+
+const SOURCE_ICON = {
+  text: PenLine,
+  voice: Mic,
+  document: FileText,
+  email: Mail,
+  whatsapp: MessageCircle,
+} as const;
+
+/** The note's first line, which names the card in the list. */
+function firstLine(body: string): string {
+  return body.trim().split("\n")[0]?.trim() ?? "";
+}
 
 /**
  * One captured note and the changes it suggests. The suggestions themselves
@@ -130,21 +143,36 @@ export function CaptureCard({
     capture.source === "document"
       ? t(SOURCE_KEY.document, { name: capture.documentName ?? "" })
       : t(SOURCE_KEY[capture.source]);
+  const SourceIcon = SOURCE_ICON[capture.source];
 
   return (
     <Card id={`capture-${capture.id}`} className="scroll-mt-24 overflow-hidden">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-sand-100 px-4 py-2.5">
-        <span className="text-xs text-sand-500">
-          {/* The capture's own calendar day, UTC-pinned: a clock time here
-              would render in the server's zone, then the browser's. */}
-          {formatDay(capture.localDate, dateLocale)}
-          <span className="mx-1.5 text-sand-300">·</span>
-          {sourceLabel}
+      {/* The note's own first line names the card, so the list says what was
+          said without opening each one; where and when it came from sit
+          beneath it. */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-sand-100 px-5 py-3.5">
+        <span
+          aria-hidden
+          className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-600 ring-1 ring-brand-100"
+        >
+          <SourceIcon className="size-4" />
         </span>
-        {pending.length > 0 ? (
-          <Badge tone="info">{t("capture.pendingCount", { count: pending.length })}</Badge>
-        ) : null}
-        <span className="flex-1" />
+        <div className="min-w-0 flex-1 basis-48">
+          <p className="truncate text-sm font-medium text-sand-900">{firstLine(capture.body)}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-sand-500">
+            {/* The capture's own calendar day, UTC-pinned: a clock time here
+                would render in the server's zone, then the browser's. */}
+            <span>
+              {formatDay(capture.localDate, dateLocale)}
+              <span className="mx-1.5 text-sand-300">·</span>
+              {sourceLabel}
+            </span>
+            {pending.length > 0 ? (
+              <Badge tone="info">{t("capture.pendingCount", { count: pending.length })}</Badge>
+            ) : null}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 pt-1">
         {capture.source === "email" ? (
           <Link
             href={`/email?capture=${capture.id}`}
@@ -188,28 +216,29 @@ export function CaptureCard({
           <Trash2 className="size-3.5" aria-hidden />
           <span className="sr-only">{t("capture.delete")}</span>
         </button>
+        </div>
       </div>
 
       {showNote ? (
-        <p className="border-b border-sand-100 bg-sand-50 px-4 py-3 text-sm whitespace-pre-wrap text-sand-700">
+        <p className="border-b border-sand-100 bg-sand-50/70 px-5 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-sand-700">
           {capture.body}
         </p>
       ) : null}
 
       {capture.status === "failed" ? (
-        <div className="space-y-3 p-4">
+        <div className="space-y-3 p-5">
           <ErrorState message={`${t("capture.failedTitle")}: ${capture.errorMessage ?? ""}`} />
           <Button type="button" size="sm" disabled={busy === "retry"} onClick={() => void retry()}>
-            {busy === "retry" ? <Spinner className="border-white/40 border-t-white" /> : null}
+            {busy === "retry" ? <Spinner inverse /> : null}
             {t("capture.retry")}
           </Button>
         </div>
       ) : capture.status === "processing" ? (
-        <p className="flex items-center gap-2 p-4 text-sm text-sand-500">
+        <p className="flex items-center gap-2 p-5 text-sm text-sand-500">
           <Spinner /> {t("capture.submitting")}
         </p>
       ) : capture.proposals.length === 0 ? (
-        <p className="p-4 text-sm text-sand-500">{t("capture.noSuggestions")}</p>
+        <p className="p-5 text-sm text-sand-500">{t("capture.noSuggestions")}</p>
       ) : (
         <ProposalList
           proposals={capture.proposals}

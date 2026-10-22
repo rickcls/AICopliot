@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useT } from "@/components/i18n-provider";
-import { Select } from "@/components/ui";
+import { Badge, Select } from "@/components/ui";
 import type { TaskRow } from "@/components/task-types";
 
 /**
@@ -116,9 +116,9 @@ export function TaskDependencies({
                     {dependency.dependsOnTask.title}
                   </button>
                   {dependency.source === "ai_suggested" ? (
-                    <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                    <Badge tone="info" className="shrink-0">
                       {t("tasks.fields.aiSuggested")}
-                    </span>
+                    </Badge>
                   ) : null}
                 </span>
                 <button

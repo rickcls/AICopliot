@@ -4,9 +4,8 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { nextActionsFor } from "@/lib/chat/next-actions";
 import { useT } from "@/components/i18n-provider";
-import { FOCUS_RING } from "@/components/ui";
+import { buttonClasses } from "@/components/ui";
 import type { Citation } from "@/lib/schemas";
-import { cn } from "@/lib/utils";
 
 /**
  * Where an answer lets you go next, derived from its own evidence.
@@ -34,11 +33,11 @@ export function NextActions({
           <Link
             key={action.href}
             href={action.href}
-            className={cn(
-              "inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-3",
-              "text-sm font-medium text-sand-900 transition-colors hover:bg-sand-50",
-              FOCUS_RING,
-            )}
+            className={buttonClasses({
+              variant: "secondary",
+              size: "sm",
+              className: "max-w-full gap-1.5",
+            })}
           >
             <span className="truncate">{action.label}</span>
             <ArrowUpRight className="size-3.5 shrink-0 text-sand-400" aria-hidden />

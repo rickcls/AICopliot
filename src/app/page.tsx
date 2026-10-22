@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CalendarCheck, Lock, Quote, ShieldCheck } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
+import { Card, FOCUS_RING, LinkButton } from "@/components/ui";
 import { getSessionUser } from "@/lib/auth-guard";
 import { getT } from "@/lib/i18n/server";
 import type { MessageKey } from "@/lib/i18n/translate";
+import { cn } from "@/lib/utils";
 
-const FEATURES: { title: MessageKey; body: MessageKey }[] = [
-  { title: "landing.features.todayTitle", body: "landing.features.todayBody" },
-  { title: "landing.features.citedTitle", body: "landing.features.citedBody" },
-  { title: "landing.features.refuseTitle", body: "landing.features.refuseBody" },
+const FEATURES: {
+  title: MessageKey;
+  body: MessageKey;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { title: "landing.features.todayTitle", body: "landing.features.todayBody", icon: CalendarCheck },
+  { title: "landing.features.citedTitle", body: "landing.features.citedBody", icon: Quote },
+  { title: "landing.features.refuseTitle", body: "landing.features.refuseBody", icon: ShieldCheck },
   {
     title: "landing.features.isolationTitle",
     body: "landing.features.isolationBody",
+    icon: Lock,
   },
 ];
 
@@ -21,60 +30,62 @@ export default async function LandingPage() {
   const t = await getT();
 
   return (
-    <main className="flex-1">
+    // A soft terracotta wash at the top, fading into the page: the one place
+    // the brand fills an area, because this page is the first impression.
+    <main className="flex-1 bg-linear-to-b from-brand-50/80 via-sand-50 to-sand-50">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <span className="text-sm font-semibold tracking-tight">
-          {t("app.name")}
-        </span>
-        <nav className="flex items-center gap-3 text-sm">
-          <Link
-            href="/login"
-            className="rounded-lg bg-sand-900 px-4 py-2 font-medium text-white hover:bg-sand-700"
-          >
-            {t("landing.signIn")}
-          </Link>
-        </nav>
+        <Link
+          href="/"
+          className={cn("flex items-center gap-2.5 rounded-lg", FOCUS_RING)}
+        >
+          <BrandMark />
+          <span className="text-[15px] font-semibold tracking-tight">{t("app.name")}</span>
+        </Link>
+        <LinkButton href="/login" variant="secondary" size="sm">
+          {t("landing.signIn")}
+        </LinkButton>
       </header>
 
       <section className="mx-auto max-w-3xl px-6 pt-12 pb-16 text-center sm:pt-20">
-        <p className="text-sm font-medium text-sand-500">
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-sm font-medium text-brand-700 shadow-xs ring-1 ring-brand-200/70">
+          <BrandMark className="size-4 rounded-sm" />
           {t("landing.eyebrow")}
         </p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+        <h1 className="mt-6 text-4xl font-semibold tracking-tight text-balance text-sand-900 sm:text-6xl">
           {t("landing.title")}
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-sand-600">
+        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-pretty text-sand-600">
           {t("landing.lead")}
         </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link
-            href="/login"
-            className="w-full rounded-lg bg-sand-900 px-6 py-3 text-sm font-medium text-white hover:bg-sand-700 sm:w-auto"
-          >
+        <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <LinkButton href="/login?mode=signup" className="h-11 w-full px-6 sm:w-auto">
             {t("landing.getStarted")}
-          </Link>
-          <Link
-            href="/login"
-            className="w-full rounded-lg border border-sand-300 bg-white px-6 py-3 text-sm font-medium hover:bg-sand-50 sm:w-auto"
-          >
+          </LinkButton>
+          <LinkButton href="/login" variant="secondary" className="h-11 w-full px-6 sm:w-auto">
             {t("landing.tryAssistant")}
-          </Link>
+          </LinkButton>
         </div>
       </section>
 
       <section className="mx-auto max-w-5xl px-6 pb-20">
         <div className="grid gap-4 sm:grid-cols-2">
-          {FEATURES.map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-xl border border-sand-200 bg-white p-6 shadow-sm"
-            >
-              <h2 className="text-sm font-semibold">{t(feature.title)}</h2>
-              <p className="mt-2 text-sm text-pretty text-sand-600">
-                {t(feature.body)}
-              </p>
-            </div>
-          ))}
+          {FEATURES.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <Card key={feature.title} className="p-6">
+                <span
+                  aria-hidden
+                  className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100"
+                >
+                  <Icon className="size-5" />
+                </span>
+                <h2 className="mt-4 text-base font-semibold text-sand-900">{t(feature.title)}</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-pretty text-sand-600">
+                  {t(feature.body)}
+                </p>
+              </Card>
+            );
+          })}
         </div>
 
         <p className="mt-10 text-center text-xs text-sand-500">

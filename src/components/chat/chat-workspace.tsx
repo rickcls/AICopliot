@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessagesSquare } from "lucide-react";
+import { FileSearch, MessagesSquare, Quote } from "lucide-react";
 import type { LoadedConversation, ThreadSummary } from "@/lib/chat/history";
 import type { AnswerProgress } from "@/lib/rag/answer";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -301,18 +301,18 @@ export function ChatWorkspace({
 
       <div className="min-w-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col">
-          <div className="mb-5 flex items-start justify-between gap-4">
+          <div className="mb-8 flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-semibold tracking-tight">
+              <h1 className="truncate text-2xl font-semibold tracking-tight text-sand-900 sm:text-3xl">
                 {conversation?.conversation.title ?? t("chat.title")}
               </h1>
               {focus.kind === "task" ? (
-                <p className="mt-1 text-sm text-sand-600">
+                <p className="mt-2 text-[15px] leading-relaxed text-sand-600">
                   {t("chat.aboutTaskBefore")}{" "}
                   {focus.taskId && projectId ? (
                     <a
                       href={`/projects/${projectId}/tasks?task=${focus.taskId}`}
-                      className="font-medium text-sand-900 underline"
+                      className="font-medium text-sand-900 underline decoration-brand-300 underline-offset-2 hover:decoration-brand-600"
                     >
                       {focus.taskTitle}
                     </a>
@@ -322,7 +322,7 @@ export function ChatWorkspace({
                   {t("chat.aboutTaskAfter")}
                 </p>
               ) : focus.kind === "documents" ? (
-                <p className="mt-1 text-sm text-sand-600">
+                <p className="mt-2 text-[15px] leading-relaxed text-sand-600">
                   {t("chat.onlyFrom")}{" "}
                   <span className="font-medium text-sand-900">
                     {focus.documents.length === 1
@@ -331,7 +331,7 @@ export function ChatWorkspace({
                   </span>
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-sand-600">{t("chat.lead")}</p>
+                <p className="mt-2 text-[15px] leading-relaxed text-sand-600">{t("chat.lead")}</p>
               )}
             </div>
             {/* Below lg the rail has no room beside the 56px icon sidebar, so
@@ -349,6 +349,7 @@ export function ChatWorkspace({
 
           {noEvidence ? (
             <EmptyState
+              icon={<FileSearch className="size-5" />}
               title={t("chat.noEvidenceTitle")}
               description={t("chat.noEvidenceBody")}
               action={
@@ -360,6 +361,7 @@ export function ChatWorkspace({
           ) : turns.length === 0 ? (
             <div className="mb-4">
               <EmptyState
+                icon={<Quote className="size-5" />}
                 title={t("chat.startTitle")}
                 description={t("chat.startBody")}
               />
@@ -411,7 +413,9 @@ export function ChatWorkspace({
             onSubmit={() => ask(question)}
             // The negative margin lets the sticky bar cover content edge to
             // edge instead of letting text slide through the gutter beside it.
-            className="sticky bottom-0 -mx-4 border-t border-sand-200 bg-white px-4 pt-3 pb-4 sm:-mx-6 sm:px-6"
+            // It fades up from the page rather than drawing a white band with a
+            // rule, so the composer card is the only edge.
+            className="sticky bottom-0 -mx-4 bg-linear-to-t from-sand-50 from-70% to-transparent px-4 pt-6 pb-4 sm:-mx-6 sm:px-6"
           />
           )}
         </div>

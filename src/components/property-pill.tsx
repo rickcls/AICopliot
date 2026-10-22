@@ -62,7 +62,8 @@ export function PillSelect({
           "disabled:cursor-not-allowed disabled:opacity-60",
           // Windows paints the option list in the select's own colours, so a
           // solid red pill would otherwise open a red menu with white text.
-          "[&>option]:bg-white [&>option]:text-sand-900",
+          // A descendant selector, so options inside an <optgroup> are reached.
+          "[&_option]:bg-white [&_option]:text-sand-900 [&_optgroup]:bg-white [&_optgroup]:text-sand-900",
         )}
         {...props}
       >

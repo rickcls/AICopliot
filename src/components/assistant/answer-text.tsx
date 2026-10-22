@@ -60,7 +60,7 @@ export function AnswerText({ content, sources }: { content: string; sources: Pub
     last = at + match[0].length;
   }
   if (last < content.length) parts.push(content.slice(last));
-  return <p className="text-sm leading-relaxed whitespace-pre-wrap text-sand-800">{parts}</p>;
+  return <p className="text-[15px] leading-7 whitespace-pre-wrap text-sand-800">{parts}</p>;
 }
 
 const CHIP =

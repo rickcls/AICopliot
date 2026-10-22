@@ -1,7 +1,8 @@
 "use client";
 
 import { useT } from "@/components/i18n-provider";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { CircleAlert } from "lucide-react";
+import { Button, LinkButton, MessagePanel } from "@/components/ui";
 
 /**
  * Failure boundary for the project tabs. A missing or foreign project reaches
@@ -17,24 +18,27 @@ export default function ProjectTabError({
 }) {
   const t = useT();
   return (
-    <Card className="p-6">
-      <h2 className="text-sm font-semibold text-sand-900">
-        {t("errors.sectionFailedTitle")}
-      </h2>
-      <p className="mt-1 text-sm text-sand-600">{t("errors.sectionFailedBody")}</p>
+    <MessagePanel
+      tone="danger"
+      icon={<CircleAlert className="size-6" />}
+      title={t("errors.sectionFailedTitle")}
+      actions={
+        <>
+          <Button type="button" onClick={retry}>
+            {t("errors.tryAgain")}
+          </Button>
+          <LinkButton href="/projects" variant="secondary">
+            {t("errors.backToProjects")}
+          </LinkButton>
+        </>
+      }
+    >
+      <p>{t("errors.sectionFailedBody")}</p>
       {error.digest ? (
         <p className="mt-2 font-mono text-xs text-sand-400">
           {t("errors.reference", { digest: error.digest })}
         </p>
       ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" onClick={retry}>
-          {t("errors.tryAgain")}
-        </Button>
-        <LinkButton href="/projects" variant="secondary">
-          {t("errors.backToProjects")}
-        </LinkButton>
-      </div>
-    </Card>
+    </MessagePanel>
   );
 }

@@ -32,6 +32,8 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FilterChip,
+  FOCUS_RING,
   Input,
   SearchField,
   SectionHeader,
@@ -939,7 +941,7 @@ export function RequirementsPanel({
                     }
                   >
                     {extracting ? (
-                      <Spinner className="border-white/40 border-t-white" />
+                      <Spinner inverse />
                     ) : null}
                     {t("requirements.extract.run")}
                   </Button>
@@ -1309,7 +1311,7 @@ export function RequirementsPanel({
               <Button type="submit" disabled={saving || !draft.title.trim()}>
                 {saving ? (
                   <>
-                    <Spinner className="border-white/40 border-t-white" />
+                    <Spinner inverse />
                     {t("common.saving")}
                   </>
                 ) : editingId ? (
@@ -1358,31 +1360,17 @@ export function RequirementsPanel({
                   : STATUS_DOT[entry.value as RequirementStatus];
 
               return (
-                <button
+                <FilterChip
                   key={entry.value}
-                  type="button"
-                  aria-pressed={selectedFilter}
+                  pressed={selectedFilter}
+                  count={entry.count}
                   onClick={() => setFilter(entry.value)}
-                  className={cn(
-                    "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
-                    selectedFilter
-                      ? "border-sand-900 bg-sand-900 text-white"
-                      : "border-sand-200 bg-white text-sand-600 hover:border-sand-300 hover:text-sand-900",
-                  )}
                 >
                   {dot ? (
                     <span aria-hidden className={cn("size-1.5 rounded-full", dot)} />
                   ) : null}
                   {entry.label}
-                  <span
-                    className={cn(
-                      "tabular-nums",
-                      selectedFilter ? "text-sand-300" : "text-sand-400",
-                    )}
-                  >
-                    {entry.count}
-                  </span>
-                </button>
+                </FilterChip>
               );
             })}
             </div>
@@ -1390,29 +1378,14 @@ export function RequirementsPanel({
             {/* Gaps cuts across the lifecycle statuses rather than being one of
                 them, so it is a separate group. */}
             {deliveryEnabled ? (
-            <button
-              type="button"
-              aria-pressed={filter === "gaps"}
+            <FilterChip
+              tone="danger"
+              pressed={filter === "gaps"}
+              count={uncoveredCount}
               onClick={() => setFilter("gaps")}
-              className={cn(
-                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
-                filter === "gaps"
-                  ? "border-red-700 bg-red-700 text-white"
-                  : uncoveredCount > 0
-                    ? "border-red-200 bg-white text-red-700 hover:border-red-300"
-                    : "border-sand-200 bg-white text-sand-600 hover:border-sand-300",
-              )}
             >
               {t("requirements.filters.gaps")}
-              <span
-                className={cn(
-                  "tabular-nums",
-                  filter === "gaps" ? "text-red-200" : "text-sand-400",
-                )}
-              >
-                {uncoveredCount}
-              </span>
-            </button>
+            </FilterChip>
             ) : null}
           </div>
 
@@ -1506,20 +1479,22 @@ export function RequirementsPanel({
           {/* Reviewing a whole extraction is the point of this page, so the
               batch path is first-class rather than 19 individual dropdowns. */}
           {selectedVisible.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-sand-200 bg-sand-900 px-3 py-2 text-white">
-              <span className="text-xs font-medium">
+            // A tinted band like the task list's, not a black one: the batch
+            // is a selection, and selection is drawn in the brand tint.
+            <div className="flex flex-wrap items-center gap-2 border-b border-brand-100 bg-brand-50 px-3 py-2 text-brand-900">
+              <span className="text-xs font-semibold">
                 {t("requirements.bulk.selected", { count: selectedVisible.length })}
               </span>
               {!allVisibleSelected ? (
                 <button
                   type="button"
-                  className="text-xs text-white/80 underline hover:text-white"
+                  className={cn("rounded text-xs text-brand-700 underline underline-offset-2 hover:text-brand-900", FOCUS_RING)}
                   onClick={toggleSelectAll}
                 >
                   {t("requirements.bulk.selectAll", { count: visible.length })}
                 </button>
               ) : null}
-              <span aria-hidden className="mx-1 h-4 w-px bg-white/20" />
+              <span aria-hidden className="mx-1 h-4 w-px bg-brand-200" />
               {(
                 [
                   ["approved", t("requirements.bulk.approve")],
@@ -1536,15 +1511,15 @@ export function RequirementsPanel({
                   type="button"
                   disabled={bulkBusy}
                   onClick={() => void applyBulkStatus(status)}
-                  className="inline-flex h-7 items-center rounded-md border border-white/25 px-2.5 text-xs font-medium hover:bg-white/10 disabled:opacity-50"
+                  className={buttonClasses({ variant: "secondary", size: "sm", className: "h-7 px-2.5 text-xs" })}
                 >
                   {text}
                 </button>
               ))}
-              {bulkBusy ? <Spinner className="border-white/30 border-t-white" /> : null}
+              {bulkBusy ? <Spinner /> : null}
               <button
                 type="button"
-                className="ml-auto text-xs text-white/70 hover:text-white"
+                className={cn("ml-auto rounded text-xs text-brand-700 hover:text-brand-900", FOCUS_RING)}
                 onClick={() => setSelected(new Set())}
               >
                 {t("common.clear")}
@@ -1649,16 +1624,13 @@ export function RequirementsPanel({
 
                       <div className="flex shrink-0 basis-full items-center gap-1.5 pl-9 sm:basis-auto sm:pl-0">
                         {warnings.map((warning) => (
-                          <span
-                            key={warning}
-                            className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
-                          >
+                          <Badge key={warning} tone="warning">
                             {t(`requirements.warnings.${warning}`)}
-                          </span>
+                          </Badge>
                         ))}
                         <span
                           className={cn(
-                            "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium",
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
                             PRIORITY_STYLE[requirement.priority],
                           )}
                         >

@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Card } from "@/components/ui";
+import { SearchX } from "lucide-react";
+import { LinkButton, MessagePanel } from "@/components/ui";
 import { getT } from "@/lib/i18n/server";
 
 /**
@@ -13,19 +13,20 @@ import { getT } from "@/lib/i18n/server";
 export default async function AppNotFound() {
   const t = await getT();
   return (
-    <Card className="mx-auto max-w-lg p-6">
-      <h1 className="text-lg font-semibold text-sand-900">
-        {t("errors.notFoundTitle")}
-      </h1>
-      <p className="mt-2 text-sm text-sand-600">{t("errors.notFoundBody")}</p>
-      <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium">
-        <Link href="/today" className="text-sand-900 underline">
-          {t("errors.goToToday")}
-        </Link>
-        <Link href="/projects" className="text-sand-900 underline">
-          {t("errors.browseProjects")}
-        </Link>
-      </div>
-    </Card>
+    <MessagePanel
+      headingLevel={1}
+      icon={<SearchX className="size-6" />}
+      title={t("errors.notFoundTitle")}
+      actions={
+        <>
+          <LinkButton href="/today">{t("errors.goToToday")}</LinkButton>
+          <LinkButton href="/projects" variant="secondary">
+            {t("errors.browseProjects")}
+          </LinkButton>
+        </>
+      }
+    >
+      <p>{t("errors.notFoundBody")}</p>
+    </MessagePanel>
   );
 }

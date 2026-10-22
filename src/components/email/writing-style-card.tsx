@@ -80,9 +80,9 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-sand-900">{t("email.style.title")}</h2>
+          <h2 className="text-base font-semibold text-sand-900">{t("email.style.title")}</h2>
           <p className="mt-0.5 text-xs text-sand-500">
             {saved.samples.length > 0
               ? t("email.style.samples", { count: saved.samples.length })
@@ -100,7 +100,10 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
 
       {open ? (
         <div className="space-y-4 border-t border-sand-100 p-4">
-          <p className="text-xs text-sand-500">{t("email.style.lead")}</p>
+          {/* The header already says this while there are no samples. */}
+          {saved.samples.length > 0 ? (
+            <p className="text-xs text-sand-500">{t("email.style.lead")}</p>
+          ) : null}
           {samples.map((sample, index) => (
             <div key={index}>
               <div className="mb-1 flex items-center justify-between">
@@ -167,7 +170,7 @@ export function WritingStyleCard({ initial }: { initial: WritingStyleView }) {
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" disabled={busy !== null} onClick={() => void save()}>
-              {busy === "save" ? <Spinner className="border-white/40 border-t-white" /> : null}
+              {busy === "save" ? <Spinner inverse /> : null}
               {t("email.style.save")}
             </Button>
             <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void analyse()}>

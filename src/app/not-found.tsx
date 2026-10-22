@@ -1,4 +1,5 @@
-import { LinkButton } from "@/components/ui";
+import { SearchX } from "lucide-react";
+import { LinkButton, MessagePanel } from "@/components/ui";
 import { getT } from "@/lib/i18n/server";
 
 /**
@@ -9,22 +10,22 @@ import { getT } from "@/lib/i18n/server";
 export default async function NotFound() {
   const t = await getT();
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-      <p className="text-xs font-semibold tracking-wide text-sand-400 uppercase">
-        404
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-sand-900">
-        {t("errors.publicNotFoundTitle")}
-      </h1>
-      <p className="mt-2 max-w-md text-sm text-sand-600">
-        {t("errors.publicNotFoundBody")}
-      </p>
-      <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <LinkButton href="/">{t("errors.backHome")}</LinkButton>
-        <LinkButton href="/today" variant="secondary">
-          {t("errors.goToToday")}
-        </LinkButton>
-      </div>
+    <main className="flex flex-1 flex-col items-center justify-center bg-linear-to-b from-brand-50/70 via-sand-50 to-sand-50 px-6 py-16">
+      <MessagePanel
+        headingLevel={1}
+        icon={<SearchX className="size-6" />}
+        title={t("errors.publicNotFoundTitle")}
+        actions={
+          <>
+            <LinkButton href="/">{t("errors.backHome")}</LinkButton>
+            <LinkButton href="/today" variant="secondary">
+              {t("errors.goToToday")}
+            </LinkButton>
+          </>
+        }
+      >
+        <p>{t("errors.publicNotFoundBody")}</p>
+      </MessagePanel>
     </main>
   );
 }

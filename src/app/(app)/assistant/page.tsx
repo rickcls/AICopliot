@@ -1,4 +1,5 @@
 import { AssistantWorkspace } from "@/components/assistant/assistant-workspace";
+import { PageHeader } from "@/components/ui";
 import { getThread, listThreads } from "@/lib/assistant/service";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { getCaptureProjectOptions } from "@/lib/capture/service";
@@ -24,10 +25,7 @@ export default async function AssistantPage({
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("assistant.title")}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-sand-600">{t("assistant.lead")}</p>
-      </div>
+      <PageHeader title={t("assistant.title")} lead={t("assistant.lead")} />
       {/* The workspace keeps the web-search switch across thread changes.
           The conversation itself is keyed inside, so opening another one
           starts from that thread's messages. */}

@@ -7,6 +7,7 @@ import { useToast } from "@/components/toast";
 import {
   Badge,
   Button,
+  buttonClasses,
   Card,
   ErrorState,
   FOCUS_RING,
@@ -229,7 +230,7 @@ export function EmailComposer({
           </div>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={busy || !keyPoints.trim()}>
-              {busy ? <Spinner className="border-white/40 border-t-white" /> : <PenLine className="size-4" aria-hidden />}
+              {busy ? <Spinner inverse /> : <PenLine className="size-4" aria-hidden />}
               {busy ? t("email.drafting") : t("email.draft")}
             </Button>
           </div>
@@ -285,20 +286,14 @@ export function EmailComposer({
               href={gmailComposeUrl({ to, subject, body })}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-lg border border-sand-300 bg-white px-4 text-sm font-medium text-sand-900 hover:bg-sand-50",
-                FOCUS_RING,
-              )}
+              className={buttonClasses({ variant: "secondary" })}
             >
               <ExternalLink className="size-4" aria-hidden />
               {t("email.openGmail")}
             </a>
             <a
               href={mailtoUrl({ to, subject, body })}
-              className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-sand-600 hover:bg-sand-100 hover:text-sand-900",
-                FOCUS_RING,
-              )}
+              className={buttonClasses({ variant: "ghost" })}
             >
               <Mail className="size-4" aria-hidden />
               {t("email.openMail")}

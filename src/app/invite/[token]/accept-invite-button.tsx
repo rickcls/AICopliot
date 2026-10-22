@@ -51,7 +51,7 @@ export function AcceptInviteButton({
     <div className="space-y-3">
       {error ? <ErrorState message={error} /> : null}
       <Button type="button" className="w-full" disabled={pending} onClick={() => void accept()}>
-        {pending ? <Spinner className="border-white/40 border-t-white" /> : null}
+        {pending ? <Spinner inverse /> : null}
         {label}
       </Button>
     </div>

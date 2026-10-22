@@ -3,13 +3,22 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bot, Plus, Send, Trash2 } from "lucide-react";
+import { Plus, Send, Sparkles, Trash2 } from "lucide-react";
 import { AssistantMessage } from "@/components/assistant/assistant-message";
+import { BrandMark } from "@/components/brand-mark";
 import type { ColleagueOption, ProjectOption } from "@/components/capture/proposal-list";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
-import { Button, Card, ErrorState, FilterChip, FOCUS_RING, Spinner, Textarea } from "@/components/ui";
+import {
+  Button,
+  ErrorState,
+  FilterChip,
+  FOCUS_RING,
+  LinkButton,
+  Spinner,
+  Textarea,
+} from "@/components/ui";
 import type { AssistantMessageView } from "@/lib/assistant/service";
 import { cn } from "@/lib/utils";
 
@@ -162,17 +171,11 @@ function AssistantConversation({
   return (
     <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
       <aside className="space-y-2">
-        <Link
-          href="/assistant"
-          className={cn(
-            "flex items-center gap-2 rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm font-medium text-sand-700 hover:bg-sand-50",
-            FOCUS_RING,
-          )}
-        >
+        <LinkButton href="/assistant" variant="secondary" className="w-full justify-start">
           <Plus className="size-4" aria-hidden />
           {t("assistant.newThread")}
-        </Link>
-        <p className="px-1 pt-2 text-xs font-semibold tracking-wide text-sand-400 uppercase">
+        </LinkButton>
+        <p className="px-1 pt-3 text-xs font-semibold tracking-wide text-sand-500 uppercase">
           {t("assistant.threads")}
         </p>
         {threads.length === 0 ? (
@@ -185,8 +188,11 @@ function AssistantConversation({
                   href={`/assistant?thread=${thread.id}`}
                   aria-current={thread.id === threadId ? "true" : undefined}
                   className={cn(
-                    "min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-sm",
-                    thread.id === threadId ? "bg-sand-100 font-medium text-sand-900" : "text-sand-600 hover:bg-sand-50",
+                    "min-w-0 flex-1 truncate rounded-xl px-2.5 py-1.5 text-sm transition-colors",
+                    FOCUS_RING,
+                    thread.id === threadId
+                      ? "bg-brand-100/70 font-medium text-brand-800"
+                      : "text-sand-600 hover:bg-sand-100 hover:text-sand-900",
                   )}
                 >
                   {thread.title}
@@ -208,13 +214,17 @@ function AssistantConversation({
 
       <section className="min-w-0 space-y-6">
         {messages.length === 0 ? (
-          <Card className="p-5">
-            <div className="flex items-center gap-2 text-sm font-semibold text-sand-900">
-              <Bot className="size-4 text-sand-400" aria-hidden />
-              {t("assistant.title")}
-            </div>
-            <p className="mt-1 max-w-2xl text-sm text-sand-600">{t("assistant.lead")}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
+          // An invitation rather than a second copy of the page's own heading
+          // and lead, which the page header above already shows.
+          <div className="flex flex-col items-center px-4 py-12 text-center">
+            <BrandMark className="size-12" />
+            <h2 className="mt-4 text-xl font-semibold tracking-tight text-sand-900">
+              {t("assistant.emptyTitle")}
+            </h2>
+            <p className="mt-6 text-xs font-semibold tracking-wide text-sand-500 uppercase">
+              {t("assistant.tryAsking")}
+            </p>
+            <div className="mt-3 flex max-w-2xl flex-wrap justify-center gap-2">
               {examples.map((example) => (
                 <button
                   key={example}
@@ -222,21 +232,23 @@ function AssistantConversation({
                   onClick={() => void ask(example)}
                   disabled={busy}
                   className={cn(
-                    "rounded-full border border-sand-200 bg-white px-3 py-1 text-xs text-sand-700 hover:bg-sand-50",
+                    "inline-flex items-center gap-1.5 rounded-full border border-sand-200 bg-white px-3.5 py-1.5 text-sm text-sand-700 shadow-xs transition-colors",
+                    "hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 disabled:opacity-50",
                     FOCUS_RING,
                   )}
                 >
+                  <Sparkles aria-hidden className="size-3.5 text-brand-500" />
                   {example}
                 </button>
               ))}
             </div>
-          </Card>
+          </div>
         ) : (
           <ol className="space-y-6">
             {messages.map((message) => (
               <li key={message.id}>
                 {message.role === "user" ? (
-                  <div className="ml-auto max-w-[85%] rounded-xl bg-sand-900 px-4 py-2.5 text-sm whitespace-pre-wrap text-white">
+                  <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-brand-50 px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap text-brand-950 ring-1 ring-brand-100 ring-inset">
                     <span className="sr-only">{t("assistant.you")}: </span>
                     {message.content}
                   </div>
@@ -268,7 +280,9 @@ function AssistantConversation({
             event.preventDefault();
             void ask(question);
           }}
-          className="sticky bottom-4 rounded-xl border border-sand-200 bg-white p-3 shadow-sm"
+          // One card with a borderless field inside, like the capture box; the
+          // card shows focus, so the field drops its own ring.
+          className="sticky bottom-4 overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-soft transition-shadow focus-within:border-brand-300 focus-within:ring-4 focus-within:ring-brand-100/70"
         >
           <label htmlFor={inputId} className="sr-only">
             {t("assistant.title")}
@@ -280,6 +294,7 @@ function AssistantConversation({
             maxLength={2000}
             placeholder={t("assistant.placeholder")}
             disabled={busy}
+            className="resize-none rounded-none border-0 bg-transparent px-4 pt-3 pb-1 text-[15px] leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0"
             onChange={(event) => setQuestion(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -288,7 +303,7 @@ function AssistantConversation({
               }
             }}
           />
-          <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 px-3 pt-1 pb-3">
             <div className="flex min-w-0 items-center gap-2">
               <FilterChip
                 pressed={webSearch}
@@ -301,7 +316,7 @@ function AssistantConversation({
               <span className="hidden text-xs text-sand-400 sm:inline">{t("capture.shortcutHint", { key: "Ctrl/⌘" })}</span>
             </div>
             <Button type="submit" size="sm" disabled={busy || !question.trim()}>
-              {busy ? <Spinner className="border-white/40 border-t-white" /> : <Send className="size-3.5" aria-hidden />}
+              {busy ? <Spinner inverse /> : <Send className="size-3.5" aria-hidden />}
               {t("assistant.ask")}
             </Button>
           </div>

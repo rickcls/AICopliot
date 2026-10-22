@@ -5,6 +5,7 @@ import { getCapture } from "@/lib/capture/service";
 import { getEmailDraft, getWritingStyle, listEmailDrafts } from "@/lib/email/service";
 import { getT } from "@/lib/i18n/server";
 import { getMyOpenTasks } from "@/lib/pm/my-work";
+import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,7 @@ export default async function EmailPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("email.title")}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-sand-600">{t("email.lead")}</p>
-      </div>
+      <PageHeader title={t("email.title")} lead={t("email.lead")} />
       <WritingStyleCard initial={style} />
       <EmailComposer
         tasks={options}

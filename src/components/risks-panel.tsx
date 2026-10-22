@@ -439,7 +439,7 @@ export function RisksPanel({
               >
                 {saving ? (
                   <>
-                    <Spinner className="border-white/40 border-t-white" />
+                    <Spinner inverse />
                     {t("common.saving")}
                   </>
                 ) : editingId ? (

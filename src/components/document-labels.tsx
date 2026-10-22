@@ -173,7 +173,7 @@ export function DocumentLabels({
           </div>
           <div className="flex gap-2 sm:col-start-2">
             <Button type="submit" size="sm" disabled={busy !== null}>
-              {busy === "save" ? <Spinner className="border-white/40 border-t-white" /> : null}
+              {busy === "save" ? <Spinner inverse /> : null}
               {t("documents.detail.save")}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>

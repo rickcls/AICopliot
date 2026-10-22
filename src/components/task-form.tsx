@@ -583,7 +583,7 @@ export function TaskForm({
           <Button type="submit" disabled={!submittable}>
             {saving ? (
               <>
-                <Spinner className="border-white/40 border-t-white" />
+                <Spinner inverse />
                 {t("common.saving")}
               </>
             ) : editing ? (

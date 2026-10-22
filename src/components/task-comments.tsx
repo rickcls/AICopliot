@@ -166,7 +166,7 @@ export function TaskComments({
                     </span>
                     <time
                       dateTime={comment.createdAt}
-                      className="text-[11px] text-sand-400"
+                      className="text-xs text-sand-400"
                     >
                       {formatDate(comment.createdAt, dateLocale, timeZone)}
                     </time>
@@ -174,7 +174,7 @@ export function TaskComments({
                       <button
                         type="button"
                         onClick={() => void remove(comment)}
-                        className="text-[11px] text-sand-400 transition-colors hover:text-red-700"
+                        className="text-xs text-sand-400 transition-colors hover:text-red-700"
                       >
                         {t("common.delete")}
                       </button>
@@ -228,7 +228,7 @@ export function TaskComments({
             <Button type="submit" size="sm" disabled={posting}>
               {posting ? (
                 <>
-                  <Spinner className="size-3 border-white/40 border-t-white" />
+                  <Spinner inverse className="size-3" />
                   {t("tasks.comments.posting")}
                 </>
               ) : (

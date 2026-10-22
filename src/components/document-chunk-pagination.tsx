@@ -93,7 +93,7 @@ export function DocumentChunkPageLinks({
               className={cn(
                 buttonClasses({ size: "icon", variant: "ghost" }),
                 active
-                  ? "bg-sand-900 text-white"
+                  ? "bg-brand-100/70 font-semibold text-brand-800 hover:bg-brand-100"
                   : "hover:text-sand-900",
               )}
             >
