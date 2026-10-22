@@ -166,22 +166,28 @@ export function TaskDocumentsField({
             icon={<FilePlus2 className="size-3.5" />}
             className="max-w-xs"
             value=""
+            placeholder={t("tasks.documents.linkPlaceholder")}
             disabled={disabled}
-            onChange={(event) => {
-              const document = unlinked.find((item) => item.id === event.target.value);
+            options={unlinked.map((document) => ({
+              value: document.id,
+              label: document.originalFilename,
+              content: (
+                <>
+                  <FileText aria-hidden className="size-4 shrink-0 text-sand-400" />
+                  <span className="truncate">{document.originalFilename}</span>
+                  {document.status === "ready" ? null : (
+                    <Badge tone={document.status === "failed" ? "danger" : "neutral"} className="shrink-0">
+                      {t(`documents.status.${document.status}`)}
+                    </Badge>
+                  )}
+                </>
+              ),
+            }))}
+            onValueChange={(id) => {
+              const document = unlinked.find((item) => item.id === id);
               if (document) onAdd(document);
             }}
-          >
-            <option value="">{t("tasks.documents.linkPlaceholder")}</option>
-            {unlinked.map((document) => (
-              <option key={document.id} value={document.id}>
-                {document.originalFilename}
-                {document.status === "ready"
-                  ? ""
-                  : ` (${t(`documents.status.${document.status}`)})`}
-              </option>
-            ))}
-          </PillSelect>
+          />
         ) : null}
 
         <label

@@ -31,6 +31,13 @@ import {
   TaskDatePill,
 } from "@/components/property-pill";
 import { TaskApproach } from "@/components/task-approach";
+import {
+  assigneeOptions,
+  milestoneOptions,
+  priorityOptions,
+  projectOptions,
+  statusOptions,
+} from "@/components/task-field-options";
 import { TaskChat } from "@/components/task-chat";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDependencies } from "@/components/task-dependencies";
@@ -46,7 +53,6 @@ import {
 import {
   STATUS_DOT,
   STATUS_PILL,
-  TASK_PRIORITIES,
   statusColorToken,
   type MemberOption,
   type MilestoneOption,
@@ -56,7 +62,6 @@ import {
   type TaskRow,
   type TaskStatusOption,
 } from "@/components/task-types";
-import { displayStatusLabel } from "@/lib/i18n/status-labels";
 import type { TaskProposal } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { TracedRequirements } from "@/components/traced-requirements";
@@ -456,7 +461,7 @@ export function TaskDetail({
                 project asks first, and a cancelled move leaves this as it was. */}
             {projects.length > 1 ? (
               <>
-                <label htmlFor="detail-project" className={ROW_LABEL}>
+                <label id="detail-project-label" htmlFor="detail-project" className={ROW_LABEL}>
                   {t("tasks.fields.project")}
                 </label>
                 <div className="min-w-0">
@@ -464,20 +469,15 @@ export function TaskDetail({
                     id="detail-project"
                     icon={<Folder className="size-3.5 opacity-70" />}
                     value={task.projectId}
+                    options={projectOptions(projects)}
                     disabled={disabled}
-                    onChange={(event) => onMove(event.target.value)}
-                  >
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </PillSelect>
+                    onValueChange={onMove}
+                  />
                 </div>
               </>
             ) : null}
 
-            <label htmlFor="detail-status" className={ROW_LABEL}>
+            <label id="detail-status-label" htmlFor="detail-status" className={ROW_LABEL}>
               {t("tasks.fields.status")}
             </label>
             <div className="min-w-0">
@@ -486,18 +486,13 @@ export function TaskDetail({
                 tone={STATUS_PILL[statusTone]}
                 icon={<span className={cn("block size-2 rounded-full", STATUS_DOT[statusTone])} />}
                 value={draft.statusId}
+                options={statusOptions(statuses, t)}
                 disabled={disabled}
-                onChange={(event) => void save({ statusId: event.target.value })}
-              >
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {displayStatusLabel(status, t)}
-                  </option>
-                ))}
-              </PillSelect>
+                onValueChange={(statusId) => void save({ statusId })}
+              />
             </div>
 
-            <label htmlFor="detail-assignee" className={ROW_LABEL}>
+            <label id="detail-assignee-label" htmlFor="detail-assignee" className={ROW_LABEL}>
               {t("tasks.fields.assignee")}
             </label>
             <div className="min-w-0">
@@ -512,19 +507,13 @@ export function TaskDetail({
                   )
                 }
                 value={draft.assigneeId}
+                options={assigneeOptions(members, t)}
                 disabled={disabled}
-                onChange={(event) => void save({ assigneeId: event.target.value })}
-              >
-                <option value="">{t("common.unassigned")}</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </PillSelect>
+                onValueChange={(assigneeId) => void save({ assigneeId })}
+              />
             </div>
 
-            <label htmlFor="detail-priority" className={ROW_LABEL}>
+            <label id="detail-priority-label" htmlFor="detail-priority" className={ROW_LABEL}>
               {t("tasks.fields.priority")}
             </label>
             <div className="min-w-0">
@@ -534,20 +523,13 @@ export function TaskDetail({
                 icon={<PriorityIcon priority={draft.priority} />}
                 className="font-semibold"
                 value={draft.priority}
+                options={priorityOptions(t)}
                 disabled={disabled}
-                onChange={(event) =>
-                  void save({ priority: event.target.value as TaskPriority })
-                }
-              >
-                {TASK_PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {t(`priority.${priority}`)}
-                  </option>
-                ))}
-              </PillSelect>
+                onValueChange={(priority) => void save({ priority: priority as TaskPriority })}
+              />
             </div>
 
-            <label htmlFor="detail-milestone" className={ROW_LABEL}>
+            <label id="detail-milestone-label" htmlFor="detail-milestone" className={ROW_LABEL}>
               {t("tasks.fields.milestone")}
             </label>
             <div className="min-w-0">
@@ -556,16 +538,10 @@ export function TaskDetail({
                 tone={draft.milestoneId ? undefined : PILL_EMPTY}
                 icon={<Milestone className="size-3.5 opacity-70" />}
                 value={draft.milestoneId}
+                options={milestoneOptions(milestones, t)}
                 disabled={disabled}
-                onChange={(event) => void save({ milestoneId: event.target.value })}
-              >
-                <option value="">{t("common.none")}</option>
-                {milestones.map((milestone) => (
-                  <option key={milestone.id} value={milestone.id}>
-                    {milestone.title}
-                  </option>
-                ))}
-              </PillSelect>
+                onValueChange={(milestoneId) => void save({ milestoneId })}
+              />
             </div>
 
             {showStart ? (
