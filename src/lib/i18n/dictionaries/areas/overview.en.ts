@@ -165,7 +165,6 @@ export const overviewEn = {
     emptyTitle: "No projects yet",
     emptyBody: "Create a project to keep its documents and tasks together, and to keep answers to the right context.",
     noDescription: "No description.",
-    open: "Open project",
     ask: "Ask",
   },
 } as const;

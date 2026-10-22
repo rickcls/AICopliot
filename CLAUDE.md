@@ -670,7 +670,14 @@ Also there, and to be reused rather than re-typed:
 - `buttonClasses()` / `LinkButton` — a navigation styled as a button stays an
   `<a>`. Fourteen links had hand-copied button classes at three heights.
 - `StatCard` (a zero renders neutral whatever its tone) and `ProgressBar` (fed
-  by `percentOf` from `progress.ts`, never a raw `Math.round`).
+  by `percentOf` from `progress.ts`, never a raw `Math.round`). Numbers read
+  together go in one `StatGroup` as `plain` cells rather than a card each: the
+  hairlines between them are the card's fill showing through a `gap-px` grid,
+  so they hold at any column count — but every cell must be filled, or the
+  gap colour shows through the empty one.
+- `FOCUS_RING_INSET` — for a link that fills a cell of a clipped card or a
+  sideways-scrolling strip (stat cells, overview panels, project tabs), where
+  `FOCUS_RING`'s offset ring would be cut off.
 - `FilterChip` (`aria-pressed` carries the state), `SearchField`, and `CHECKBOX`.
 - `PageHeader` — a page's one `h1`, lead, and actions. Pages had written it
   ten ways; new pages use it, and the rest move over page by page.
@@ -678,8 +685,10 @@ Also there, and to be reused rather than re-typed:
   not driven by an options array, because segments hold an icon, a language
   mark (with its own `lang`), or icon and text. Five copies existed.
 - `identityTone(seed)` — one colour per person or project, from its id or
-  email, so it is the same in every list (`Avatar`, the sidebar's project
-  marks).
+  email, so it is the same in every list. `Avatar` uses it, and `ProjectMark`
+  (`project-mark.tsx`) is the one project mark — sidebar, project list, and
+  project header — with a person glyph on the brand tint for someone's own
+  project.
 
 **The look is warm and quiet: paper, not a spreadsheet.** The neutral is
 `sand` (a warm grey whose lightness follows slate step for step, so contrast
@@ -701,7 +710,9 @@ sources. Decided items expand into read-only values, not disabled inputs.
 Two devices earn their keep in dense rows. **Priority is a coloured flag, not a
 badge** — next to a status pill, two same-shaped pills compete for one glance,
 and `low` is deliberately near-invisible because the column exists to find the
-urgent rows. **A risk's impact and likelihood collapse to one chip coloured by
+urgent rows. It is the *only* mark of priority: board cards once carried a
+same-coloured stripe down the left edge as well, two marks saying one thing.
+**A risk's impact and likelihood collapse to one chip coloured by
 whichever is worse**; that is a rule for picking a colour, not a new severity
 scale, and both levels stay named in the chip and again in the expansion.
 Wherever colour replaces a word, the word goes to `sr-only` — see the flag on
@@ -1183,7 +1194,11 @@ footer; the workspace overview is reached from Projects, so each question has
 one entry.
 `/projects/[id]/documents` remains the project-scoped library.
 
-**The Overview leads somewhere.** Each stat card opens the filtered rows it
+**The Overview leads somewhere, on few surfaces.** It used to draw up to
+sixteen bordered boxes; now the next step and its four discovery stages are
+one card, each section's numbers are one `StatGroup`, and lists read together
+(overdue beside blocked, milestones beside risks) share one card split by a
+hairline. Each stat card opens the filtered rows it
 counts (`/tasks?filter=overdue`, `/requirements?filter=gaps`, …), overdue and
 blocked rows open the task itself, and a "waiting on a decision" banner counts
 `undecidedRequirementWhere` and `pendingPlanRunWhere` from `rules.ts`.
@@ -1570,6 +1585,11 @@ and `/* dark-palette:end */` in `src/app/globals.css` inverts each scale
   (`ProjectTaskStatus.color`, the seeded Backlog) and the `STATUS_DOT` /
   `STATUS_PILL` keys that read it — data, so it is never renamed; it maps to
   `sand-*` classes.
+- **Text never sits on a 500 fill.** 500 is the one shade the remap leaves in
+  place while `white` turns dark, so white-on-500 becomes dark-on-mid in the
+  dark theme. A fill carrying white text uses 600 or deeper; a label uses a
+  tint (`bg-*-50 text-*-700`, as `Badge` and `STATUS_PILL` do). A 500 fill
+  with no text — a dot, a Gantt bar — is fine.
 - **Regenerate the block rather than hand-editing it:**
   `node scripts/generate-dark-palette.mjs`. It reads
   `node_modules/tailwindcss/theme.css` plus the families declared in

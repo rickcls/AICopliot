@@ -64,12 +64,12 @@ export function Modal({
       className={cn(
         // Wide enough that the paired fields get a real measure each, and
         // capped by the viewport clause so it still fits a phone.
-        "m-auto w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-sand-200 bg-white p-0 text-sand-900 shadow-xl",
+        "m-auto w-[calc(100vw-2rem)] max-w-4xl rounded-2xl border border-sand-200/80 bg-white p-0 text-sand-900 shadow-2xl",
         // Leaves a margin at both ends on a short viewport, so the panel never
         // runs off the top where its header — and the close button — would be
         // unreachable.
         "max-h-[calc(100dvh-4rem)]",
-        "open:animate-dialog-in backdrop:animate-overlay-in backdrop:bg-black/50",
+        "open:animate-dialog-in backdrop:animate-overlay-in backdrop:bg-black/40",
         className,
       )}
     >
@@ -78,13 +78,13 @@ export function Modal({
           would leave a closed dialog visible. `inherit` picks up the cap above
           so the body has a bounded height to scroll within. */}
       <div className="flex max-h-[inherit] flex-col">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-sand-200 px-5 py-3.5">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-sand-100 px-6 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-sm font-semibold text-sand-900">
+            <h2 id={titleId} className="text-base font-semibold text-sand-900">
               {title}
             </h2>
             {description ? (
-              <p className="mt-0.5 text-xs text-sand-500">{description}</p>
+              <p className="mt-0.5 text-sm text-sand-500">{description}</p>
             ) : null}
           </div>
           <button
@@ -92,7 +92,7 @@ export function Modal({
             onClick={onClose}
             aria-label={t("common.close")}
             className={cn(
-              "-mr-1.5 -mt-0.5 grid size-7 shrink-0 place-items-center rounded-md text-sand-400 transition-colors hover:bg-sand-100 hover:text-sand-900",
+              "-mr-1.5 -mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg text-sand-400 transition-colors hover:bg-sand-100 hover:text-sand-900",
               FOCUS_RING,
             )}
           >
@@ -113,7 +113,7 @@ export function ModalBody({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", className)}
+      className={cn("min-h-0 flex-1 overflow-y-auto px-6 py-5", className)}
       {...props}
     />
   );
@@ -127,7 +127,7 @@ export function ModalFooter({
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-sand-200 bg-sand-50/60 px-5 py-3",
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-sand-100 bg-sand-50/60 px-6 py-3.5",
         className,
       )}
       {...props}

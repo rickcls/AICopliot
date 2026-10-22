@@ -10,7 +10,7 @@ import {
   Timer,
 } from "lucide-react";
 import { useDateLocale, useT } from "@/components/i18n-provider";
-import { Avatar, FOCUS_RING, Input, Select } from "@/components/ui";
+import { Avatar, Badge, CHECKBOX, FOCUS_RING, Input, Select } from "@/components/ui";
 import { toPartialPayload, type TaskDraft } from "@/components/task-form";
 import {
   PRIORITY_FLAG,
@@ -210,7 +210,7 @@ export function TaskListRow({
           onChange={(event) =>
             onToggleSelect((event.nativeEvent as MouseEvent).shiftKey)
           }
-          className="size-3.5 rounded border-sand-300 text-sand-900 focus-visible:ring-sand-900"
+          className={CHECKBOX}
         />
       </td>
       <td className="px-1 py-2.5">
@@ -290,13 +290,13 @@ export function TaskListRow({
             </button>
           ) : null}
           {task.dependencies.length > 0 && editing !== "title" ? (
-            <span
+            <Badge
               title={t("tasks.card.dependsOn", { count: task.dependencies.length })}
-              className="inline-flex shrink-0 items-center gap-1 rounded bg-sand-100 px-1.5 py-0.5 text-[11px] text-sand-600 tabular-nums"
+              className="shrink-0 gap-1 px-1.5 tabular-nums"
             >
               <GitBranch className="size-3" aria-hidden />
               {task.dependencies.length}
-            </span>
+            </Badge>
           ) : null}
         </span>
       </th>

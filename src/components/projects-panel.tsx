@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FileText, FolderKanban, MessageSquare, ShieldAlert, SquareKanban } from "lucide-react";
+import { ProjectMark } from "@/components/project-mark";
 import {
   Button,
   Card,
   EmptyState,
   ErrorState,
+  FOCUS_RING,
   LinkButton,
   Input,
   Spinner,
@@ -16,11 +19,14 @@ import {
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDateLocale, useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
+import { cn } from "@/lib/utils";
 
 interface ProjectRow {
   id: string;
   name: string;
   description: string | null;
+  /** The viewer's own project, which carries a person mark. */
+  personal: boolean;
   documentCount: number;
   taskCount: number;
   milestoneCount: number;
@@ -73,11 +79,12 @@ export function ProjectsPanel({
             id: data.project.id,
             name: data.project.name,
             description: data.project.description,
+            personal: false,
             documentCount: data.project._count.documents,
             taskCount: data.project._count.tasks,
             milestoneCount: data.project._count.milestones,
             riskCount: data.project._count.risks,
-          requirementCount: data.project._count.requirements,
+            requirementCount: data.project._count.requirements,
           },
         ].sort((a, b) => a.name.localeCompare(b.name)),
       );
@@ -166,12 +173,14 @@ export function ProjectsPanel({
 
   return (
     <div className="space-y-6">
+      {/* One line until there is a name to describe: the form used to open
+          the page as a full card above the list it adds to. */}
       <Card className="p-4">
         <form onSubmit={createProject} className="space-y-3">
-          <div>
-            <label htmlFor="project-name" className="mb-1.5 block text-sm font-medium">
-              {t("projects.name")}
-            </label>
+          <label htmlFor="project-name" className="block text-sm font-medium text-sand-900">
+            {t("projects.name")}
+          </label>
+          <div className="flex flex-wrap gap-2">
             <Input
               id="project-name"
               value={name}
@@ -179,27 +188,8 @@ export function ProjectsPanel({
               placeholder={t("projects.namePlaceholder")}
               maxLength={120}
               disabled={saving}
+              className="min-w-0 flex-1 basis-60"
             />
-          </div>
-          <div>
-            <label
-              htmlFor="project-description"
-              className="mb-1.5 block text-sm font-medium"
-            >
-              {t("projects.description")}{" "}
-              <span className="font-normal text-sand-500">{t("projects.optional")}</span>
-            </label>
-            <Textarea
-              id="project-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder={t("projects.descriptionPlaceholder")}
-              rows={2}
-              maxLength={1000}
-              disabled={saving}
-            />
-          </div>
-          <div className="flex justify-end">
             <Button type="submit" disabled={saving || !name.trim()}>
               {saving ? (
                 <>
@@ -211,6 +201,26 @@ export function ProjectsPanel({
               )}
             </Button>
           </div>
+          {name.trim() ? (
+            <div>
+              <label
+                htmlFor="project-description"
+                className="mb-1.5 block text-sm font-medium text-sand-900"
+              >
+                {t("projects.description")}{" "}
+                <span className="font-normal text-sand-500">{t("projects.optional")}</span>
+              </label>
+              <Textarea
+                id="project-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder={t("projects.descriptionPlaceholder")}
+                rows={2}
+                maxLength={1000}
+                disabled={saving}
+              />
+            </div>
+          ) : null}
         </form>
       </Card>
 
@@ -218,45 +228,71 @@ export function ProjectsPanel({
 
       {projects.length === 0 ? (
         <EmptyState
+          icon={<FolderKanban className="size-5" />}
           title={t("projects.emptyTitle")}
           description={t("projects.emptyBody")}
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
-            <Card key={project.id} className="flex flex-col p-5">
-              <Link
-                href={`/projects/${project.id}`}
-                className="text-sm font-semibold hover:underline"
-              >
-                {project.name}
-              </Link>
-              <p className="mt-1 flex-1 text-sm text-pretty text-sand-600">
+            <Card
+              key={project.id}
+              className="relative flex flex-col p-5 transition-[border-color,box-shadow] hover:border-sand-300 hover:shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <ProjectMark
+                  id={project.id}
+                  name={project.name}
+                  personal={project.personal}
+                  className="size-9 rounded-xl text-sm"
+                />
+                {/* The name's link covers the whole card (the `after:` layer),
+                    so the card opens the project; the buttons below sit above
+                    that layer. A separate "Open" button only repeated it. */}
+                <Link
+                  href={`/projects/${project.id}`}
+                  className={cn(
+                    "min-w-0 truncate rounded text-base font-semibold text-sand-900 after:absolute after:inset-0 after:rounded-2xl",
+                    FOCUS_RING,
+                  )}
+                >
+                  {project.name}
+                </Link>
+              </div>
+              <p className="mt-3 line-clamp-3 flex-1 text-sm text-pretty text-sand-600">
                 {project.description || t("projects.noDescription")}
               </p>
-              <p className="mt-4 text-xs text-sand-500">
-                {[
-                  t("projects.nouns.document", { count: project.documentCount }),
-                  t("projects.nouns.task", { count: project.taskCount }),
-                  t("projects.nouns.risk", { count: project.riskCount }),
-                ].join(" · ")}
+              <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-sand-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <SquareKanban aria-hidden className="size-3.5 text-sand-400" />
+                  {t("projects.nouns.task", { count: project.taskCount })}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <FileText aria-hidden className="size-3.5 text-sand-400" />
+                  {t("projects.nouns.document", { count: project.documentCount })}
+                </span>
+                {project.riskCount > 0 ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <ShieldAlert aria-hidden className="size-3.5 text-sand-400" />
+                    {t("projects.nouns.risk", { count: project.riskCount })}
+                  </span>
+                ) : null}
               </p>
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-sand-100 pt-4">
-                <LinkButton href={`/projects/${project.id}`} size="sm">
-                  {t("projects.open")}
-                </LinkButton>
+              <div className="relative z-10 mt-4 flex items-center gap-2 border-t border-sand-100 pt-3">
                 <LinkButton
                   href={`/chat?project=${project.id}`}
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
+                  className="-ml-2"
                 >
+                  <MessageSquare className="size-3.5" aria-hidden />
                   {t("projects.ask")}
                 </LinkButton>
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="ml-auto"
+                  className="ml-auto -mr-2 text-sand-500 hover:text-red-700"
                   disabled={deletingId === project.id}
                   onClick={() => void deleteProject(project)}
                 >

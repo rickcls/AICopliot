@@ -4,7 +4,7 @@ import { MessageSquare } from "lucide-react";
 import { DeleteDocumentButton } from "@/components/delete-document-button";
 import { DocumentLabels } from "@/components/document-labels";
 import { RetryIngestionButton } from "@/components/retry-ingestion-button";
-import { Badge, Card, LinkButton, SectionHeader } from "@/components/ui";
+import { Badge, Card, LinkButton, PageHeader, SectionHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { intlLocale } from "@/lib/i18n/locales";
@@ -45,39 +45,43 @@ export default async function DocumentDetailPage({
   return (
     // Extracted document text is prose; cap the width so lines stay readable.
     <div className="mx-auto w-full max-w-4xl">
-      <Link href="/documents" className="text-sm text-sand-500 hover:text-sand-900">
+      <Link href="/documents" className="inline-flex items-center gap-1 text-sm text-sand-500 hover:text-sand-900">
         ← {t("documents.detail.back")}
       </Link>
 
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">{name}</h1>
-          <p className="mt-1 text-sm text-sand-500">
+      <PageHeader
+        className="mt-3 mb-0"
+        // A filename can be one unbroken word; let it wrap rather than overflow.
+        title={<span className="break-words">{name}</span>}
+        lead={
+          <>
             {document.title ? `${document.originalFilename} · ` : null}
             {t("documents.detail.uploaded", {
               size: formatBytes(document.sizeBytes),
               date: formatInstantDay(document.createdAt, dateLocale, timeZone),
             })}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {document.status !== "ready" ? (
-            <Badge tone={STATUS_TONE[document.status]}>
-              {t(`documents.status.${document.status}`)}
-            </Badge>
-          ) : (
-            <LinkButton href={`/chat?docs=${document.id}`} variant="secondary" size="sm">
-              <MessageSquare className="size-4" aria-hidden />
-              {t("documents.detail.ask")}
-            </LinkButton>
-          )}
-          {document.status === "failed" ? <RetryIngestionButton id={document.id} /> : null}
-          <DeleteDocumentButton id={document.id} filename={name} />
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            {document.status !== "ready" ? (
+              <Badge tone={STATUS_TONE[document.status]}>
+                {t(`documents.status.${document.status}`)}
+              </Badge>
+            ) : (
+              <LinkButton href={`/chat?docs=${document.id}`} variant="secondary" size="sm">
+                <MessageSquare className="size-4" aria-hidden />
+                {t("documents.detail.ask")}
+              </LinkButton>
+            )}
+            {document.status === "failed" ? <RetryIngestionButton id={document.id} /> : null}
+            <DeleteDocumentButton id={document.id} filename={name} />
+          </>
+        }
+      />
 
       {document.status === "failed" && document.errorMessage ? (
-        <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+        <div role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
           <p className="text-sm font-medium text-red-800">{t("documents.detail.failedTitle")}</p>
           <p className="mt-1 text-sm text-red-700">{document.errorMessage}</p>
         </div>

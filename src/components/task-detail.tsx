@@ -15,6 +15,7 @@ import {
   Badge,
   Button,
   ErrorState,
+  FOCUS_RING,
   Input,
   QUIET_CONTROL,
   ROW_ICON,
@@ -294,14 +295,16 @@ export function TaskDetail({
         type="button"
         aria-label={t("tasks.detail.closeDetails")}
         onClick={onClose}
-        className="absolute inset-0 bg-sand-900/30"
+        // Black, as for the dialogs: a sand scrim inverts to a light wash in
+        // the dark theme.
+        className="absolute inset-0 animate-overlay-in bg-black/40"
       />
 
       <div
         role="dialog"
         aria-label={t("tasks.detail.dialogLabel", { title: task.title })}
         aria-modal="true"
-        className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-sand-200 bg-white shadow-xl"
+        className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-sand-200/80 bg-white shadow-2xl"
       >
         <div className="sticky top-0 z-10 flex flex-wrap items-start gap-2 border-b border-sand-200 bg-white/95 px-4 pt-4 backdrop-blur">
           {/* The name is edited in place at heading size, matching the create
@@ -323,7 +326,10 @@ export function TaskDetail({
             onClick={() => onExpand(draft)}
             aria-label={t("tasks.detail.expand")}
             title={t("tasks.detail.expand")}
-            className="shrink-0 rounded-lg p-1.5 text-sand-500 transition-colors hover:bg-sand-100 hover:text-sand-900"
+            className={cn(
+              "shrink-0 rounded-lg p-1.5 text-sand-500 transition-colors hover:bg-sand-100 hover:text-sand-900",
+              FOCUS_RING,
+            )}
           >
             <Maximize2 className="size-4" aria-hidden />
           </button>
@@ -331,7 +337,10 @@ export function TaskDetail({
             type="button"
             onClick={onClose}
             aria-label={t("common.close")}
-            className="shrink-0 rounded-lg p-1.5 text-sand-500 transition-colors hover:bg-sand-100 hover:text-sand-900"
+            className={cn(
+              "shrink-0 rounded-lg p-1.5 text-sand-500 transition-colors hover:bg-sand-100 hover:text-sand-900",
+              FOCUS_RING,
+            )}
           >
             <X className="size-4" aria-hidden />
           </button>
@@ -358,7 +367,7 @@ export function TaskDetail({
                 className={cn(
                   "-mb-px inline-flex items-center gap-1.5 border-b-2 px-1.5 pt-1 pb-2 text-sm font-medium transition-colors",
                   tab === value
-                    ? "border-sand-900 text-sand-900"
+                    ? "border-brand-600 text-sand-900"
                     : "border-transparent text-sand-500 hover:text-sand-800",
                 )}
               >

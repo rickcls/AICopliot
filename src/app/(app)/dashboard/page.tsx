@@ -4,6 +4,7 @@ import {
   Card,
   EmptyState,
   LinkButton,
+  PageHeader,
   Skeleton,
   SkeletonRegion,
 } from "@/components/ui";
@@ -30,18 +31,18 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {t("dashboard.title")}
-        </h1>
-        <p className="mt-1 text-sm text-sand-600">
-          <span className="font-medium text-sand-900">{workspaceName}</span> ·{" "}
-          {t("workspaceOverview.counts", {
-            projects: t("workspaceOverview.projects", { count: projectCount }),
-            documents: t("workspaceOverview.documents", { count: documentCount }),
-          })}
-        </p>
-      </div>
+      <PageHeader
+        title={t("dashboard.title")}
+        lead={
+          <>
+            <span className="font-medium text-sand-900">{workspaceName}</span> ·{" "}
+            {t("workspaceOverview.counts", {
+              projects: t("workspaceOverview.projects", { count: projectCount }),
+              documents: t("workspaceOverview.documents", { count: documentCount }),
+            })}
+          </>
+        }
+      />
 
       {/* With no projects, four zero cards above an empty state say the same
           thing five times; the empty state alone says it once. */}

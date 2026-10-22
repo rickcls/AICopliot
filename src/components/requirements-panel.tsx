@@ -32,10 +32,11 @@ import {
   EmptyState,
   ErrorState,
   Field,
-  FOCUS_RING,
   Input,
   SearchField,
   SectionHeader,
+  Segment,
+  SegmentedControl,
   Select,
   Spinner,
   Textarea,
@@ -983,35 +984,24 @@ export function RequirementsPanel({
         }
       >
         {deliveryEnabled ? (
-        <div
-          role="group"
-          aria-label={t("requirements.register.viewLabel")}
-          className="inline-flex rounded-lg border border-sand-200 bg-sand-50 p-0.5"
-        >
+        <SegmentedControl label={t("requirements.register.viewLabel")}>
           {(
             [
               ["register", t("requirements.register.viewRegister"), ListChecks],
               ["matrix", t("requirements.register.viewMatrix"), Grid3x3],
             ] as const
           ).map(([value, text, Icon]) => (
-            <button
+            <Segment
               key={value}
-              type="button"
-              aria-pressed={view === value}
+              pressed={view === value}
               onClick={() => setView(value)}
-              className={cn(
-                "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                FOCUS_RING,
-                view === value
-                  ? "bg-white text-sand-900 shadow-sm"
-                  : "text-sand-500 hover:text-sand-900",
-              )}
+              className="px-2.5"
             >
               <Icon className="size-3.5" aria-hidden />
               {text}
-            </button>
+            </Segment>
           ))}
-        </div>
+        </SegmentedControl>
         ) : null}
         {view === "register" ? (
         <Button

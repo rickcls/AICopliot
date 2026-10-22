@@ -4,7 +4,9 @@ import { MessageSquare } from "lucide-react";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { getT } from "@/lib/i18n/server";
 import { getScopedProject } from "@/lib/pm/project";
+import { ProjectMark } from "@/components/project-mark";
 import { ProjectTabs } from "@/components/project-tabs";
+import { LinkButton, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,7 @@ export default async function ProjectLayout({
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
-  const { workspaceId } = await requireWorkspace();
+  const { workspaceId, userId } = await requireWorkspace();
   const { id } = await params;
 
   const project = await getScopedProject(workspaceId, id);
@@ -38,29 +40,35 @@ export default async function ProjectLayout({
         <Link href="/projects" className="text-sand-500 hover:text-sand-900">
           {t("project.breadcrumb")}
         </Link>
-        <span className="mx-1.5 text-sand-300">/</span>
-        <span className="text-sand-900">{project.name}</span>
+        <span aria-hidden className="mx-1.5 text-sand-300">
+          /
+        </span>
+        <span className="text-sand-700">{project.name}</span>
       </nav>
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-4 pb-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-balance">
-            {project.name}
-          </h1>
-          {project.description ? (
-            <p className="mt-1.5 max-w-2xl text-sm text-pretty text-sand-600">
-              {project.description}
-            </p>
-          ) : null}
-        </div>
-        <Link
-          href={`/chat?project=${project.id}`}
-          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-sand-900 px-3.5 text-sm font-medium text-white transition-colors hover:bg-sand-700"
-        >
-          <MessageSquare className="size-4" aria-hidden />
-          {t("project.ask")}
-        </Link>
-      </div>
+      {/* Asking is secondary here: within a section, the section's own action
+          (add a task, upload, extract) is the primary one. */}
+      <PageHeader
+        className="mt-3 mb-5"
+        title={
+          <span className="flex items-center gap-3">
+            <ProjectMark
+              id={project.id}
+              name={project.name}
+              personal={project.personalOwnerId === userId}
+              className="size-9 rounded-xl text-base"
+            />
+            <span className="min-w-0">{project.name}</span>
+          </span>
+        }
+        lead={project.description ?? undefined}
+        actions={
+          <LinkButton href={`/chat?project=${project.id}`} variant="secondary">
+            <MessageSquare className="size-4" aria-hidden />
+            {t("project.ask")}
+          </LinkButton>
+        }
+      />
 
       <ProjectTabs
         projectId={project.id}

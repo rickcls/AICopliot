@@ -1,6 +1,6 @@
 import { LayoutDashboard } from "lucide-react";
 import { ProjectsPanel } from "@/components/projects-panel";
-import { LinkButton } from "@/components/ui";
+import { LinkButton, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getT } from "@/lib/i18n/server";
@@ -18,6 +18,7 @@ export default async function ProjectsPage() {
       id: true,
       name: true,
       description: true,
+      personalOwnerId: true,
       _count: {
         select: {
           documents: true,
@@ -32,25 +33,24 @@ export default async function ProjectsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {t("nav.projects")}
-          </h1>
-          <p className="mt-1 text-sm text-sand-600">{t("projects.lead")}</p>
-        </div>
-        {/* The workspace-wide summary left the sidebar when Today became home;
-            it is a view across projects, so it is reached from here. */}
-        <LinkButton href="/dashboard" variant="secondary">
-          <LayoutDashboard className="size-4" aria-hidden />
-          {t("dashboard.link")}
-        </LinkButton>
-      </div>
+      {/* The workspace-wide summary left the sidebar when Today became home;
+          it is a view across projects, so it is reached from here. */}
+      <PageHeader
+        title={t("nav.projects")}
+        lead={t("projects.lead")}
+        actions={
+          <LinkButton href="/dashboard" variant="secondary">
+            <LayoutDashboard className="size-4" aria-hidden />
+            {t("dashboard.link")}
+          </LinkButton>
+        }
+      />
       <ProjectsPanel
         initialProjects={projects.map((project) => ({
           id: project.id,
           name: project.name,
           description: project.description,
+          personal: project.personalOwnerId === userId,
           documentCount: project._count.documents,
           taskCount: project._count.tasks,
           milestoneCount: project._count.milestones,

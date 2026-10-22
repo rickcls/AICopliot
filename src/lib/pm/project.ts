@@ -20,6 +20,7 @@ export const getScopedProject = cache(
         description: true,
         deliveryEnabled: true,
         discoveryEnabled: true,
+        personalOwnerId: true,
       },
     }),
 );
