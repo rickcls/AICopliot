@@ -164,7 +164,7 @@ export async function runAssistantTurn(
   // can name T1 in the same answer. A title with no word in common stays out.
   const taskLines = tasksMatchingText(openTasks, input.question, today).map((task) => {
     const due = task.dueDate ? task.dueDate.toISOString().slice(0, 10) : "none";
-    const line = `${task.title} | project ${task.project.name} | status ${task.status.category} | due ${due} | priority ${task.priority}`;
+    const line = `${task.title} | project ${task.project.name} | status ${task.status.category} | column ${task.status.key} | due ${due} | priority ${task.priority}`;
     const source = registry.add("T", `task:${task.id}`, (label) => ({
       label,
       kind: "task" as const,
@@ -172,6 +172,7 @@ export async function runAssistantTurn(
       projectId: task.project.id,
       title: task.title,
       category: task.status.category,
+      statusKey: task.status.key,
       dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
       priority: task.priority,
       facts: line,

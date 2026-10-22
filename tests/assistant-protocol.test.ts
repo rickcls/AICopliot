@@ -67,6 +67,7 @@ describe("parseStep", () => {
     expect(assistantSystemPrompt(false)).not.toContain("search_web");
     expect(assistantSystemPrompt(true)).toContain("search_web");
     expect(assistantSystemPrompt(false)).toContain("find_tasks");
+    expect(assistantSystemPrompt(false)).toContain("In progress column");
     expect(assistantSystemPrompt(false)).toContain("Do not tell the person you are unable");
     expect(assistantSystemPrompt(false)).not.toContain("You cannot change anything");
   });

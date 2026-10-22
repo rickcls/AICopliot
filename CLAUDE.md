@@ -36,9 +36,11 @@ by a step cap, a time limit, read-only tools, and the same proposal path as
 everything else. Do not add multi-agent orchestration, background jobs, loops
 that outlive a request, or tools that write. External systems are read-only
 and read only when the user asks (Gmail is listed when "Check Gmail" is
-pressed, never on a schedule). The app never sends email and never writes to
-another system: email drafts leave through copy, `mailto:`, or a compose link
-the user opens.
+pressed, never on a schedule). The assistant never sends email and never
+writes to another system. A draft leaves through copy, `mailto:`, or a compose
+link the user opens. Account mail — a password reset today, and later an alert
+the person asked to receive — is the one exception, and it goes only through
+`src/lib/outbound/`.
 
 ## Stack
 
@@ -284,7 +286,7 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    is applied without a click. Applying a new task from it keeps the email as
    a document in the person's personal project, linked to the task — said
    beside Apply before it is pressed — and from then on it is a document like
-   any other. The app never sends mail or writes to Gmail.
+   any other. The app never sends mail through Gmail, and never writes to Gmail.
    **Outlook keeps the same contract** through Microsoft Graph, with
    `offline_access User.Read Mail.Read` and nothing more (`src/lib/outlook/`).
    **WhatsApp connects to nothing:** it has no API for personal chats, so a chat
@@ -884,7 +886,8 @@ assistant something — typed, pasted, dictated, or from a file. One model call
   not mentioned") rather than showing a blank that reads as a judgement.
 - **Status goes by category, never by label.** `pickStatusForCategory()` picks
   the first column of that category in board order, preferring the seeded
-  `in_progress` for "still going". A project with no blocked column refuses
+  `in_progress` for "still going". Backlog and To do are category `open` too,
+  so that move is kept even though the category did not change. A project with no blocked column refuses
   the update with a message instead of inventing one.
 - **New tasks land in the personal project** unless the person (or a
   confident `P` label) names another, and are assigned to the person applying
@@ -1120,6 +1123,27 @@ address.
 - `EmailDraft` keeps the last drafts per person (private, triple-scoped), so a
   reload does not lose one. The task panel's approach tab links to
   `/email?task={id}`.
+
+## Account mail
+
+Password reset is the first message the product sends. A later alert (a due
+task, a check-in) uses the same sender and must not grow a second one.
+
+- **One sender.** `sendTransactionalEmail` in `src/lib/outbound/send.ts` posts
+  to Resend when `RESEND_API_KEY` and `EMAIL_FROM` are both set. Without them,
+  production refuses to send; development prints the message in the server log
+  so a reset can be tried locally. The key never reaches the browser. There is
+  no schedule: a reset goes out only because the person asked, and an alert,
+  when one exists, has to be something they turned on.
+- **Drafts are still not sent.** `/email`, the assistant, and `draft_email`
+  do not call this. A draft still leaves by copy, `mailto:`, or a compose link.
+- **A reset link is a bearer token, stored only as a hash**, same as an invite:
+  32 random bytes, SHA-256 in `PasswordReset.tokenHash`, one hour, one use.
+  The claim is a conditional `updateMany` in the same transaction as the
+  password write. Asking for a link always answers the same way, whether or
+  not the address has an account. Opening the link does not change the
+  password; that is a POST. The row is an account record, not a workspace
+  record — the password belongs to the person.
 
 ## Team workspace notes
 
