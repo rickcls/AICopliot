@@ -117,7 +117,10 @@ function withPooledDatabaseUrl(
 }
 
 export function getEnv(): Env {
-  if (cached) return cached;
+  // Next reloads `.env` into this process during development. Keeping the first
+  // parse would ignore that, so a key added while the server is running would
+  // never be seen and password reset would keep logging the link.
+  if (cached && process.env.NODE_ENV === "production") return cached;
 
   const parsed = envSchema.safeParse(
     withPooledDatabaseUrl(withoutBlankValues(process.env)),

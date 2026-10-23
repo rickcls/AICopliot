@@ -38,9 +38,10 @@ that outlive a request, or tools that write. External systems are read-only
 and read only when the user asks (Gmail is listed when "Check Gmail" is
 pressed, never on a schedule). The assistant never sends email and never
 writes to another system. A draft leaves through copy, `mailto:`, or a compose
-link the user opens. Account mail — a password reset today, and later an alert
-the person asked to receive — is the one exception, and it goes only through
-`src/lib/outbound/`.
+link the user opens. Account mail goes only through `src/lib/outbound/`:
+a password reset (`/api/password/forgot`, not under `/api/auth`, which the
+sign-in handler owns) and a notice when an account is created. A failed notice
+does not undo the account.
 
 ## Stack
 

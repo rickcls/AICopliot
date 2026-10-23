@@ -3,6 +3,10 @@ import { requestPasswordReset } from "@/lib/auth/password-reset-service";
 import { currentMailDelivery, publicOrigin, resolveMailSender } from "@/lib/outbound/send";
 import { forgotPasswordSchema } from "@/lib/schemas";
 
+/**
+ * Not under `/api/auth`. The sign-in handler owns that prefix and answers
+ * any other path there with "Bad request", which sends no mail.
+ */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = forgotPasswordSchema.safeParse(body);

@@ -1,10 +1,8 @@
 /**
  * The one way mail leaves the product.
  *
- * Password reset uses it today. A later alert (a due task, a check-in) must
- * call `sendTransactionalEmail` too, rather than grow a second sender. Drafts
- * on `/email` and the assistant do not: those still leave by copy, `mailto:`,
- * or a compose link the person opens.
+ * Password reset and the registration notice use it. A later alert must call
+ * `sendTransactionalEmail` too. Drafts on `/email` and the assistant do not.
  *
  * Resend is an HTTP call, which a serverless function can make. SMTP from
  * the same function is not. Without `RESEND_API_KEY` and `EMAIL_FROM`,

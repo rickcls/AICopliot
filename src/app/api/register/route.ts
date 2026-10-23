@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { notifyRegistration } from "@/lib/auth/welcome-email";
 import { prisma } from "@/lib/db";
+import { getLocale } from "@/lib/i18n/server";
+import { publicOrigin, resolveMailSender } from "@/lib/outbound/send";
 import { registerSchema } from "@/lib/schemas";
 
 export async function POST(request: Request) {
@@ -29,6 +32,14 @@ export async function POST(request: Request) {
   // The workspace is created lazily on first authenticated request
   // (getOrCreateDefaultWorkspace), so registration only creates the identity.
   await prisma.user.create({ data: { name, email, passwordHash } });
+
+  await notifyRegistration({
+    to: email,
+    name,
+    locale: await getLocale(),
+    signInUrl: `${publicOrigin(request.url)}/login`,
+    sender: resolveMailSender(),
+  });
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

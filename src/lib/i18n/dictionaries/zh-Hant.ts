@@ -71,6 +71,10 @@ export const zhHant = {
     resetEmailExpiry: "連結一小時後失效，而且只能使用一次。",
     resetEmailIgnore:
       "如果你沒有要求重設密碼，可以忽略這封電郵。你的密碼不會改變。",
+    welcomeEmailSubject: "你的 {app} 帳戶已建立",
+    welcomeEmailLead: "{name}，你的帳戶已建立。",
+    welcomeEmailBody: "請用 {email} 登入。",
+    welcomeEmailIgnore: "如果你沒有建立此帳戶，可以忽略這封電郵。",
   },
   invite: {
     title: "加入「{workspace}」",

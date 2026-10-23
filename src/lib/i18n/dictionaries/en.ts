@@ -76,6 +76,10 @@ export const en = {
     resetEmailExpiry: "The link expires in one hour and works once.",
     resetEmailIgnore:
       "If you did not ask for this, you can ignore this email. Your password will stay the same.",
+    welcomeEmailSubject: "Your {app} account is ready",
+    welcomeEmailLead: "{name}, your account is ready.",
+    welcomeEmailBody: "Sign in with {email}.",
+    welcomeEmailIgnore: "If you did not create this account, you can ignore this email.",
   },
   invite: {
     title: "Join {workspace}",
