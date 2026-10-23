@@ -415,7 +415,7 @@ export function TaskForm({
 
             {showStart ? (
               <>
-                <label htmlFor="task-start" className={ROW_LABEL}>
+                <label id="task-start-label" htmlFor="task-start" className={ROW_LABEL}>
                   {t("tasks.fields.startDate")}
                 </label>
                 <div className="min-w-0">
@@ -424,18 +424,15 @@ export function TaskForm({
                     todayIso={todayIso}
                     countdown={false}
                     value={draft.startDate}
-                    onChange={(event) =>
-                      onChange({ ...draft, startDate: event.target.value })
-                    }
+                    onValueChange={(startDate) => onChange({ ...draft, startDate })}
                     disabled={busy}
-                    aria-invalid={datesInverted || undefined}
                     aria-describedby={datesInverted ? "task-date-error" : undefined}
                   />
                 </div>
               </>
             ) : null}
 
-            <label htmlFor="task-due" className={ROW_LABEL}>
+            <label id="task-due-label" htmlFor="task-due" className={ROW_LABEL}>
               {t("tasks.fields.dueDate")}
             </label>
             <div className="min-w-0">
@@ -444,11 +441,8 @@ export function TaskForm({
                 todayIso={todayIso}
                 countdown={selectedStatus?.category !== "done"}
                 value={draft.dueDate}
-                onChange={(event) =>
-                  onChange({ ...draft, dueDate: event.target.value })
-                }
+                onValueChange={(dueDate) => onChange({ ...draft, dueDate })}
                 disabled={busy}
-                aria-invalid={datesInverted || undefined}
                 aria-describedby={datesInverted ? "task-date-error" : undefined}
               />
             </div>

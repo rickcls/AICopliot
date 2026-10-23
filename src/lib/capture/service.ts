@@ -692,7 +692,7 @@ export async function getCaptureProjectOptions(access: CaptureAccess) {
      */
     colleagues: members
       .filter((member) => member.id !== access.userId)
-      .map((member) => ({ id: member.id, name: member.name })),
+      .map((member) => ({ id: member.id, name: member.name, email: member.email })),
     projects: [
       { id: personal.id, name: personal.name, personal: true },
       ...projects

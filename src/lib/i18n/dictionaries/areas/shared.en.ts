@@ -99,4 +99,10 @@ export const sharedEn = {
     hours: "{count}h ago",
     days: "{count}d ago",
   },
+  datePicker: {
+    chooseDate: "Choose a date",
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    today: "Today",
+  },
 } as const;

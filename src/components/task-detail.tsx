@@ -546,7 +546,7 @@ export function TaskDetail({
 
             {showStart ? (
               <>
-                <label htmlFor="detail-start" className={ROW_LABEL}>
+                <label id="detail-start-label" htmlFor="detail-start" className={ROW_LABEL}>
                   {t("tasks.fields.startDate")}
                 </label>
                 <div className="min-w-0">
@@ -556,22 +556,14 @@ export function TaskDetail({
                     countdown={false}
                     value={draft.startDate}
                     disabled={disabled}
-                    aria-invalid={datesInverted || undefined}
                     aria-describedby={datesInverted ? "detail-date-error" : undefined}
-                    onChange={(event) =>
-                      setDraft({ ...draft, startDate: event.target.value })
-                    }
-                    onBlur={(event) => {
-                      if (event.target.value === (task.startDate?.slice(0, 10) ?? ""))
-                        return;
-                      void save({ startDate: event.target.value });
-                    }}
+                    onValueChange={(startDate) => void save({ startDate })}
                   />
                 </div>
               </>
             ) : null}
 
-            <label htmlFor="detail-due" className={ROW_LABEL}>
+            <label id="detail-due-label" htmlFor="detail-due" className={ROW_LABEL}>
               {t("tasks.fields.dueDate")}
             </label>
             <div className="min-w-0">
@@ -581,16 +573,8 @@ export function TaskDetail({
                 countdown={selectedStatus.category !== "done"}
                 value={draft.dueDate}
                 disabled={disabled}
-                aria-invalid={datesInverted || undefined}
                 aria-describedby={datesInverted ? "detail-date-error" : undefined}
-                onChange={(event) =>
-                  setDraft({ ...draft, dueDate: event.target.value })
-                }
-                onBlur={(event) => {
-                  if (event.target.value === (task.dueDate?.slice(0, 10) ?? ""))
-                    return;
-                  void save({ dueDate: event.target.value });
-                }}
+                onValueChange={(dueDate) => void save({ dueDate })}
               />
             </div>
 

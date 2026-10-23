@@ -76,12 +76,13 @@ export function GanttChart({ model }: { model: GanttModel | null }) {
             {model.todayPct !== null ? (
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-red-400"
+                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-brand-400"
                 style={{
                   left: `calc(${ROW_LABEL_WIDTH} + (100% - ${ROW_LABEL_WIDTH}) * ${model.todayPct / 100})`,
                 }}
               >
-                <span className="absolute -top-0.5 -left-3.5 rounded-sm bg-red-600 px-1 text-[10px] font-medium text-white">
+                {/* Not red: red is what overdue wears, and "today" is where you are, not a warning. */}
+                <span className="absolute top-0 left-0 -translate-x-1/2 rounded-full bg-brand-600 px-1.5 py-px text-[10px] font-medium whitespace-nowrap text-white">
                   {t("timeline.todayMarker")}
                 </span>
               </div>

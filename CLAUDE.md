@@ -707,8 +707,10 @@ pairings held when it replaced slate), cards are `rounded-2xl` with the faint
 current selection (`bg-brand-50 text-brand-800` — a nav item, a pressed chip,
 a batch bar), focus, the `BrandMark` (which is also the assistant's avatar in
 Ask documents and on `/assistant`), and the person's own words in a
-conversation (their message bubble), plus the soft wash behind the landing
-and sign-in pages.** Prose the assistant writes is set at reading size
+conversation (their message bubble), plus the Timeline's "today" marker (the
+calendar cell and the Gantt line, where nothing is selected, and never red,
+which an overdue item wears), plus the soft wash behind the landing and
+sign-in pages.** Prose the assistant writes is set at reading size
 (15px, `leading-7`), like a task description. It never carries a status: it
 sits close to overdue red and warning amber, so overdue keeps red *and* a
 glyph, and a status pill never borrows the brand. `BrandMark` is drawn with
@@ -749,9 +751,10 @@ attention — and the row still says it is blocked. Empty buckets are not drawn.
 **Undated work is listed, not guessed.** A task with no due date never reaches
 a dated bucket, so it used to be only the "N more" count at the foot of the
 page. `undatedToShow()` lists the five most important (then most recently
-touched) under "No due date", each with an inline date that saves through the
-ordinary task PATCH on submit — not on change, because a date field reports a
-value as each part is filled and typing a year would save 0002 first. The AI is
+touched) under "No due date", each chip opening the calendar and saving the
+picked day through the ordinary task PATCH. A pick is one whole day, so there
+is nothing to submit; the native date field it replaced reported a value as
+each part was typed, and a year being typed would save 0002 first. The AI is
 never asked to fill a date in; this is where the person does.
 
 **Work that has gone quiet asks for a check-in.** `isStale()` in `rules.ts`
@@ -1408,13 +1411,15 @@ competing objects with the description the smallest thing on screen.
   chrome-less selects (`QUIET_CONTROL`), which kept seven fields from reading
   as seven boxes but made every value read as plain text that nothing said
   could change. A pill gives a value shape and colour without the form box.
-- **A date or number pill is the native input underneath**, so the platform
-  picker and the keyboard are unchanged. A date pill
-  shows the formatted date — without the year when it is this year, so
-  "30 Oct · 8 days left" fits a side panel — and, on open work's due date,
-  "3 days left" / "2 days overdue" from `daysFromToday`, the same UTC days as
-  `isTaskOverdue`. The date input sits on top, invisible until focused, and a
-  click calls `showPicker()`.
+- **A number pill is the native input underneath**, so the keyboard and the
+  platform's stepper are unchanged. A date pill shows the formatted date —
+  without the year when it is this year, so "30 Oct · 8 days left" fits a side
+  panel — and, on open work's due date, "3 days left" / "2 days overdue" from
+  `daysFromToday`, the same UTC days as `isTaskOverdue`. **It opens the app's
+  own calendar, never `<input type="date">`** (see "Dates are picked on the
+  app's calendar" below): the native input printed "dd/mm/yyyy" and drew a
+  picker in the browser's colours, and a task panel saves the moment a day is
+  picked rather than on blur.
 - **A choice pill opens its own menu, not a native `<select>`.** The
   platform's list drew every status and priority as the same grey words, so
   `PillSelect` takes `options` (`PillOption`: a plain `label` for the pill,
@@ -1423,7 +1428,18 @@ competing objects with the description the smallest thing on screen.
   a priority as its badge, a person with their avatar. The builders live in
   `task-field-options.tsx`, shared by the form and the detail panel; the chat
   composer's project and focus pickers use the same menu, with `group`
-  headings for tasks and documents. Three rules:
+  headings for tasks and documents, as do the Tasks filter bar's priority
+  and milestone, a capture suggestion's fields, and a list row edited in
+  place (`defaultOpen` opens it as the cell turns into an editor). **A plain
+  form field takes `Select` from `ui.tsx`, which is the same menu with the
+  `<option>`/`<optgroup>` children and `event.target.value` of the native
+  element it replaced** (`select.tsx`, re-exported from `ui.tsx` because it
+  holds state and `ui.tsx` is also imported by server components): no page
+  renders a native `<select>` any more, so do not add one. Reach for
+  `PillSelect` with `options` when the values deserve their own drawing. The
+  menu, its keyboard, and its placement are one implementation
+  (`popover-menu.tsx`: `useListbox`, `ListboxMenu`, `placeMenu`), shared by
+  both and by the date picker. Three rules:
   - **The menu is a `popover` in the top layer**, placed with fixed
     coordinates and flipped above the pill when there is more room there. So
     the detail panel's scroll and a modal's overflow never clip it, and the
@@ -1437,6 +1453,24 @@ competing objects with the description the smallest thing on screen.
     `sr-only` span) the id `${id}-label`, and the button reads
     `aria-labelledby="${id}-label ${id}-value"` — the field, then its value.
     Pass `aria-label` instead where there is no visible label.
+- **Dates are picked on the app's calendar** (`date-picker.tsx`).
+  `DatePicker` is a trigger plus a month grid in the same top-layer popover;
+  `PillDate`/`TaskDatePill` draw the trigger as a pill and `DateField` as a
+  form field, and the value is still the `YYYY-MM-DD` string with "" for no
+  date, so nothing server-facing changed. Rules: **the grid is the
+  Timeline's `buildCalendarMonth`** — Monday first, built in UTC — so the two
+  cannot disagree about which day a date lands on, and the day arithmetic for
+  the keyboard (`moveCalendarFocus`, `shiftIsoMonth`) is pure and tested in
+  `calendar.ts`; **today is the server's day anchor when the page passes
+  `todayIso`, else where the viewer is, read when the calendar opens and
+  never during render** (invariant 15); the picked day is the brand fill and
+  today only a neutral ring, so the two never read as one; Escape stops
+  propagation like a menu's, so it never closes the panel or modal around the
+  trigger; arrows move a day or a week, Home/End the ends of the week,
+  PageUp/PageDown a month. A trigger is named like a pill — label id
+  `${id}-label`, then its value — or takes `aria-label`. It has no
+  `aria-invalid`: that is not a button's attribute, so an inverted range is
+  said through `aria-describedby` alone.
 - **Pills hug their value, not the panel.** Empty space to the right of a short
   value is what makes the block read as a list of facts rather than a wall of
   inputs — same as the reference.

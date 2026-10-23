@@ -1,12 +1,12 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Milestone, X } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
-import { Button, FilterChip, SearchField, Select } from "@/components/ui";
-import {
-  TASK_PRIORITIES,
-  type MilestoneOption,
-} from "@/components/task-types";
+import { PRIORITY_TONE, PriorityIcon } from "@/components/priority-badge";
+import { PILL_NEUTRAL, PillSelect } from "@/components/property-pill";
+import { milestoneOptions, priorityOptions } from "@/components/task-field-options";
+import { Button, FilterChip, SearchField } from "@/components/ui";
+import type { MilestoneOption, TaskPriority } from "@/components/task-types";
 import {
   EMPTY_TASK_FILTER,
   isTaskFilterActive,
@@ -74,39 +74,32 @@ export function TaskFilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select
+        <PillSelect
           aria-label={t("tasks.filter.byPriority")}
+          tone={filter.priority ? PRIORITY_TONE[filter.priority as TaskPriority] : PILL_NEUTRAL}
+          icon={filter.priority ? <PriorityIcon priority={filter.priority as TaskPriority} /> : undefined}
+          className="h-7 text-xs"
           value={filter.priority ?? ""}
-          onChange={(event) =>
-            onChange({ ...filter, priority: event.target.value || null })
-          }
-          className="h-8 text-xs"
-        >
-          <option value="">{t("tasks.filter.anyPriority")}</option>
-          {[...TASK_PRIORITIES].reverse().map((priority) => (
-            <option key={priority} value={priority}>
-              {t(`priority.${priority}`)}
-            </option>
-          ))}
-        </Select>
+          options={[
+            { value: "", label: t("tasks.filter.anyPriority") },
+            ...[...priorityOptions(t)].reverse(),
+          ]}
+          onValueChange={(priority) => onChange({ ...filter, priority: priority || null })}
+        />
 
         {milestones.length > 0 ? (
-          <Select
+          <PillSelect
             aria-label={t("tasks.filter.byMilestone")}
+            icon={<Milestone className="size-3.5 opacity-70" />}
+            className="h-7 max-w-48 text-xs"
             value={filter.milestoneId ?? ""}
-            onChange={(event) =>
-              onChange({ ...filter, milestoneId: event.target.value || null })
-            }
-            className="h-8 max-w-48 text-xs"
-          >
-            <option value="">{t("tasks.filter.anyMilestone")}</option>
-            <option value="none">{t("tasks.filter.noMilestone")}</option>
-            {milestones.map((milestone) => (
-              <option key={milestone.id} value={milestone.id}>
-                {milestone.title}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: t("tasks.filter.anyMilestone") },
+              { value: "none", label: t("tasks.filter.noMilestone") },
+              ...milestoneOptions(milestones, t).slice(1),
+            ]}
+            onValueChange={(milestoneId) => onChange({ ...filter, milestoneId: milestoneId || null })}
+          />
         ) : null}
 
         {active ? (

@@ -9,12 +9,14 @@ import {
   Timer,
 } from "lucide-react";
 import { useDateLocale, useT } from "@/components/i18n-provider";
-import { Avatar, Badge, CHECKBOX, FOCUS_RING, Input, Select } from "@/components/ui";
+import { DateField } from "@/components/date-picker";
+import { PillSelect } from "@/components/property-pill";
+import { assigneeOptions, priorityOptions } from "@/components/task-field-options";
+import { Avatar, Badge, CHECKBOX, FOCUS_RING, Input } from "@/components/ui";
 import { PriorityBadge } from "@/components/priority-badge";
 import { toPartialPayload, type TaskDraft } from "@/components/task-form";
 import {
   STATUS_DOT,
-  TASK_PRIORITIES,
   isTaskOverdue,
   statusColorToken,
   toDateInput,
@@ -74,9 +76,6 @@ export function TaskListRow({
   );
   const titleRef = useRef<HTMLInputElement>(null);
   const estimateRef = useRef<HTMLInputElement>(null);
-  const assigneeRef = useRef<HTMLSelectElement>(null);
-  const priorityRef = useRef<HTMLSelectElement>(null);
-  const dueRef = useRef<HTMLInputElement>(null);
 
   const overdue = isTaskOverdue(task, todayIso);
   const t = useT();
@@ -87,12 +86,6 @@ export function TaskListRow({
   useEffect(() => {
     if (editing === "title") titleRef.current?.focus();
     if (editing === "estimatedHours") estimateRef.current?.focus();
-    if (editing === "assigneeId") assigneeRef.current?.focus();
-    if (editing === "priority") priorityRef.current?.focus();
-    if (editing === "dueDate") {
-      dueRef.current?.focus();
-      dueRef.current?.showPicker?.();
-    }
   }, [editing]);
 
   function beginEdit(field: ListEditField) {
@@ -298,24 +291,15 @@ export function TaskListRow({
         onDoubleClick={() => beginEdit("assigneeId")}
       >
         {editing === "assigneeId" ? (
-          <Select
-            ref={assigneeRef}
+          <PillSelect
+            defaultOpen
             aria-label={t("tasks.fields.assignee")}
-            className="h-8 w-full max-w-full text-xs"
-            defaultValue={task.assigneeId ?? ""}
-            onChange={(event) => void commitAssignee(event.target.value)}
-            onBlur={() => setEditing(null)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setEditing(null);
-            }}
-          >
-            <option value="">{t("common.unassigned")}</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-              </option>
-            ))}
-          </Select>
+            className="h-7 text-xs"
+            value={task.assigneeId ?? ""}
+            options={assigneeOptions(members, t)}
+            onValueChange={(value) => void commitAssignee(value)}
+            onLeave={() => setEditing(null)}
+          />
         ) : task.assignee ? (
           <span className="flex items-center gap-2">
             <Avatar
@@ -337,25 +321,15 @@ export function TaskListRow({
         onDoubleClick={() => beginEdit("priority")}
       >
         {editing === "priority" ? (
-          <Select
-            ref={priorityRef}
+          <PillSelect
+            defaultOpen
             aria-label={t("tasks.fields.priority")}
-            className="h-8 w-full max-w-full text-xs"
-            defaultValue={task.priority}
-            onChange={(event) =>
-              void commitPriority(event.target.value as TaskPriority)
-            }
-            onBlur={() => setEditing(null)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setEditing(null);
-            }}
-          >
-            {TASK_PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {t(`priority.${priority}`)}
-              </option>
-            ))}
-          </Select>
+            className="h-7 text-xs"
+            value={task.priority}
+            options={[...priorityOptions(t)].reverse()}
+            onValueChange={(value) => void commitPriority(value as TaskPriority)}
+            onLeave={() => setEditing(null)}
+          />
         ) : (
           <PriorityBadge priority={task.priority} />
         )}
@@ -369,21 +343,14 @@ export function TaskListRow({
         onDoubleClick={() => beginEdit("dueDate")}
       >
         {editing === "dueDate" ? (
-          <Input
-            ref={dueRef}
-            type="date"
+          <DateField
+            defaultOpen
             aria-label={t("tasks.fields.dueDate")}
-            defaultValue={toDateInput(task.dueDate)}
-            onChange={(event) => void commitDue(event.target.value)}
-            onBlur={(event) => {
-              if (editing === "dueDate") void commitDue(event.target.value);
-            }}
-            onKeyDown={(event) =>
-              onEditKeyDown(event, () => {
-                if (dueRef.current) void commitDue(dueRef.current.value);
-              })
-            }
-            className="h-8 w-auto max-w-none text-xs"
+            value={toDateInput(task.dueDate)}
+            todayIso={todayIso}
+            onValueChange={(value) => void commitDue(value)}
+            onLeave={() => setEditing(null)}
+            className="h-8 text-xs"
           />
         ) : task.dueDate ? (
           <span className="inline-flex items-center gap-1.5">

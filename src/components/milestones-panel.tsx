@@ -19,6 +19,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { DateField } from "@/components/date-picker";
 import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { cn, formatDay, formatInstantDay } from "@/lib/utils";
@@ -286,19 +287,18 @@ export function MilestonesPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label
+                id="milestone-date-label"
                 htmlFor="milestone-date"
                 className="mb-1 block text-xs text-sand-500"
               >
                 {t("milestones.targetDate")}
               </label>
-              <Input
+              <DateField
                 id="milestone-date"
-                type="date"
                 value={draft.targetDate}
-                onChange={(event) =>
-                  setDraft({ ...draft, targetDate: event.target.value })
-                }
+                onValueChange={(targetDate) => setDraft({ ...draft, targetDate })}
                 disabled={saving}
+                className="w-full"
               />
             </div>
             <div>

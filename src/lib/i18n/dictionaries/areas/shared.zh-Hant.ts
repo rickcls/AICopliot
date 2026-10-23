@@ -94,4 +94,10 @@ export const sharedZhHant = {
     hours: "{count} 小時前",
     days: "{count} 日前",
   },
+  datePicker: {
+    chooseDate: "選擇日期",
+    previousMonth: "上個月",
+    nextMonth: "下個月",
+    today: "今日",
+  },
 } satisfies Pick<Dictionary, keyof typeof sharedEn>;
