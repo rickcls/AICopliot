@@ -41,7 +41,11 @@ beforeEach(() => {
 });
 
 function taskIn(category: string) {
-  mockPrisma.task.findFirst.mockResolvedValue({ id: "t1", projectId: "p1", status: { category } });
+  mockPrisma.task.findFirst.mockResolvedValue({
+    id: "t1",
+    projectId: "p1",
+    status: { id: `s-was-${category}`, category },
+  });
 }
 
 describe("checkIn", () => {
@@ -67,6 +71,18 @@ describe("checkIn", () => {
       body: "Sent to ABC",
     });
     expect(tx.task.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { checkedInAt: NOW } });
+  });
+
+  it("says which column a moved task came from, so a mistaken tick can be undone", async () => {
+    taskIn("open");
+    const result = await checkIn(access, "t1", { action: "done" }, NOW);
+    expect(result.previousStatusId).toBe("s-was-open");
+  });
+
+  it("has no column to restore when the answer did not move the task", async () => {
+    taskIn("open");
+    expect((await checkIn(access, "t1", { action: "progress" }, NOW)).previousStatusId).toBeNull();
+    expect((await checkIn(access, "t1", { action: "snooze" }, NOW)).previousStatusId).toBeNull();
   });
 
   it("records 'still working' on an open task without moving it", async () => {

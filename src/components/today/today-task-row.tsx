@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { CircleAlert } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { PriorityBadge } from "@/components/priority-badge";
+import { CheckInActions } from "@/components/today/check-in-actions";
 import { CheckInStrip } from "@/components/today/check-in-strip";
 import { useToast } from "@/components/toast";
-import { Badge, Button, FOCUS_RING, Input, buttonClasses } from "@/components/ui";
+import { DatePicker } from "@/components/date-picker";
+import { Badge, FOCUS_RING } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export interface TodayRowTask {
@@ -36,11 +38,8 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
   const router = useRouter();
   const ids = useId();
   const [open, setOpen] = useState(false);
-  const [due, setDue] = useState<string | null>(null);
   const [savingDue, setSavingDue] = useState(false);
 
-  // Saved on submit, not on change: a date field reports a value as soon as
-  // each part is filled, so typing a year would save 0002-10-21 first.
   async function saveDue(value: string) {
     setSavingDue(true);
     try {
@@ -55,7 +54,6 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
         return;
       }
       toast.success(t("today.dueSet"));
-      setDue(null);
       // The task moves to the bucket its new date belongs in.
       router.refresh();
     } catch {
@@ -100,56 +98,30 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
               {task.overdue ? <CircleAlert aria-hidden className="size-3.5" /> : null}
               {task.dueLabel}
             </span>
-          ) : due === null ? (
-            <button
-              type="button"
-              onClick={() => setDue("")}
+          ) : (
+            // The chip is the calendar's trigger: pick a day and it is saved,
+            // so there is no form to fill and submit.
+            <DatePicker
+              value=""
+              clearable={false}
+              disabled={savingDue}
+              aria-label={t("today.setDueLabel", { title: task.title })}
+              onValueChange={(date) => void saveDue(date)}
               className={cn(
                 "rounded-full bg-amber-50 px-2.5 py-0.5 font-medium text-amber-800 ring-1 ring-amber-200/70 ring-inset transition-colors hover:bg-amber-100",
-                FOCUS_RING,
               )}
             >
               {t("today.noDueDate")}
-            </button>
-          ) : (
-            <form
-              className="flex items-center gap-1"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (due) void saveDue(due);
-              }}
-            >
-              <Input
-                type="date"
-                value={due}
-                disabled={savingDue}
-                aria-label={t("today.setDueLabel", { title: task.title })}
-                onChange={(event) => setDue(event.target.value)}
-                className="h-7 w-auto px-2 text-xs"
-              />
-              <Button type="submit" size="sm" disabled={savingDue || !due}>
-                {t("today.setDue")}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" disabled={savingDue} onClick={() => setDue(null)}>
-                {t("common.cancel")}
-              </Button>
-            </form>
+            </DatePicker>
           )}
         </span>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-controls={`${ids}-actions`}
-          aria-label={t("checkIn.actions", { title: task.title })}
-          className={buttonClasses({
-            variant: open ? "ghost" : "secondary",
-            size: "sm",
-            className: "h-7 shrink-0 px-2.5 text-xs",
-          })}
-        >
-          {open ? t("checkIn.close") : t("checkIn.open")}
-        </button>
+        <CheckInActions
+          taskId={task.id}
+          title={task.title}
+          open={open}
+          onToggle={() => setOpen(!open)}
+          controls={`${ids}-actions`}
+        />
       </div>
 
       {open ? (

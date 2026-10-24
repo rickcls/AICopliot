@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { Check, ChevronRight, X } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { DateField } from "@/components/date-picker";
 import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import type { MessageKey, Translate } from "@/lib/i18n/translate";
 import { worstRiskLevel } from "@/lib/pm/filters";
@@ -340,7 +341,11 @@ function EditRow({
 }) {
   return (
     <div className="grid gap-1 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center sm:gap-x-6">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-sand-500">
+      <label
+        id={htmlFor ? `${htmlFor}-label` : undefined}
+        htmlFor={htmlFor}
+        className="text-xs font-medium text-sand-500"
+      >
         {label}
       </label>
       <div className="min-w-0">{children}</div>
@@ -674,13 +679,12 @@ function ProposalRow({
               {proposal.kind === "milestone" ? (
                 <>
                   <EditRow label={t("planReview.targetDate")} htmlFor={`${idPrefix}-target`}>
-                    <Input
+                    <DateField
                       id={`${idPrefix}-target`}
-                      type="date"
                       value={values.targetDate}
-                      onChange={(event) => set("targetDate", event.target.value)}
+                      onValueChange={(targetDate) => set("targetDate", targetDate)}
                       disabled={disabled}
-                      className="h-9 w-auto"
+                      className="h-9"
                     />
                   </EditRow>
                   {select(
@@ -696,25 +700,23 @@ function ProposalRow({
                 <>
                   <EditRow label={t("planReview.dates")} htmlFor={`${idPrefix}-start`}>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Input
+                      <DateField
                         id={`${idPrefix}-start`}
-                        type="date"
                         aria-label={t("planReview.startDate")}
                         value={values.startDate}
-                        onChange={(event) => set("startDate", event.target.value)}
+                        onValueChange={(startDate) => set("startDate", startDate)}
                         disabled={disabled}
-                        className="h-9 w-auto"
+                        className="h-9"
                       />
                       <span aria-hidden className="text-sand-400">
                         →
                       </span>
-                      <Input
-                        type="date"
+                      <DateField
                         aria-label={t("planReview.dueDate")}
                         value={values.dueDate}
-                        onChange={(event) => set("dueDate", event.target.value)}
+                        onValueChange={(dueDate) => set("dueDate", dueDate)}
                         disabled={disabled}
-                        className="h-9 w-auto"
+                        className="h-9"
                       />
                     </div>
                   </EditRow>

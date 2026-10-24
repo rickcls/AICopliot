@@ -309,9 +309,9 @@ function LinkEditor({
           className="h-7 max-w-xs py-0 text-xs"
           defaultValue=""
           disabled={busy}
-          // Focus lands on the picker the moment it replaces the button, so a
+          // The menu is open the moment the picker replaces the button, so a
           // keyboard user is not left on an element that just disappeared.
-          autoFocus
+          defaultOpen
           onBlur={() => setPicking(false)}
           onChange={async (event) => {
             const targetId = event.target.value;

@@ -56,7 +56,7 @@ function Chip({ item }: { item: CalendarInput }) {
       <span
         title={`${item.title} — ${item.date ? formatDay(item.date, dateLocale) : ""} · ${statusLabel}`}
         className={cn(
-          "flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] leading-tight",
+          "flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] leading-tight ring-1 ring-current/10 ring-inset",
           chipTone(item),
           finished && "opacity-70",
         )}
@@ -82,23 +82,27 @@ function Day({ cell }: { cell: CalendarCell }) {
   return (
     <td
       className={cn(
-        "h-24 border-r border-b border-sand-100 p-1 align-top last:border-r-0",
-        // Three distinct levels, so the week structure is readable at a glance:
-        // white weekday, tinted weekend, darker filler from the next month over.
+        "h-24 border-r border-b border-sand-100 p-1.5 align-top last:border-r-0",
+        // Four distinct levels, so the week structure is readable at a glance:
+        // white weekday, tinted weekend, darker filler from the next month
+        // over, and today picked out in the brand tint.
         !cell.inMonth && "bg-sand-100/70",
         cell.inMonth && cell.isWeekend && "bg-sand-50",
+        cell.isToday && "bg-brand-50/70",
       )}
     >
       <div className="flex justify-end px-0.5">
         {cell.isToday ? (
-          <span className="inline-flex size-5 items-center justify-center rounded-full bg-red-600 text-[11px] font-semibold text-white tabular-nums">
+          // The brand fill, not red: red is what an overdue item wears, and
+          // today is where you are rather than a warning.
+          <span className="inline-flex size-6 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white tabular-nums">
             {cell.dayOfMonth}
           </span>
         ) : (
           <span
             className={cn(
-              "inline-flex size-5 items-center justify-center text-[11px] tabular-nums",
-              cell.inMonth ? "text-sand-500" : "text-sand-300",
+              "inline-flex size-6 items-center justify-center text-xs tabular-nums",
+              cell.inMonth ? "text-sand-600" : "text-sand-300",
             )}
           >
             {cell.dayOfMonth}
@@ -143,7 +147,7 @@ export function TimelineCalendar({ month }: { month: CalendarMonth }) {
                   key={label}
                   scope="col"
                   className={cn(
-                    "border-r border-sand-200 px-2 py-1.5 text-[11px] font-medium text-sand-500 last:border-r-0",
+                    "border-r border-sand-200 px-2 py-2 text-xs font-medium text-sand-600 last:border-r-0",
                     index >= 5 && "text-sand-400",
                   )}
                 >

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { Button, Input } from "@/components/ui";
@@ -10,7 +11,9 @@ import { cn } from "@/lib/utils";
 export type CheckInAction = "done" | "progress" | "blocked" | "snooze";
 
 /**
- * Saying where a task stands: an optional note and an answer. Shared by a Today
+ * Saying where a task stands: an optional note and an answer. The first answer
+ * says outright that it moves the task to Done ("Mark task as done"), because
+ * a bare "Done" was read as "finished updating". Shared by a Today
  * row and a day-plan item, so both write through the same check-in route —
  * which uses the board's own write path — and the page then re-renders from
  * the server, so buckets, counts and the plan's ticks stay one source of truth.
@@ -83,6 +86,7 @@ export function CheckInStrip({
         className="h-8 min-w-0 flex-1 basis-56 text-xs"
       />
       <Button type="button" size="sm" disabled={busy !== null} onClick={() => void report("done")}>
+        <Check aria-hidden className="size-3.5" strokeWidth={2.75} />
         {t("checkIn.done")}
       </Button>
       <Button type="button" size="sm" variant="secondary" disabled={busy !== null} onClick={() => void report("progress")}>

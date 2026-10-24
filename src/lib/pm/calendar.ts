@@ -183,3 +183,81 @@ export function initialCalendarMonth(
 
   return startOfUtcMonth(nearest.date!);
 }
+
+/**
+ * Day arithmetic on the `YYYY-MM-DD` strings a date field holds, for the date
+ * picker. Same rule as the grid above: everything is `Date.UTC` and read with
+ * `getUTC*`, so a day is never moved by the viewer's offset.
+ */
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** UTC midnight of a `YYYY-MM-DD` string, or null if it is not a real day. */
+export function parseIsoDay(iso: string): Date | null {
+  if (!ISO_DAY.test(iso)) return null;
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) || toIsoDay(date) !== iso ? null : date;
+}
+
+export function toIsoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+export function shiftIsoDay(iso: string, days: number): string {
+  const date = parseIsoDay(iso);
+  return date ? toIsoDay(addUtcDays(date, days)) : iso;
+}
+
+/** The same day number in another month, held to that month's last day (31 Jan + 1 month = 28 Feb). */
+export function shiftIsoMonth(iso: string, months: number): string {
+  const date = parseIsoDay(iso);
+  if (!date) return iso;
+  const target = addUtcMonths(date, months);
+  const day = Math.min(date.getUTCDate(), daysInUtcMonth(target));
+  return toIsoDay(
+    new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), day)),
+  );
+}
+
+/**
+ * Where a key moves the focused day in the picker's grid, or null for a key
+ * that does not move it. Home and End are the ends of the week (Monday and
+ * Sunday), PageUp and PageDown a month.
+ */
+export function moveCalendarFocus(iso: string, key: string): string | null {
+  const date = parseIsoDay(iso);
+  if (!date) return null;
+  const sinceWeekStart =
+    (date.getUTCDay() - WEEK_STARTS_ON + DAYS_PER_WEEK) % DAYS_PER_WEEK;
+  switch (key) {
+    case "ArrowLeft":
+      return shiftIsoDay(iso, -1);
+    case "ArrowRight":
+      return shiftIsoDay(iso, 1);
+    case "ArrowUp":
+      return shiftIsoDay(iso, -DAYS_PER_WEEK);
+    case "ArrowDown":
+      return shiftIsoDay(iso, DAYS_PER_WEEK);
+    case "Home":
+      return shiftIsoDay(iso, -sinceWeekStart);
+    case "End":
+      return shiftIsoDay(iso, DAYS_PER_WEEK - 1 - sinceWeekStart);
+    case "PageUp":
+      return shiftIsoMonth(iso, -1);
+    case "PageDown":
+      return shiftIsoMonth(iso, 1);
+    default:
+      return null;
+  }
+}
+
+/** Monday-first weekday names for the grid header, in the viewer's language. */
+export function weekdayLabels(locale = "en-GB"): string[] {
+  // 1 January 2024 is a Monday.
+  return Array.from({ length: DAYS_PER_WEEK }, (_, index) =>
+    new Date(Date.UTC(2024, 0, 1 + index)).toLocaleDateString(locale, {
+      timeZone: "UTC",
+      weekday: "short",
+    }),
+  );
+}

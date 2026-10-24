@@ -6,24 +6,29 @@ import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
+  Folder,
   ListPlus,
   MessageSquareText,
   Paperclip,
   RefreshCw,
   Sparkles,
   Undo2,
+  UserRound,
 } from "lucide-react";
 import { useLocale, useT } from "@/components/i18n-provider";
-import { PriorityBadge } from "@/components/priority-badge";
+import { PRIORITY_TONE, PriorityBadge, PriorityIcon } from "@/components/priority-badge";
+import { ProjectMark } from "@/components/project-mark";
+import { PILL_EMPTY, PillDate, PillSelect, StatusTag } from "@/components/property-pill";
+import { priorityOptions } from "@/components/task-field-options";
+import { STATUS_DOT, STATUS_PILL, type TaskStatusColor } from "@/components/task-types";
 import { useToast } from "@/components/toast";
 import {
+  Avatar,
   Badge,
   Button,
   FOCUS_RING,
   Input,
-  QUIET_CONTROL,
   ROW_LABEL,
-  Select,
   Spinner,
   Textarea,
 } from "@/components/ui";
@@ -43,15 +48,22 @@ export interface ProjectOption {
 export interface ColleagueOption {
   id: string;
   name: string;
+  /** Seeds the avatar's colour, so a person looks the same here as on a task. */
+  email: string;
 }
 
 type Priority = "low" | "medium" | "high" | "urgent";
-const PRIORITIES: Priority[] = ["urgent", "high", "medium", "low"];
 const STATUS_KEY = {
   done: "capture.statusDone",
   blocked: "capture.statusBlocked",
   open: "capture.statusOpen",
 } as const;
+/** An update's status is a category, not a column, so it takes the seeded columns' colours. */
+const STATUS_TONE: Record<keyof typeof STATUS_KEY, TaskStatusColor> = {
+  done: "emerald",
+  blocked: "red",
+  open: "amber",
+};
 const KIND_ICON = {
   create_task: ListPlus,
   update_task: RefreshCw,
@@ -316,6 +328,7 @@ function ProposalRow({
   // The personal project is the select's empty option, so it is chosen by
   // default and never listed twice.
   const personalId = projects.find((project) => project.personal)?.id;
+  const assignee = colleagues.find((colleague) => colleague.id === draft.assigneeId);
   const Icon = KIND_ICON[proposal.kind];
   const decided = proposal.state !== "pending";
   const duePhrase =
@@ -356,7 +369,10 @@ function ProposalRow({
           <Icon className="size-4" aria-hidden />
           <span className="sr-only">{t(KIND_KEY[proposal.kind])}</span>
         </span>
-        <div className="min-w-0 flex-1">
+        {/* A floor on a phone: with none the title shares one line with the
+            buttons and is squeezed to a single character; with one, the
+            buttons wrap beneath it. */}
+        <div className="min-w-[12rem] flex-1 sm:min-w-0">
           <p className={cn("flex min-w-0 items-center gap-2 text-sm font-medium", decided ? "text-sand-500" : "text-sand-900")}>
             <span className="truncate">{headline}</span>
             {proposal.kind === "create_task" && values.priority ? (
@@ -432,99 +448,156 @@ function ProposalRow({
                   onChange={(event) => onDraft({ description: event.target.value || null })}
                 />
               </FieldRow>
-              <FieldRow label={t("capture.fieldProject")} id={`${ids}-project`}>
-                <Select
+              <FieldRow label={t("capture.fieldProject")} id={`${ids}-project`} pill>
+                <PillSelect
                   id={`${ids}-project`}
+                  icon={<Folder className="size-3.5 opacity-70" />}
                   value={values.projectId && values.projectId !== personalId ? values.projectId : ""}
+                  options={[
+                    {
+                      value: "",
+                      label: t("capture.personalProject"),
+                      content: (
+                        <>
+                          <ProjectMark
+                            id={personalId ?? "personal"}
+                            name={t("capture.personalProject")}
+                            personal
+                            className="size-5 text-[10px]"
+                          />
+                          <span className="truncate">{t("capture.personalProject")}</span>
+                        </>
+                      ),
+                    },
+                    ...projects
+                      .filter((project) => !project.personal)
+                      .map((project) => ({
+                        value: project.id,
+                        label: project.name,
+                        content: (
+                          <>
+                            <ProjectMark
+                              id={project.id}
+                              name={project.name}
+                              personal={false}
+                              className="size-5 text-[10px]"
+                            />
+                            <span className="truncate">{project.name}</span>
+                          </>
+                        ),
+                      })),
+                  ]}
                   disabled={decided}
-                  onChange={(event) => onDraft({ projectId: event.target.value || personalId })}
-                  className={cn(QUIET_CONTROL, "h-9")}
-                >
-                  <option value="">{t("capture.personalProject")}</option>
-                  {projects
-                    .filter((project) => !project.personal)
-                    .map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                </Select>
+                  onValueChange={(projectId) => onDraft({ projectId: projectId || personalId })}
+                />
               </FieldRow>
               {colleagues.length > 0 ? (
-                <FieldRow label={t("capture.fieldAssignee")} id={`${ids}-assignee`}>
-                  <Select
+                <FieldRow label={t("capture.fieldAssignee")} id={`${ids}-assignee`} pill>
+                  <PillSelect
                     id={`${ids}-assignee`}
+                    icon={
+                      assignee ? (
+                        <Avatar name={assignee.name} email={assignee.email} className="size-5" />
+                      ) : (
+                        <UserRound className="size-3.5" />
+                      )
+                    }
                     value={draft.assigneeId ?? ""}
+                    options={[
+                      {
+                        value: "",
+                        label: t("capture.assigneeMe"),
+                        content: (
+                          <>
+                            <span
+                              aria-hidden
+                              className="grid size-6 shrink-0 place-items-center rounded-full bg-sand-100 text-sand-500"
+                            >
+                              <UserRound className="size-3.5" />
+                            </span>
+                            <span className="truncate">{t("capture.assigneeMe")}</span>
+                          </>
+                        ),
+                      },
+                      ...colleagues.map((colleague) => ({
+                        value: colleague.id,
+                        label: colleague.name,
+                        content: (
+                          <>
+                            <Avatar name={colleague.name} email={colleague.email} />
+                            <span className="truncate">{colleague.name}</span>
+                          </>
+                        ),
+                      })),
+                    ]}
                     disabled={decided}
-                    onChange={(event) => onDraft({ assigneeId: event.target.value || undefined })}
-                    className={cn(QUIET_CONTROL, "h-9")}
-                  >
-                    <option value="">{t("capture.assigneeMe")}</option>
-                    {colleagues.map((colleague) => (
-                      <option key={colleague.id} value={colleague.id}>
-                        {colleague.name}
-                      </option>
-                    ))}
-                  </Select>
+                    onValueChange={(assigneeId) => onDraft({ assigneeId: assigneeId || undefined })}
+                  />
                 </FieldRow>
               ) : null}
             </>
           ) : null}
 
           {proposal.kind === "update_task" ? (
-            <FieldRow label={t("capture.fieldStatus")} id={`${ids}-status`}>
-              <Select
+            <FieldRow label={t("capture.fieldStatus")} id={`${ids}-status`} pill>
+              <PillSelect
                 id={`${ids}-status`}
-                value={values.status ?? ""}
-                disabled={decided}
-                onChange={(event) =>
-                  onDraft({ status: (event.target.value || null) as ProposalOverrides["status"] })
+                tone={values.status ? STATUS_PILL[STATUS_TONE[values.status]] : PILL_EMPTY}
+                icon={
+                  values.status ? (
+                    <span className={cn("block size-2 rounded-full", STATUS_DOT[STATUS_TONE[values.status]])} />
+                  ) : undefined
                 }
-                className={cn(QUIET_CONTROL, "h-9")}
-              >
-                <option value="">{t("capture.noChange")}</option>
-                {(Object.keys(STATUS_KEY) as (keyof typeof STATUS_KEY)[]).map((status) => (
-                  <option key={status} value={status}>
-                    {t(STATUS_KEY[status])}
-                  </option>
-                ))}
-              </Select>
+                value={values.status ?? ""}
+                options={[
+                  { value: "", label: t("capture.noChange") },
+                  ...(Object.keys(STATUS_KEY) as (keyof typeof STATUS_KEY)[]).map((status) => ({
+                    value: status,
+                    label: t(STATUS_KEY[status]),
+                    content: <StatusTag tone={STATUS_TONE[status]} label={t(STATUS_KEY[status])} />,
+                  })),
+                ]}
+                disabled={decided}
+                onValueChange={(status) =>
+                  onDraft({ status: (status || null) as ProposalOverrides["status"] })
+                }
+              />
             </FieldRow>
           ) : null}
 
           {proposal.kind !== "add_note" ? (
             <>
-              <FieldRow label={t("capture.fieldDue")} id={`${ids}-due`}>
-                <Input
+              <FieldRow label={t("capture.fieldDue")} id={`${ids}-due`} pill>
+                <PillDate
                   id={`${ids}-due`}
-                  type="date"
                   value={values.dueDate ?? ""}
+                  display={values.dueDate ? formatDay(values.dueDate, dateLocale) : t("tasks.fields.setDate")}
                   disabled={decided}
-                  onChange={(event) => onDraft({ dueDate: event.target.value || null })}
-                  className="h-9 w-auto"
+                  onValueChange={(dueDate) => onDraft({ dueDate: dueDate || null })}
                 />
               </FieldRow>
-              <FieldRow label={t("capture.fieldPriority")} id={`${ids}-priority`}>
-                <Select
+              <FieldRow label={t("capture.fieldPriority")} id={`${ids}-priority`} pill>
+                <PillSelect
                   id={`${ids}-priority`}
+                  tone={values.priority ? PRIORITY_TONE[values.priority] : PILL_EMPTY}
+                  icon={values.priority ? <PriorityIcon priority={values.priority} /> : undefined}
+                  className={values.priority ? "font-semibold" : undefined}
                   value={values.priority ?? ""}
+                  options={[
+                    // Priority is only read from words like 急 or 唔急; with none, a
+                    // new task is saved at medium, and the option says so.
+                    {
+                      value: "",
+                      label:
+                        proposal.kind === "update_task"
+                          ? t("capture.noChange")
+                          : t("capture.priorityDefault"),
+                    },
+                    ...[...priorityOptions(t)].reverse(),
+                  ]}
                   disabled={decided}
-                  onChange={(event) => onDraft({ priority: (event.target.value || null) as Priority | null })}
-                  className={cn(QUIET_CONTROL, "h-9")}
-                >
-                  {/* Priority is only read from words like 急 or 唔急; with none, a
-                      new task is saved at medium, and the option says so. */}
-                  <option value="">
-                    {proposal.kind === "update_task"
-                      ? t("capture.noChange")
-                      : t("capture.priorityDefault")}
-                  </option>
-                  {PRIORITIES.map((priority) => (
-                    <option key={priority} value={priority}>
-                      {t(`priority.${priority}`)}
-                    </option>
-                  ))}
-                </Select>
+                  onValueChange={(priority) => onDraft({ priority: (priority || null) as Priority | null })}
+                />
               </FieldRow>
             </>
           ) : (
@@ -596,13 +669,27 @@ function ProposalRow({
   );
 }
 
-function FieldRow({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
+/**
+ * A label and its value. A pill hugs its value rather than filling the column,
+ * and is named by this label (`${id}-label`), as in the task panel.
+ */
+function FieldRow({
+  label,
+  id,
+  pill,
+  children,
+}: {
+  label: string;
+  id: string;
+  pill?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid gap-1 sm:grid-cols-[6rem_minmax(0,24rem)] sm:items-center sm:gap-3">
-      <label htmlFor={id} className={ROW_LABEL}>
+      <label id={`${id}-label`} htmlFor={id} className={ROW_LABEL}>
         {label}
       </label>
-      {children}
+      {pill ? <div className="flex min-w-0">{children}</div> : children}
     </div>
   );
 }

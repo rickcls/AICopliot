@@ -133,23 +133,10 @@ export function Textarea({
   );
 }
 
-export function Select({
-  className,
-  ...props
-}: React.ComponentProps<"select">) {
-  return (
-    <select
-      className={cn(
-        "h-10 rounded-xl border border-sand-300 bg-white px-3 text-sm text-sand-900",
-        "focus-visible:border-brand-500",
-        FOCUS_RING,
-        "disabled:cursor-not-allowed disabled:bg-sand-50",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
+// A form choice opens the app's own menu rather than the platform's plain
+// list (see select.tsx). It lives apart because it holds state, and this
+// module is also imported by server components.
+export { Select } from "@/components/select";
 
 /**
  * A toggle chip in a filter bar. `aria-pressed` carries the state, so the
