@@ -763,13 +763,24 @@ is the only definition: open, and no task write or comment by anyone for
 `getMyOpenTasks` carries the newest comment and the viewer's own snooze so the
 rule runs on loaded rows. A quiet task is badged where it already appears and
 listed under "Needs an update" only if no other bucket shows it. Each Today
-row's Update strip posts to `POST /api/tasks/[id]/check-in`
-(`src/lib/today/check-in.ts`): done and blocked move the task by category
-through `task-write`; "still working" moves a blocked task back to an open
-column, or on an open task only sets `Task.checkedInAt` — which moves
-`updatedAt` and so clears the reminder; a note becomes the person's comment in
-the same transaction. **Snooze is a separate `TaskSnooze` row, never a task
-write**, because writing to the task would make it look worked on.
+row posts to `POST /api/tasks/[id]/check-in` (`src/lib/today/check-in.ts`):
+done and blocked move the task by category through `task-write`; "still
+working" moves a blocked task back to an open column, or on an open task only
+sets `Task.checkedInAt` — which moves `updatedAt` and so clears the reminder; a
+note becomes the person's comment in the same transaction. **Snooze is a
+separate `TaskSnooze` row, never a task write**, because writing to the task
+would make it look worked on.
+
+**A row ends in a tick and a note button** (`check-in-actions.tsx`, shared by a
+Today row and a plan item). The tick is one click to "this task is done" — the
+`done` answer without the strip — and a click that moves real work has a way
+back: the route reports `previousStatusId`, and the toast's **Undo** puts the
+task in that column through the ordinary status PATCH (so `completedAt` clears
+by invariant 12). The note icon opens the strip. **The strip's first button
+says "Mark task as done" (標記任務已完成), never a bare "Done"/完成**: beside a
+note field it was read as "finished updating", when it moves the task to the
+Done column. The old text "Update" button is gone; do not bring a word back
+where an icon and a tooltip say it.
 
 **The day plan is a suggestion that changes nothing.** `POST /api/today/plan`
 ranks the viewer's open tasks with the pure `rankTasks()` (deadlines first,

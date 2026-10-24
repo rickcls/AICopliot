@@ -18,11 +18,18 @@ import { FOCUS_RING } from "./ui";
 
 type ToastTone = "success" | "error" | "info";
 
+/** One thing the toast offers to do — an Undo, for an action that moved something. */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface ToastRecord {
   id: number;
   tone: ToastTone;
   message: string;
   description?: string;
+  action?: ToastAction;
 }
 
 /** Long enough to read a sentence; errors get longer because they matter more. */
@@ -31,6 +38,9 @@ const DURATION: Record<ToastTone, number> = {
   info: 5000,
   error: 9000,
 };
+
+/** An offer to undo has to outlast reading the sentence and reaching for it. */
+const ACTION_DURATION = 9000;
 
 /** Beyond this the stack becomes a wall that covers the page it describes. */
 const MAX_VISIBLE = 3;
@@ -55,7 +65,7 @@ const TONE_ICONS: Record<ToastTone, React.ComponentType<{ className?: string }>>
   };
 
 export interface Toaster {
-  success: (message: string, description?: string) => void;
+  success: (message: string, description?: string, action?: ToastAction) => void;
   error: (message: string, description?: string) => void;
   info: (message: string, description?: string) => void;
 }
@@ -78,10 +88,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const push = React.useCallback(
-    (tone: ToastTone, message: string, description?: string) => {
+    (tone: ToastTone, message: string, description?: string, action?: ToastAction) => {
       const id = nextId.current++;
       setToasts((current) =>
-        [...current, { id, tone, message, description }].slice(-MAX_VISIBLE),
+        [...current, { id, tone, message, description, action }].slice(-MAX_VISIBLE),
       );
     },
     [],
@@ -89,7 +99,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const toaster = React.useMemo<Toaster>(
     () => ({
-      success: (message, description) => push("success", message, description),
+      success: (message, description, action) => push("success", message, description, action),
       error: (message, description) => push("error", message, description),
       info: (message, description) => push("info", message, description),
     }),
@@ -130,9 +140,12 @@ function ToastItem({
 
   React.useEffect(() => {
     if (held) return;
-    const timer = setTimeout(() => onDismiss(toast.id), DURATION[toast.tone]);
+    const timer = setTimeout(
+      () => onDismiss(toast.id),
+      toast.action ? ACTION_DURATION : DURATION[toast.tone],
+    );
     return () => clearTimeout(timer);
-  }, [held, toast.id, toast.tone, onDismiss]);
+  }, [held, toast.id, toast.tone, toast.action, onDismiss]);
 
   return (
     <li
@@ -150,6 +163,21 @@ function ToastItem({
         <p className="text-sm font-medium">{toast.message}</p>
         {toast.description ? (
           <p className="mt-0.5 text-sm opacity-80">{toast.description}</p>
+        ) : null}
+        {toast.action ? (
+          <button
+            type="button"
+            onClick={() => {
+              toast.action?.onClick();
+              onDismiss(toast.id);
+            }}
+            className={cn(
+              "mt-1 rounded text-sm font-semibold underline underline-offset-2 hover:no-underline",
+              FOCUS_RING,
+            )}
+          >
+            {toast.action.label}
+          </button>
         ) : null}
       </div>
       <button

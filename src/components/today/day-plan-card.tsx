@@ -4,6 +4,7 @@ import { Fragment, useId, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, Check, CircleCheck, RefreshCw } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
+import { CheckInActions } from "@/components/today/check-in-actions";
 import { CheckInStrip, type CheckInAction } from "@/components/today/check-in-strip";
 import {
   Badge,
@@ -14,7 +15,6 @@ import {
   Input,
   SectionHeader,
   Spinner,
-  buttonClasses,
 } from "@/components/ui";
 import type { PlanItemState } from "@/lib/today/plan";
 import type { DayPlanView } from "@/lib/today/plan-service";
@@ -226,20 +226,13 @@ export function DayPlanCard({ initialPlan }: { initialPlan: DayPlanView | null }
                         {item.reason ? <p className="text-xs text-sand-500">{item.reason}</p> : null}
                       </div>
                       {item.state !== "done" ? (
-                        <button
-                          type="button"
-                          onClick={() => setCheckingIn(checkingIn === item.taskId ? null : item.taskId)}
-                          aria-expanded={checkingIn === item.taskId}
-                          aria-controls={stripId}
-                          aria-label={t("checkIn.actions", { title: item.title })}
-                          className={buttonClasses({
-                            variant: checkingIn === item.taskId ? "ghost" : "secondary",
-                            size: "sm",
-                            className: "h-7 shrink-0 px-2.5 text-xs",
-                          })}
-                        >
-                          {checkingIn === item.taskId ? t("checkIn.close") : t("checkIn.open")}
-                        </button>
+                        <CheckInActions
+                          taskId={item.taskId}
+                          title={item.title}
+                          open={checkingIn === item.taskId}
+                          onToggle={() => setCheckingIn(checkingIn === item.taskId ? null : item.taskId)}
+                          controls={stripId}
+                        />
                       ) : null}
                     </div>
                     {checkingIn === item.taskId ? (

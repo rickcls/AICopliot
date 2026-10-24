@@ -40,6 +40,9 @@ export class CheckInError extends Error {
  *
  * A note becomes a comment by the person, in the same transaction as the
  * status change, so the two cannot come apart.
+ *
+ * The result carries `previousStatusId` when the task moved, which is what the
+ * Undo on a one-click "done" restores.
  */
 export async function checkIn(
   access: WorkspaceAccess,
@@ -49,7 +52,7 @@ export async function checkIn(
 ) {
   const task = await prisma.task.findFirst({
     where: officialRecordWhere({ id: taskId, workspaceId: access.workspaceId }),
-    select: { id: true, projectId: true, status: { select: { category: true } } },
+    select: { id: true, projectId: true, status: { select: { id: true, category: true } } },
   });
   if (!task) throw new CheckInError("Task not found", 404);
 
@@ -62,7 +65,7 @@ export async function checkIn(
       create: { workspaceId: access.workspaceId, userId: access.userId, taskId: task.id, until },
       update: { until },
     });
-    return { taskId: task.id, until };
+    return { taskId: task.id, until, previousStatusId: null };
   }
 
   const target =
@@ -105,5 +108,7 @@ export async function checkIn(
     await tx.taskSnooze.deleteMany({ where: { userId: access.userId, taskId: task.id } });
   });
 
-  return { taskId: task.id, until: null };
+  // Where the task was, so a tick pressed by mistake can put it back through the
+  // ordinary status update. Null when the answer did not move it.
+  return { taskId: task.id, until: null, previousStatusId: statusId ? task.status.id : null };
 }

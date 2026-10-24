@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { CircleAlert } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { PriorityBadge } from "@/components/priority-badge";
+import { CheckInActions } from "@/components/today/check-in-actions";
 import { CheckInStrip } from "@/components/today/check-in-strip";
 import { useToast } from "@/components/toast";
 import { DatePicker } from "@/components/date-picker";
-import { Badge, FOCUS_RING, buttonClasses } from "@/components/ui";
+import { Badge, FOCUS_RING } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export interface TodayRowTask {
@@ -114,20 +115,13 @@ export function TodayTaskRow({ task }: { task: TodayRowTask }) {
             </DatePicker>
           )}
         </span>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-controls={`${ids}-actions`}
-          aria-label={t("checkIn.actions", { title: task.title })}
-          className={buttonClasses({
-            variant: open ? "ghost" : "secondary",
-            size: "sm",
-            className: "h-7 shrink-0 px-2.5 text-xs",
-          })}
-        >
-          {open ? t("checkIn.close") : t("checkIn.open")}
-        </button>
+        <CheckInActions
+          taskId={task.id}
+          title={task.title}
+          open={open}
+          onToggle={() => setOpen(!open)}
+          controls={`${ids}-actions`}
+        />
       </div>
 
       {open ? (
