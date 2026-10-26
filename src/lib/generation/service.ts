@@ -501,7 +501,7 @@ const documentCitationSelect = {
       id: true,
       pageNumber: true,
       sectionTitle: true,
-      document: { select: { id: true, originalFilename: true } },
+      document: { select: { id: true, originalFilename: true, title: true } },
     },
   },
 } as const;
@@ -514,7 +514,7 @@ const plainCitationSelect = {
       id: true,
       pageNumber: true,
       sectionTitle: true,
-      document: { select: { id: true, originalFilename: true } },
+      document: { select: { id: true, originalFilename: true, title: true } },
     },
   },
 } as const;

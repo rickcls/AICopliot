@@ -28,6 +28,7 @@ import type {
   TracedRequirementRow,
 } from "@/components/task-types";
 import { TracedRequirements } from "@/components/traced-requirements";
+import { documentName } from "@/lib/documents/name";
 
 export type RiskLevel = "low" | "medium" | "high";
 export type RiskStatus = "open" | "monitoring" | "mitigated" | "accepted";
@@ -40,7 +41,7 @@ export interface RiskCitationRow {
     id: string;
     pageNumber: number | null;
     sectionTitle: string | null;
-    document: { id: string; originalFilename: string };
+    document: { id: string; originalFilename: string; title: string | null };
   };
 }
 
@@ -633,7 +634,7 @@ export function RisksPanel({
                                     href={`/documents/${citation.chunk.document.id}`}
                                     className="text-xs text-sand-700 underline hover:text-sand-900"
                                   >
-                                    {citation.chunk.document.originalFilename}
+                                    {documentName(citation.chunk.document)}
                                     {citation.chunk.pageNumber
                                       ? ` ${t("common.page", { page: citation.chunk.pageNumber })}`
                                       : ""}

@@ -43,7 +43,7 @@ export default async function ProjectRequirementsPage({
     prisma.document.findMany({
       where: { workspaceId, projectId: project.id, status: "ready" },
       orderBy: { createdAt: "asc" },
-      select: { id: true, originalFilename: true, chunkCount: true },
+      select: { id: true, originalFilename: true, title: true, chunkCount: true },
     }),
     prisma.task.findMany({
       where: officialRecordWhere({ workspaceId, projectId: project.id }),

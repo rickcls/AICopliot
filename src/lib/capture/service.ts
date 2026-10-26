@@ -92,7 +92,7 @@ const CAPTURE_SELECT = {
   localDate: true,
   replyLanguage: true,
   documentId: true,
-  document: { select: { originalFilename: true } },
+  document: { select: { originalFilename: true, title: true } },
   createdAt: true,
   proposals: { orderBy: { position: "asc" as const }, select: PROPOSAL_SELECT },
 } as const;

@@ -46,7 +46,7 @@ export async function retrieveChunks(
       SELECT
         c."id",
         c."documentId",
-        d."originalFilename" AS "filename",
+        COALESCE(NULLIF(d."title", ''), d."originalFilename") AS "filename",
         c."content",
         c."chunkIndex",
         c."pageNumber",
@@ -70,7 +70,7 @@ export async function retrieveChunks(
       SELECT
         c."id",
         c."documentId",
-        d."originalFilename" AS "filename",
+        COALESCE(NULLIF(d."title", ''), d."originalFilename") AS "filename",
         c."content",
         c."chunkIndex",
         c."pageNumber",

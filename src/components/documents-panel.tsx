@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FileUp, Sparkles } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useLocale, useT, useTimeZone } from "@/components/i18n-provider";
+import { RenameDocumentButton } from "@/components/rename-document-button";
 import { useToast } from "@/components/toast";
 import {
   Badge,
@@ -23,6 +24,7 @@ import type { MessageKey } from "@/lib/i18n/translate";
 import { UPLOAD_EXTENSIONS, asUploadable, mailFileErrorKey } from "@/lib/mail/document";
 import { matchesQuery } from "@/lib/pm/filters";
 import { cn, formatBytes, formatInstantDay } from "@/lib/utils";
+import { documentName } from "@/lib/documents/name";
 
 interface ProjectOption {
   id: string;
@@ -250,7 +252,7 @@ export function DocumentsPanel({
   }
 
   async function handleDelete(doc: DocumentRow) {
-    const name = doc.title ?? doc.originalFilename;
+    const name = documentName(doc);
     const confirmed = await confirm({
       title: t("documents.deleteTitle", { name }),
       body: t("documents.deleteBody"),
@@ -291,7 +293,7 @@ export function DocumentsPanel({
     setBulk("label");
     for (const doc of unlabelled) {
       if (!(await label(doc.id))) {
-        toast.error(t("documents.labelFailed", { name: doc.originalFilename }));
+        toast.error(t("documents.labelFailed", { name: documentName(doc) }));
       }
     }
     await load();
@@ -477,7 +479,7 @@ export function DocumentsPanel({
                     href={`/documents/${doc.id}`}
                     className="block truncate text-sm font-medium hover:underline"
                   >
-                    {doc.title ?? doc.originalFilename}
+                    {documentName(doc)}
                   </Link>
                   <p className="mt-0.5 truncate text-xs text-sand-500">
                     {meta.join(" · ")}
@@ -528,7 +530,7 @@ export function DocumentsPanel({
                     disabled={busy}
                     onClick={async () => {
                       if (!(await label(doc.id))) {
-                        toast.error(t("documents.labelFailed", { name: doc.originalFilename }));
+                        toast.error(t("documents.labelFailed", { name: documentName(doc) }));
                       }
                       await load();
                     }}
@@ -540,7 +542,7 @@ export function DocumentsPanel({
 
                 {!fixedProject ? (
                   <Select
-                    aria-label={t("documents.projectFor", { name: doc.originalFilename })}
+                    aria-label={t("documents.projectFor", { name: documentName(doc) })}
                     value={doc.projectId ?? ""}
                     onChange={(event) => void assignProject(doc.id, event.target.value)}
                     disabled={busy}
@@ -555,6 +557,17 @@ export function DocumentsPanel({
                   </Select>
                 ) : null}
 
+                <RenameDocumentButton
+                  variant="ghost"
+                  id={doc.id}
+                  title={doc.title}
+                  originalFilename={doc.originalFilename}
+                  onRenamed={(title) =>
+                    setDocuments((previous) =>
+                      previous.map((row) => (row.id === doc.id ? { ...row, title } : row)),
+                    )
+                  }
+                />
                 <Button variant="ghost" size="sm" onClick={() => void handleDelete(doc)}>
                   {t("documents.delete")}
                 </Button>

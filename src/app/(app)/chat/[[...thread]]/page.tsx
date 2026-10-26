@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { officialRecordWhere } from "@/lib/pm/rules";
 import { MAX_FOCUS_DOCUMENTS } from "@/lib/schemas";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
+import { documentName } from "@/lib/documents/name";
 
 /**
  * `/chat` and `/chat/<conversationId>` are one route segment on purpose.
@@ -102,7 +103,7 @@ export default async function ChatPage({
             ...(initialProjectId ? { projectId: initialProjectId } : {}),
           },
           orderBy: { originalFilename: "asc" },
-          select: { id: true, originalFilename: true },
+          select: { id: true, originalFilename: true, title: true },
         })
       : Promise.resolve([]),
     loadFocusOptions(workspaceId, initialProjectId),
@@ -149,7 +150,7 @@ export default async function ChatPage({
       kind: "documents",
       documents: focusDocuments.map((document) => ({
         id: document.id,
-        filename: document.originalFilename,
+        filename: documentName(document),
       })),
     };
   }
@@ -213,14 +214,13 @@ async function loadFocusOptions(
       },
       orderBy: { originalFilename: "asc" },
       take: MAX_FOCUS_OPTIONS,
-      select: { id: true, originalFilename: true },
+      select: { id: true, originalFilename: true, title: true },
     }),
   ]);
   return {
     tasks,
-    documents: documents.map((document) => ({
-      id: document.id,
-      filename: document.originalFilename,
-    })),
+    documents: documents
+      .map((document) => ({ id: document.id, filename: documentName(document) }))
+      .sort((a, b) => a.filename.localeCompare(b.filename)),
   };
 }

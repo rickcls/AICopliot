@@ -27,6 +27,7 @@ import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import type { MessageKey, Translate } from "@/lib/i18n/translate";
 import { worstRiskLevel } from "@/lib/pm/filters";
 import { cn, formatDate, formatDay } from "@/lib/utils";
+import { documentName } from "@/lib/documents/name";
 
 type GenerationStatus = "draft" | "approved" | "rejected" | "not_applicable";
 type ItemKind = "milestone" | "task" | "risk" | "dependency";
@@ -34,6 +35,7 @@ type ItemKind = "milestone" | "task" | "risk" | "dependency";
 interface ReadyDocument {
   id: string;
   originalFilename: string;
+  title: string | null;
   chunkCount: number;
 }
 
@@ -45,7 +47,7 @@ interface EvidenceCitation {
     id: string;
     pageNumber: number | null;
     sectionTitle: string | null;
-    document: { id: string; originalFilename: string };
+    document: { id: string; originalFilename: string; title: string | null };
   };
 }
 
@@ -185,7 +187,7 @@ function CitationList({ citations }: { citations: EvidenceCitation[] }) {
               href={`/documents/${citation.chunk.document.id}`}
               className="font-medium text-sand-700 hover:underline"
             >
-              {citation.chunk.document.originalFilename}
+              {documentName(citation.chunk.document)}
             </Link>
             {citation.chunk.pageNumber !== null ? (
               <span>· {t("planReview.page", { page: citation.chunk.pageNumber })}</span>
@@ -1022,7 +1024,7 @@ export function ReviewPanel({
                   />
                   <span className="min-w-0">
                     <span className="block truncate font-medium text-sand-800">
-                      {document.originalFilename}
+                      {documentName(document)}
                     </span>
                     <span className="text-xs text-sand-500">
                       {t("planReview.chunks", { count: document.chunkCount })}

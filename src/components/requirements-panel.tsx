@@ -48,6 +48,7 @@ import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { formatRequirementCode } from "@/lib/pm/rules";
 import { cn } from "@/lib/utils";
+import { documentName } from "@/lib/documents/name";
 
 export type RequirementType =
   | "business"
@@ -70,7 +71,7 @@ export interface RequirementCitationRow {
     id: string;
     pageNumber: number | null;
     sectionTitle: string | null;
-    document: { id: string; originalFilename: string };
+    document: { id: string; originalFilename: string; title: string | null };
   };
 }
 
@@ -112,6 +113,7 @@ export interface TaskOption {
 export interface ReadyDocument {
   id: string;
   originalFilename: string;
+  title: string | null;
   chunkCount: number;
 }
 
@@ -729,7 +731,7 @@ export function RequirementsPanel({
       void fetch(`/api/documents/${data.id}/label`, { method: "POST" }).catch(() => {});
       setDocuments((current) => [
         ...current,
-        { id: data.id, originalFilename: file.name, chunkCount: processed.chunkCount ?? 0 },
+        { id: data.id, originalFilename: file.name, title: null, chunkCount: processed.chunkCount ?? 0 },
       ]);
       setDocumentIds((current) =>
         current.size < MAX_DOCUMENTS ? new Set([...current, data.id]) : current,
@@ -916,7 +918,7 @@ export function RequirementsPanel({
                       />
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-sand-800">
-                          {document.originalFilename}
+                          {documentName(document)}
                         </span>
                         <span className="text-xs text-sand-500">
                           {t("requirements.extract.chunks", { count: document.chunkCount })}
@@ -1792,7 +1794,7 @@ export function RequirementsPanel({
                                       className="inline-flex items-center gap-1.5 text-xs font-medium text-sand-700 hover:text-sand-900 hover:underline"
                                     >
                                       <FileText className="size-3 shrink-0 text-sand-400" />
-                                      {citation.chunk.document.originalFilename}
+                                      {documentName(citation.chunk.document)}
                                       {citation.chunk.pageNumber
                                         ? ` · ${t("common.page", { page: citation.chunk.pageNumber })}`
                                         : ""}

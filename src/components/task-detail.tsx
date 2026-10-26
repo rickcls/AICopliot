@@ -65,6 +65,7 @@ import {
 import type { TaskProposal } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { TracedRequirements } from "@/components/traced-requirements";
+import { documentName } from "@/lib/documents/name";
 
 /**
  * Slide-over for one task, and the place a task is edited.
@@ -747,7 +748,7 @@ export function TaskDetail({
                       href={`/documents/${citation.chunk.document.id}`}
                       className="font-medium text-sand-800 underline hover:text-sand-950"
                     >
-                      {citation.chunk.document.originalFilename}
+                      {documentName(citation.chunk.document)}
                       {citation.chunk.pageNumber
                         ? ` · ${t("common.page", { page: citation.chunk.pageNumber })}`
                         : ""}

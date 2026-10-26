@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useT } from "@/components/i18n-provider";
 import { Badge, Select } from "@/components/ui";
 import type { TaskRow } from "@/components/task-types";
+import { documentName } from "@/lib/documents/name";
 
 /**
  * Dependency editor for one task card.
@@ -141,7 +142,7 @@ export function TaskDependencies({
                         href={`/documents/${citation.chunk.document.id}`}
                         className="font-medium text-sand-700 underline hover:text-sand-900"
                       >
-                        {citation.chunk.document.originalFilename}
+                        {documentName(citation.chunk.document)}
                         {citation.chunk.pageNumber !== null
                           ? ` · ${t("common.page", { page: citation.chunk.pageNumber })}`
                           : ""}

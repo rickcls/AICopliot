@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { DeleteDocumentButton } from "@/components/delete-document-button";
 import { DocumentLabels } from "@/components/document-labels";
+import { RenameDocumentButton } from "@/components/rename-document-button";
 import { RetryIngestionButton } from "@/components/retry-ingestion-button";
 import { Badge, Card, LinkButton, PageHeader, SectionHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
@@ -11,6 +12,7 @@ import { intlLocale } from "@/lib/i18n/locales";
 import { getViewerTimeZone } from "@/lib/viewer";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { formatBytes, formatInstantDay } from "@/lib/utils";
+import { documentName } from "@/lib/documents/name";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +42,7 @@ export default async function DocumentDetailPage({
   });
 
   if (!document) notFound();
-  const name = document.title ?? document.originalFilename;
+  const name = documentName(document);
 
   return (
     // Extracted document text is prose; cap the width so lines stay readable.
@@ -75,6 +77,11 @@ export default async function DocumentDetailPage({
               </LinkButton>
             )}
             {document.status === "failed" ? <RetryIngestionButton id={document.id} /> : null}
+            <RenameDocumentButton
+              id={document.id}
+              title={document.title}
+              originalFilename={document.originalFilename}
+            />
             <DeleteDocumentButton id={document.id} filename={name} />
           </>
         }
@@ -102,7 +109,7 @@ export default async function DocumentDetailPage({
         <DocumentLabels
           documentId={document.id}
           ready={document.status === "ready"}
-          title={document.title}
+          name={name}
           docType={document.docType}
           tags={document.tags}
           labelSource={document.labelSource}

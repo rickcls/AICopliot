@@ -103,7 +103,7 @@ export async function POST(request: Request, { params }: Params) {
                 pageNumber: true,
                 sectionTitle: true,
                 document: {
-                  select: { id: true, originalFilename: true },
+                  select: { id: true, originalFilename: true, title: true },
                 },
               },
             },

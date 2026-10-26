@@ -24,6 +24,7 @@ import { useDateLocale, useT, useTimeZone } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { cn, formatDay, formatInstantDay } from "@/lib/utils";
 import { TracedRequirements } from "@/components/traced-requirements";
+import { documentName } from "@/lib/documents/name";
 
 export type MilestoneStatus =
   | "not_started"
@@ -39,7 +40,7 @@ export interface MilestoneCitationRow {
     id: string;
     pageNumber: number | null;
     sectionTitle: string | null;
-    document: { id: string; originalFilename: string };
+    document: { id: string; originalFilename: string; title: string | null };
   };
 }
 
@@ -457,7 +458,7 @@ export function MilestonesPanel({
                                   href={`/documents/${citation.chunk.document.id}`}
                                   className="text-xs text-sand-700 underline hover:text-sand-900"
                                 >
-                                  {citation.chunk.document.originalFilename}
+                                  {documentName(citation.chunk.document)}
                                   {citation.chunk.pageNumber
                                     ? ` ${t("common.page", { page: citation.chunk.pageNumber })}`
                                     : ""}

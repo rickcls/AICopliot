@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth-guard";
 import { prisma } from "@/lib/db";
 import { getT } from "@/lib/i18n/server";
+import { documentName } from "@/lib/documents/name";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function DocumentChunksPage({
     select: {
       id: true,
       originalFilename: true,
+      title: true,
       chunkCount: true,
     },
   });
@@ -88,7 +90,7 @@ export default async function DocumentChunksPage({
   return (
     <div className="mx-auto w-full max-w-4xl">
       <Link href={`/documents/${document.id}`} className="inline-flex items-center gap-1 text-sm text-sand-500 hover:text-sand-900">
-        ← {document.originalFilename}
+        ← {documentName(document)}
       </Link>
 
       <PageHeader
