@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileSearch, MessagesSquare, Quote } from "lucide-react";
+import { FileSearch, Info, MessagesSquare, Quote } from "lucide-react";
 import type { LoadedConversation, ThreadSummary } from "@/lib/chat/history";
 import type { AnswerProgress } from "@/lib/rag/answer";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -385,6 +386,22 @@ export function ChatWorkspace({
               ) : (
                 <p className="mt-2 text-[15px] leading-relaxed text-sand-600">{t("chat.lead")}</p>
               )}
+              {/* Said in every scope: this page answers from the person's own
+                  files and records only, unlike the assistant. */}
+              <p className="mt-1.5 flex items-start gap-1.5 text-sm leading-relaxed text-sand-500">
+                <Info aria-hidden className="mt-1 size-3.5 shrink-0" />
+                <span>
+                  {t("chat.groundedOnly")}
+                  {t("chat.forGeneral")}
+                  <Link
+                    href="/assistant"
+                    className="font-medium text-sand-700 underline decoration-brand-300 underline-offset-2 hover:decoration-brand-600"
+                  >
+                    {t("chat.assistantLink")}
+                  </Link>
+                  {t("chat.forGeneralAfter")}
+                </span>
+              </p>
             </div>
             {/* Below lg the rail has no room beside the 56px icon sidebar, so
                 the same component opens in a dialog instead. */}

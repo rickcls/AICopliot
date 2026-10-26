@@ -991,7 +991,10 @@ document's page offers "Ask about this document" (`/chat?docs={id}`).
 ## Assistant notes
 
 `/assistant` is the agent; `/chat` ("Ask documents") stays the strictly
-grounded, scope-pinned Q&A. Both are in the sidebar under those names.
+grounded, scope-pinned Q&A. Both are in the sidebar under those names. The
+Ask documents heading says so in every scope — answers only from the
+person's documents and records, no outside information or general knowledge
+— and links to the assistant for those (`chat.groundedOnly`).
 
 - **The protocol is JSON steps, not native tool calling.** Each model reply is
   one object — `{"action":"<tool>","input":{…}}` or `{"action":"answer",…}` —
