@@ -6,6 +6,7 @@ import { useT } from "@/components/i18n-provider";
 import { PILL_EMPTY, PillSelect } from "@/components/property-pill";
 import { Badge, Spinner } from "@/components/ui";
 import type { ProjectDocumentOption } from "@/components/task-types";
+import { documentName } from "@/lib/documents/name";
 import { UPLOAD_EXTENSIONS, asUploadable, mailFileErrorKey } from "@/lib/mail/document";
 import { cn } from "@/lib/utils";
 
@@ -83,6 +84,7 @@ export function TaskDocumentsField({
       const document: ProjectDocumentOption = {
         id: data.id,
         originalFilename: file.name,
+        title: null,
         status: "processing",
       };
       onDocumentChange(document);
@@ -133,7 +135,7 @@ export function TaskDocumentsField({
                 rel="noreferrer"
                 className="min-w-0 flex-1 truncate text-sand-800 hover:underline"
               >
-                {document.originalFilename}
+                {documentName(document)}
               </a>
               {document.status === "failed" ? (
                 <Badge tone="danger">{t("documents.status.failed")}</Badge>
@@ -147,7 +149,7 @@ export function TaskDocumentsField({
                 type="button"
                 onClick={() => onRemove(document.id)}
                 disabled={disabled}
-                aria-label={t("tasks.documents.unlink", { filename: document.originalFilename })}
+                aria-label={t("tasks.documents.unlink", { filename: documentName(document) })}
                 title={t("tasks.documents.unlinkHint")}
                 className="shrink-0 rounded p-1 text-sand-400 hover:bg-sand-200 hover:text-sand-700 disabled:opacity-50"
               >
@@ -170,11 +172,11 @@ export function TaskDocumentsField({
             disabled={disabled}
             options={unlinked.map((document) => ({
               value: document.id,
-              label: document.originalFilename,
+              label: documentName(document),
               content: (
                 <>
                   <FileText aria-hidden className="size-4 shrink-0 text-sand-400" />
-                  <span className="truncate">{document.originalFilename}</span>
+                  <span className="truncate">{documentName(document)}</span>
                   {document.status === "ready" ? null : (
                     <Badge tone={document.status === "failed" ? "danger" : "neutral"} className="shrink-0">
                       {t(`documents.status.${document.status}`)}

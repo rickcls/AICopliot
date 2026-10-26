@@ -1,3 +1,4 @@
+import { documentName } from "@/lib/documents/name";
 import { labelOr, type Translate } from "@/lib/i18n/translate";
 import { requirementStatusLabel } from "./labels";
 import { formatRequirementCode } from "./rules";
@@ -37,7 +38,7 @@ export interface ExportableRequirement {
   citations: Array<{
     chunk: {
       pageNumber: number | null;
-      document: { originalFilename: string };
+      document: { originalFilename: string; title?: string | null };
     };
   }>;
 }
@@ -72,7 +73,7 @@ function evidence(requirement: ExportableRequirement, t: Translate): string[] {
     ...new Set(
       requirement.citations.map(
         (citation) =>
-          citation.chunk.document.originalFilename +
+          documentName(citation.chunk.document) +
           (citation.chunk.pageNumber !== null
             ? ` ${t("requirementsExport.page", { page: citation.chunk.pageNumber })}`
             : ""),

@@ -56,7 +56,7 @@ async function firstChunks(
   return normalizeRows(
     await prisma.$queryRaw<ContextRow[]>(Prisma.sql`
       SELECT DISTINCT ON (c."documentId")
-        c."id", c."documentId", d."originalFilename" AS "filename",
+        c."id", c."documentId", COALESCE(NULLIF(d."title", ''), d."originalFilename") AS "filename",
         c."content", c."chunkIndex", c."pageNumber", c."sectionTitle"
       FROM "DocumentChunk" c
       JOIN "Document" d ON d."id" = c."documentId"
@@ -76,7 +76,7 @@ async function allChunks(
   return normalizeRows(
     await prisma.$queryRaw<ContextRow[]>(Prisma.sql`
       SELECT
-        c."id", c."documentId", d."originalFilename" AS "filename",
+        c."id", c."documentId", COALESCE(NULLIF(d."title", ''), d."originalFilename") AS "filename",
         c."content", c."chunkIndex", c."pageNumber", c."sectionTitle"
       FROM "DocumentChunk" c
       JOIN "Document" d ON d."id" = c."documentId"
@@ -99,7 +99,7 @@ async function retrieveCandidates(
   const [vectorRows, lexicalRows] = await Promise.all([
     prisma.$queryRaw<VectorRow[]>(Prisma.sql`
       SELECT
-        c."id", c."documentId", d."originalFilename" AS "filename",
+        c."id", c."documentId", COALESCE(NULLIF(d."title", ''), d."originalFilename") AS "filename",
         c."content", c."chunkIndex", c."pageNumber", c."sectionTitle",
         1 - (c."embedding" <=> ${literal}::vector) AS "semanticScore"
       FROM "DocumentChunk" c
@@ -115,7 +115,7 @@ async function retrieveCandidates(
     prisma.$queryRaw<LexicalRow[]>(Prisma.sql`
       WITH query AS (SELECT websearch_to_tsquery('english', ${query}) AS value)
       SELECT
-        c."id", c."documentId", d."originalFilename" AS "filename",
+        c."id", c."documentId", COALESCE(NULLIF(d."title", ''), d."originalFilename") AS "filename",
         c."content", c."chunkIndex", c."pageNumber", c."sectionTitle",
         ts_rank_cd(to_tsvector('english', c."content"), query.value) AS "lexicalScore"
       FROM "DocumentChunk" c

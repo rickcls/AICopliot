@@ -6,6 +6,7 @@ import type {
   ProposalFlag,
   UpdateTaskPayload,
 } from "@/lib/capture/validate";
+import { documentName } from "@/lib/documents/name";
 
 /**
  * The shape a capture takes on its way to the browser: dates as ISO strings,
@@ -54,7 +55,7 @@ export function toCaptureView(row: CaptureRow): CaptureView {
     errorMessage: row.errorMessage,
     localDate: row.localDate.toISOString().slice(0, 10),
     documentId: row.documentId,
-    documentName: row.document?.originalFilename ?? null,
+    documentName: row.document ? documentName(row.document) : null,
     createdAt: row.createdAt.toISOString(),
     proposals: row.proposals.map(
       (proposal) =>

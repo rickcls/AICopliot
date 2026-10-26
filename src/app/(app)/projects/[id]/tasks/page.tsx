@@ -50,7 +50,7 @@ export default async function ProjectTasksPage({
     prisma.document.findMany({
       where: { workspaceId, projectId: project.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, originalFilename: true, status: true },
+      select: { id: true, originalFilename: true, title: true, status: true },
     }),
     prisma.project.findMany({
       where: visibleProjectWhere(workspaceId, user.id),

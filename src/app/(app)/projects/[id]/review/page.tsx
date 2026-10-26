@@ -28,7 +28,7 @@ export default async function ProjectReviewPage({
         status: "ready",
       },
       orderBy: { createdAt: "asc" },
-      select: { id: true, originalFilename: true, chunkCount: true },
+      select: { id: true, originalFilename: true, title: true, chunkCount: true },
     }),
     getProjectPlanRuns(workspaceId, project.id),
   ]);

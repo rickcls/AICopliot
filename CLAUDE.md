@@ -943,6 +943,22 @@ assistant something — typed, pasted, dictated, or from a file. One model call
 bytes under `{workspaceId}/{documentId}.{ext}`, and the row removed if storage
 fails. The upload route and "save a capture as a document" both call it.
 
+**A document is called by one rule: `documentName()`** (`src/lib/documents/name.ts`)
+— the name a person gave it (`Document.title`), else the file's own name.
+Every screen that names a document goes through it: the lists, a task's
+documents and Sources, the requirement, risk, milestone, and plan citations,
+the chat pickers, capture cards, the assistant, and the requirement exports.
+Retrieval and plan context select the same rule in SQL
+(`COALESCE(NULLIF(d."title", ''), d."originalFilename") AS "filename"`), so a
+new answer's sources carry it too; sources already saved keep the name they
+had. **Rename** (`RenameDocumentButton`) is on the document page and each list
+row, and writes `title` through the ordinary PATCH; clearing it goes back to
+the file's name, which the document page keeps showing beside the name. The
+labels card no longer edits the title — one place to rename. An AI label may
+fill the title before a person does; a rename marks the labels as the
+person's own, so the AI does not rename it again. Labelling itself still sends
+the file's own name, since that is what the AI names it from.
+
 **Labels are written after indexing, in their own request.** The panel
 uploads up to two files at a time, then calls `/process`, then
 `POST /api/documents/[id]/label` (`label-service.ts`), so indexing keeps its

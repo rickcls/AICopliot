@@ -13,6 +13,7 @@ import { hasGroundingEvidence } from "@/lib/rag/ranking";
 import { retrieveChunks } from "@/lib/rag/retrieve";
 import { SourceRegistry, TASK_FILTERS, type ToolName } from "@/lib/assistant/protocol";
 import { tasksMatchingText } from "@/lib/capture/candidates";
+import { documentName } from "@/lib/documents/name";
 
 /**
  * The assistant's tools. Every one reads inside the caller's workspace — and
@@ -106,9 +107,15 @@ async function searchDocuments(ctx: ToolContext, input: z.infer<typeof inputs.se
         document: { workspaceId, status: "ready", ...(projectId ? { projectId } : {}) },
       },
       take: 6,
-      select: { id: true, documentId: true, content: true, pageNumber: true, document: { select: { originalFilename: true } } },
+      select: {
+        id: true,
+        documentId: true,
+        content: true,
+        pageNumber: true,
+        document: { select: { originalFilename: true, title: true } },
+      },
     });
-    chunks = literal.map((chunk) => ({ ...chunk, filename: chunk.document.originalFilename }));
+    chunks = literal.map((chunk) => ({ ...chunk, filename: documentName(chunk.document) }));
   }
 
   if (chunks.length === 0) return { text: "No passages found.", summary: "0" };
@@ -185,7 +192,7 @@ async function getTask(ctx: ToolContext, input: z.infer<typeof inputs.get_task>)
             .join("\n")}`
         : "recent notes: (none)",
       task.documents.length
-        ? `linked documents: ${task.documents.map((link) => link.document.title ?? link.document.originalFilename).join("; ")}`
+        ? `linked documents: ${task.documents.map((link) => documentName(link.document)).join("; ")}`
         : "linked documents: (none)",
     ].join("\n"),
     summary: source.title,

@@ -19,7 +19,7 @@ const citationBaseSelect = {
       id: true,
       pageNumber: true,
       sectionTitle: true,
-      document: { select: { id: true, originalFilename: true } },
+      document: { select: { id: true, originalFilename: true, title: true } },
     },
   },
 } as const;
@@ -133,7 +133,7 @@ export const taskSelect = {
     select: {
       id: true,
       document: {
-        select: { id: true, originalFilename: true, status: true },
+        select: { id: true, originalFilename: true, title: true, status: true },
       },
     },
   },

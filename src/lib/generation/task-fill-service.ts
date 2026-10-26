@@ -28,6 +28,7 @@ import {
   type TaskFillField,
 } from "./task-fill-validate";
 import type { GenerationSource } from "./validate";
+import { documentName } from "@/lib/documents/name";
 
 export interface TaskFillDeps {
   chat?: ChatProvider;
@@ -111,7 +112,7 @@ async function selectEvidence(
     // new links from the project itself.
     const documents = await prisma.document.findMany({
       where: { id: { in: documentIds }, workspaceId },
-      select: { id: true, originalFilename: true, status: true },
+      select: { id: true, originalFilename: true, title: true, status: true },
     });
     if (documents.length !== documentIds.length) {
       throw new GenerationRequestError("A linked document was not found", 400);
@@ -119,7 +120,7 @@ async function selectEvidence(
     const notReady = documents.filter((document) => document.status !== "ready");
     if (notReady.length > 0) {
       throw new GenerationRequestError(
-        `${notReady[0].originalFilename} is not ready yet. Wait for it to finish processing, or unlink it.`,
+        `${documentName(notReady[0])} is not ready yet. Wait for it to finish processing, or unlink it.`,
         409,
       );
     }

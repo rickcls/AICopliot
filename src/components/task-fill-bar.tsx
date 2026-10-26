@@ -4,6 +4,7 @@ import { Sparkles, X } from "lucide-react";
 import { useDateLocale, useT } from "@/components/i18n-provider";
 import { Button, Spinner } from "@/components/ui";
 import type { FillSummary } from "@/components/task-fill-client";
+import { documentName } from "@/lib/documents/name";
 import type { Translate } from "@/lib/i18n/translate";
 import type { TaskFillField } from "@/lib/pm/task-fill-apply";
 
@@ -13,16 +14,16 @@ import type { TaskFillField } from "@/lib/pm/task-fill-apply";
  */
 export function fillBlockedReason(
   title: string,
-  linked: ReadonlyArray<{ originalFilename: string; status: string }>,
+  linked: ReadonlyArray<{ originalFilename: string; title: string | null; status: string }>,
   t: Translate,
 ): string | null {
   if (title.trim().length < 3) return t("tasks.fill.nameFirst");
   const indexing = linked.find(
     (document) => document.status === "uploaded" || document.status === "processing",
   );
-  if (indexing) return t("tasks.fill.indexing", { filename: indexing.originalFilename });
+  if (indexing) return t("tasks.fill.indexing", { filename: documentName(indexing) });
   const failed = linked.find((document) => document.status === "failed");
-  if (failed) return t("tasks.fill.failed", { filename: failed.originalFilename });
+  if (failed) return t("tasks.fill.failed", { filename: documentName(failed) });
   return null;
 }
 

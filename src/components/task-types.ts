@@ -41,7 +41,7 @@ export interface TaskCitationRow {
     id: string;
     pageNumber: number | null;
     sectionTitle: string | null;
-    document: { id: string; originalFilename: string };
+    document: { id: string; originalFilename: string; title: string | null };
   };
 }
 
@@ -58,7 +58,7 @@ export interface TaskDependencyRow {
       id: string;
       pageNumber: number | null;
       sectionTitle: string | null;
-      document: { id: string; originalFilename: string };
+      document: { id: string; originalFilename: string; title: string | null };
     };
   }>;
 }
@@ -84,6 +84,8 @@ export type DocumentStatus = "uploaded" | "processing" | "ready" | "failed";
 export interface ProjectDocumentOption {
   id: string;
   originalFilename: string;
+  /** The name a person gave it; shown through `documentName()`. */
+  title: string | null;
   status: DocumentStatus;
 }
 

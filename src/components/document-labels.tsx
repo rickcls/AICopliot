@@ -28,18 +28,21 @@ const DOC_TYPES = [
  * A document's filing labels: shown, edited by hand, or (re)written by the
  * assistant. Editing marks them as the person's own, and a later AI pass then
  * leaves the title, type, and tags alone — it only refreshes the summary.
+ * The title is the document's name, so it is changed by Rename in the page
+ * header (`RenameDocumentButton`), not here.
  */
 export function DocumentLabels({
   documentId,
   ready,
-  title,
+  name,
   docType,
   tags,
   labelSource,
 }: {
   documentId: string;
   ready: boolean;
-  title: string | null;
+  /** What the document is called, for messages about it. */
+  name: string;
   docType: string | null;
   tags: string[];
   labelSource: string | null;
@@ -49,7 +52,7 @@ export function DocumentLabels({
   const router = useRouter();
   const ids = useId();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ title: title ?? "", docType: docType ?? "", tags: tags.join(", ") });
+  const [draft, setDraft] = useState({ docType: docType ?? "", tags: tags.join(", ") });
   const [busy, setBusy] = useState<"save" | "label" | null>(null);
 
   async function save() {
@@ -59,7 +62,6 @@ export function DocumentLabels({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: draft.title.trim() || null,
           docType: draft.docType || null,
           tags: draft.tags
             .split(/[,，、]/)
@@ -87,7 +89,7 @@ export function DocumentLabels({
       const response = await fetch(`/api/documents/${documentId}/label`, { method: "POST" });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        toast.error(t("documents.labelFailed", { name: title ?? "" }), data.error);
+        toast.error(t("documents.labelFailed", { name }), data.error);
         return;
       }
       router.refresh();
@@ -135,15 +137,6 @@ export function DocumentLabels({
           }}
           className="mt-3 grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:items-center"
         >
-          <label htmlFor={`${ids}-title`} className="text-xs font-medium text-sand-500">
-            {t("documents.detail.fieldTitle")}
-          </label>
-          <Input
-            id={`${ids}-title`}
-            value={draft.title}
-            maxLength={120}
-            onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-          />
           <label htmlFor={`${ids}-type`} className="text-xs font-medium text-sand-500">
             {t("documents.detail.fieldType")}
           </label>
