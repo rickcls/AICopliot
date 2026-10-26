@@ -374,7 +374,7 @@ export function buildOpeningMessage({
   tasks,
   history,
   question,
-  scope = { project: null, documents: [] },
+  scope = { project: null, attached: [] },
 }: {
   today: string;
   weekday: string;
@@ -385,8 +385,17 @@ export function buildOpeningMessage({
   tasks: { label: string; line: string }[];
   history: { role: "user" | "assistant"; content: string }[];
   question: string;
-  /** What the person pinned the question to in the composer. */
-  scope?: { project: { label: string; name: string } | null; documents: string[] };
+  /**
+   * What the person pinned the question to in the composer: a project, and
+   * the files they attached, already read and labelled, grouped by file.
+   */
+  scope?: {
+    project: { label: string; name: string } | null;
+    attached: {
+      name: string;
+      passages: { label: string; pageNumber: number | null; content: string }[];
+    }[];
+  };
 }): string {
   return [
     `TODAY: ${today} (${weekday}), ${timeZone}`,
@@ -398,9 +407,18 @@ export function buildOpeningMessage({
           "",
         ]
       : []),
-    ...(scope.documents.length
+    ...(scope.attached.length
       ? [
-          `ATTACHED DOCUMENTS (answer from these; search_documents searches only them): ${scope.documents.join("; ")}`,
+          "ATTACHED DOCUMENTS — the files the person chose, read for you below and grouped by file. Answer from them and cite their S labels; compare, summarise, and reason across them as the question asks, and say which file each point comes from. Use search_documents only for something not shown here; it searches only these files.",
+          ...scope.attached.flatMap((file) => [
+            `=== FILE: ${file.name} ===`,
+            ...(file.passages.length
+              ? file.passages.map(
+                  (passage) =>
+                    `[${passage.label}]${passage.pageNumber !== null ? ` (page ${passage.pageNumber})` : ""}\n${passage.content}`,
+                )
+              : ["(no passages could be read — use search_documents)"]),
+          ]),
           "",
         ]
       : []),

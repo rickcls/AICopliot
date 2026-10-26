@@ -26,6 +26,7 @@ import {
 } from "./project-context";
 import { validateProposals } from "./proposals";
 import { hasGroundingEvidence } from "./ranking";
+import { readChosenDocuments } from "./chosen-documents";
 import { retrieveChunks, type RetrievedChunk } from "./retrieve";
 import { asksAboutRecordsOnly, readQuestionIntent } from "./intent";
 import { needsRewrite, rewriteQuestion, type ChatTurn } from "./rewrite";
@@ -99,6 +100,8 @@ export interface AnswerDeps {
   projectContext?: typeof getProjectGroundingContext;
   focus?: AnswerFocus;
   taskContext?: typeof getTaskGroundingContext;
+  /** Reads a document focus; injected in tests. */
+  readDocuments?: typeof readChosenDocuments;
   /** The language a refusal falls back to when the question shows none. */
   fallbackLanguage?: ReplyLanguage;
   /**
@@ -172,6 +175,8 @@ export async function answerQuestion(
       : refusals.documents;
   const focusDocumentIds =
     focus && focus.documentIds.length > 0 ? focus.documentIds : null;
+  // Chosen documents are read whole, not searched (`readChosenDocuments`).
+  const readingChosen = focus?.kind === "documents" && focusDocumentIds !== null;
 
   const report = (progress: AnswerProgress) => {
     try {
@@ -216,23 +221,29 @@ export async function answerQuestion(
   };
   report({ phase: "retrieving" });
   const [retrieved, liveContext] = await Promise.all([
-    embeddings.embed([searchQuery]).then(([queryEmbedding]) =>
-      retrieveChunks(
-        workspaceId,
-        queryEmbedding,
-        searchQuery,
-        topK,
-        // A task's links are its own evidence wherever the document is filed
-        // (a moved task keeps them), so the project filter would only hide one.
-        focus?.kind === "task" && focusDocumentIds ? null : (deps.projectId ?? null),
-        focusDocumentIds,
-      ),
-    ),
+    readingChosen && focusDocumentIds
+      ? (deps.readDocuments ?? readChosenDocuments)(workspaceId, focusDocumentIds, embeddings, searchQuery)
+      : embeddings.embed([searchQuery]).then(([queryEmbedding]) =>
+          retrieveChunks(
+            workspaceId,
+            queryEmbedding,
+            searchQuery,
+            topK,
+            // A task's links are its own evidence wherever the document is filed
+            // (a moved task keeps them), so the project filter would only hide one.
+            focus?.kind === "task" && focusDocumentIds ? null : (deps.projectId ?? null),
+            focusDocumentIds,
+          ),
+        ),
     liveContextFor(),
   ]);
 
   // --- Guard 1: refuse before calling the model when evidence is too weak ---
-  const supported = retrieved.filter((c) => hasGroundingEvidence(c, minScore));
+  // Chosen documents are the evidence the person picked, so no score bar
+  // applies; a focus that yields no passages (nothing indexed) still refuses.
+  const supported = readingChosen
+    ? retrieved
+    : retrieved.filter((c) => hasGroundingEvidence(c, minScore));
   // "What is still pending?" and "how is it going?" are about the project's
   // own work, which its records and notes answer; document passages were cited
   // in those answers as if they were status. Unless the question names the

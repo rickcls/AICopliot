@@ -28,8 +28,10 @@ import { detectReplyLanguage } from "@/lib/language";
 import { tasksMatchingText } from "@/lib/capture/candidates";
 import { getMyOpenTasks } from "@/lib/pm/my-work";
 import { visibleProjectWhere } from "@/lib/pm/visibility";
+import { readChosenDocuments } from "@/lib/rag/chosen-documents";
 import {
   getChatProvider,
+  getEmbeddingProvider,
   isProviderTimeout,
   type ChatProvider,
   type EmbeddingProvider,
@@ -267,6 +269,36 @@ export async function runAssistantTurn(
     return { label: source.label, line };
   });
 
+  // Attached files are read for the model up front and grouped by file, so a
+  // question across them ("what is the difference?") is answered in one step
+  // from the whole of each — not from whichever six passages a search returns,
+  // which left one file barely seen and passages credited to the wrong one.
+  const attachedPassages = context.documents.length
+    ? await readChosenDocuments(
+        access.workspaceId,
+        context.documents.map((document) => document.id),
+        deps.embeddings ?? getEmbeddingProvider(),
+        input.question,
+      ).catch(() => [])
+    : [];
+  const attached = context.documents.map((document) => ({
+    name: document.name,
+    passages: attachedPassages
+      .filter((passage) => passage.documentId === document.id)
+      .map((passage) => {
+        const source = registry.add("S", `chunk:${passage.id}`, (label) => ({
+          label,
+          kind: "document" as const,
+          documentId: passage.documentId,
+          chunkId: passage.id,
+          filename: passage.filename,
+          pageNumber: passage.pageNumber,
+          content: passage.content,
+        }));
+        return { label: source.label, pageNumber: passage.pageNumber, content: passage.content };
+      }),
+  }));
+
   const chat = deps.chat ?? getChatProvider();
   const anchor = today.toISOString().slice(0, 10);
   // The switch only counts when a key exists. Without one the turn runs as usual.
@@ -285,7 +317,7 @@ export async function runAssistantTurn(
         tasks: taskLines,
         scope: {
           project: projectLabels.find((project) => project.id === context.project?.id) ?? null,
-          documents: context.documents.map((document) => document.name),
+          attached,
         },
         history: earlier.reverse().map((turn) => ({
           role: turn.role === "assistant" ? ("assistant" as const) : ("user" as const),
