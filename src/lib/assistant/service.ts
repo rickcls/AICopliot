@@ -23,6 +23,7 @@ import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import type { EmailDraftView } from "@/lib/email/service";
 import type { FactFlag } from "@/lib/email/facts";
+import { documentName } from "@/lib/documents/name";
 import { detectReplyLanguage } from "@/lib/language";
 import { tasksMatchingText } from "@/lib/capture/candidates";
 import { getMyOpenTasks } from "@/lib/pm/my-work";
@@ -87,10 +88,23 @@ export interface AssistantStep {
   summary: string;
 }
 
+/**
+ * What a question was pinned to in the composer: one project, and documents
+ * attached or chosen to answer from. Kept on the person's message, in the
+ * `sources` column an assistant message uses for its labels, so the thread
+ * shows it again on reload without a column of its own.
+ */
+export interface AskContext {
+  project: { id: string; name: string } | null;
+  documents: { id: string; name: string }[];
+}
+
 export interface AssistantMessageView {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** The person's message only: what it was asked about. */
+  context: AskContext | null;
   sources: PublicSource[];
   steps: AssistantStep[];
   general: boolean;
@@ -103,6 +117,53 @@ function scope(access: WorkspaceAccess) {
   return { workspaceId: access.workspaceId, userId: access.userId };
 }
 
+/**
+ * The project and documents a question asks about, resolved inside the
+ * workspace: a project the person can see, and documents that are indexed.
+ * Ids come from the request, so none is trusted until it resolves here.
+ */
+async function resolveAskContext(
+  access: AssistantAccess,
+  input: { projectId?: string; documentIds?: string[] },
+): Promise<AskContext> {
+  const documentIds = input.documentIds ?? [];
+  const [project, documents] = await Promise.all([
+    input.projectId
+      ? prisma.project.findFirst({
+          where: { AND: [{ id: input.projectId }, visibleProjectWhere(access.workspaceId, access.userId)] },
+          select: { id: true, name: true },
+        })
+      : null,
+    documentIds.length > 0
+      ? prisma.document.findMany({
+          where: { id: { in: documentIds }, workspaceId: access.workspaceId },
+          select: { id: true, originalFilename: true, title: true, status: true },
+        })
+      : [],
+  ]);
+  if (input.projectId && !project) throw new AssistantError("Project not found", 404);
+  if (documents.length !== documentIds.length) throw new AssistantError("Document not found", 404);
+  const notReady = documents.find((document) => document.status !== "ready");
+  if (notReady) {
+    throw new AssistantError(`${documentName(notReady)} is still being indexed. Ask again in a moment.`, 409);
+  }
+  const byId = new Map(documents.map((document) => [document.id, document]));
+  return {
+    project,
+    documents: documentIds.flatMap((id) => {
+      const document = byId.get(id);
+      return document ? [{ id: document.id, name: documentName(document) }] : [];
+    }),
+  };
+}
+
+/** The context a person's stored message carries, if it carries one. */
+function readAskContext(stored: unknown): AskContext | null {
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return null;
+  const value = stored as Partial<AskContext>;
+  return Array.isArray(value.documents) ? { project: value.project ?? null, documents: value.documents } : null;
+}
+
 function describeInput(input: Record<string, unknown>): string {
   return Object.values(input)
     .filter((value) => typeof value === "string" || typeof value === "number")
@@ -112,13 +173,22 @@ function describeInput(input: Record<string, unknown>): string {
 
 export async function runAssistantTurn(
   access: AssistantAccess,
-  input: { threadId?: string; question: string; webSearch?: boolean },
+  input: {
+    threadId?: string;
+    question: string;
+    webSearch?: boolean;
+    projectId?: string;
+    documentIds?: string[];
+  },
   deps: AssistantDeps = {},
 ): Promise<{ threadId: string; message: AssistantMessageView }> {
   const clock = deps.clock ?? Date.now;
   const started = clock();
   const now = deps.now ?? new Date();
 
+  // Resolved before a new thread exists, so a stale id leaves nothing behind.
+  const context = await resolveAskContext(access, input);
+  const pinned = context.project !== null || context.documents.length > 0;
   const thread = input.threadId
     ? await prisma.assistantThread.findFirst({ where: { id: input.threadId, ...scope(access) } })
     : await prisma.assistantThread.create({
@@ -133,7 +203,12 @@ export async function runAssistantTurn(
     select: { role: true, content: true },
   });
   await prisma.assistantMessage.create({
-    data: { threadId: thread.id, role: "user", content: input.question },
+    data: {
+      threadId: thread.id,
+      role: "user",
+      content: input.question,
+      ...(pinned ? { sources: context as unknown as Prisma.InputJsonValue } : {}),
+    },
   });
 
   const preferences = await getUserPreferences(access.userId);
@@ -149,6 +224,10 @@ export async function runAssistantTurn(
     take: 40,
     select: { id: true, name: true, personalOwnerId: true },
   });
+  // The chosen project is labelled even when it is not among the recent ones.
+  if (context.project && !projects.some((project) => project.id === context.project?.id)) {
+    projects.unshift({ ...context.project, personalOwnerId: null });
+  }
   const projectLabels = projects.map((project) => {
     const source = registry.add("P", `project:${project.id}`, (label) => ({
       label,
@@ -156,10 +235,18 @@ export async function runAssistantTurn(
       projectId: project.id,
       name: project.name,
     }));
-    return { label: source.label, name: project.name, personal: project.personalOwnerId === access.userId };
+    return {
+      id: project.id,
+      label: source.label,
+      name: project.name,
+      personal: project.personalOwnerId === access.userId,
+    };
   });
 
-  const openTasks = await getMyOpenTasks(access.workspaceId, access.userId);
+  const allOpenTasks = await getMyOpenTasks(access.workspaceId, access.userId);
+  const openTasks = context.project
+    ? allOpenTasks.filter((task) => task.project.id === context.project?.id)
+    : allOpenTasks;
   // Labelled before the model speaks, so "set the monthly report to urgent"
   // can name T1 in the same answer. A title with no word in common stays out.
   const taskLines = tasksMatchingText(openTasks, input.question, today).map((task) => {
@@ -196,6 +283,10 @@ export async function runAssistantTurn(
         language,
         projects: projectLabels,
         tasks: taskLines,
+        scope: {
+          project: projectLabels.find((project) => project.id === context.project?.id) ?? null,
+          documents: context.documents.map((document) => document.name),
+        },
         history: earlier.reverse().map((turn) => ({
           role: turn.role === "assistant" ? ("assistant" as const) : ("user" as const),
           content: stripLabels(turn.content).slice(0, 800),
@@ -224,6 +315,10 @@ export async function runAssistantTurn(
     draftIds: [] as string[],
     embeddings: deps.embeddings,
     writer: deps.writer,
+    scope: {
+      projectId: context.project?.id ?? null,
+      documentIds: context.documents.map((document) => document.id),
+    },
   };
   const steps: AssistantStep[] = [];
 
@@ -278,7 +373,15 @@ export async function runAssistantTurn(
   const final = answer
     ? finalizeAnswer(answer.answer, answer.citations, answer.general, registry, language)
     : finalizeAnswer(foundSoFar(registry, language), [], false, registry, language);
-  const proposals = answer ? validateAssistantProposals(answer.proposals, registry, anchor, language) : [];
+  const validated = answer ? validateAssistantProposals(answer.proposals, registry, anchor, language) : [];
+  // A new task with no project named goes to the one the question is about.
+  const proposals = context.project
+    ? validated.map((proposal) =>
+        proposal.kind === "create_task" && !proposal.payload.projectId
+          ? { ...proposal, payload: { ...proposal.payload, projectId: context.project?.id ?? null } }
+          : proposal,
+      )
+    : validated;
 
   const saved = await prisma.$transaction(async (tx) => {
     const message = await tx.assistantMessage.create({
@@ -367,7 +470,8 @@ async function loadMessages(access: WorkspaceAccess, threadId: string, ids?: str
     id: row.id,
     role: row.role === "assistant" ? "assistant" : "user",
     content: row.content,
-    sources: row.sources as unknown as PublicSource[],
+    context: row.role === "assistant" ? null : readAskContext(row.sources),
+    sources: row.role === "assistant" ? (row.sources as unknown as PublicSource[]) : [],
     steps: row.steps as unknown as AssistantStep[],
     general: row.general,
     drafts: row.draftIds.flatMap((id) => {

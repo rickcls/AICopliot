@@ -45,6 +45,8 @@ export const chatEn = {
       delete: "Delete “{title}”",
     },
     composer: {
+      attach: "Attach files",
+      dropHere: "Drop files to answer from them",
       question: "Your question",
       placeholder: "Ask about your documents and project records…",
       askAbout: "Ask about",

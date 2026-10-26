@@ -31,6 +31,11 @@ export interface ToolContext {
   draftIds: string[];
   embeddings?: EmbeddingProvider;
   writer?: ChatProvider;
+  /**
+   * What the person pinned the question to. Attached documents are the only
+   * ones searched; otherwise a chosen project bounds documents and tasks.
+   */
+  scope: { projectId: string | null; documentIds: string[] };
 }
 
 export interface ToolOutcome {
@@ -88,23 +93,33 @@ function registerTask(ctx: ToolContext, task: MyOpenTask) {
 
 async function searchDocuments(ctx: ToolContext, input: z.infer<typeof inputs.search_documents>): Promise<ToolOutcome> {
   const project = input.project ? ctx.registry.get(input.project) : undefined;
-  const projectId = project?.kind === "project" ? project.projectId : null;
+  const attached = ctx.scope.documentIds;
+  const pinned = attached.length > 0;
+  const projectId = pinned
+    ? null
+    : (ctx.scope.projectId ?? (project?.kind === "project" ? project.projectId : null));
   const { workspaceId } = ctx.access;
 
   let chunks: { id: string; documentId: string; filename: string; content: string; pageNumber: number | null }[] = [];
   try {
     const embeddings = ctx.embeddings ?? getEmbeddingProvider();
     const [vector] = await embeddings.embed([input.query]);
-    const retrieved = await retrieveChunks(workspaceId, vector, input.query, 6, projectId);
+    const retrieved = await retrieveChunks(workspaceId, vector, input.query, 6, projectId, pinned ? attached : null);
     const minScore = getEnv().RAG_MIN_SCORE;
-    chunks = retrieved.filter((chunk) => hasGroundingEvidence(chunk, minScore));
+    // Attached files are the evidence the person chose, so "summarise this"
+    // reads their best passages even when the wording scores low against them.
+    chunks = pinned ? retrieved : retrieved.filter((chunk) => hasGroundingEvidence(chunk, minScore));
   } catch {
     // Without embeddings, fall back to a literal match so the tool still works.
     const literal = await prisma.documentChunk.findMany({
       where: {
         workspaceId,
         content: { contains: input.query, mode: "insensitive" },
-        document: { workspaceId, status: "ready", ...(projectId ? { projectId } : {}) },
+        document: {
+          workspaceId,
+          status: "ready",
+          ...(pinned ? { id: { in: attached } } : projectId ? { projectId } : {}),
+        },
       },
       take: 6,
       select: {
@@ -135,8 +150,14 @@ async function searchDocuments(ctx: ToolContext, input: z.infer<typeof inputs.se
   return { text: blocks.join("\n\n"), summary: String(chunks.length) };
 }
 
-async function listMyTasks(ctx: ToolContext, input: z.infer<typeof inputs.list_my_tasks>): Promise<ToolOutcome> {
+/** The person's open tasks, inside the project the question is about if there is one. */
+async function scopedOpenTasks(ctx: ToolContext) {
   const tasks = await getMyOpenTasks(ctx.access.workspaceId, ctx.access.userId);
+  return ctx.scope.projectId ? tasks.filter((task) => task.project.id === ctx.scope.projectId) : tasks;
+}
+
+async function listMyTasks(ctx: ToolContext, input: z.infer<typeof inputs.list_my_tasks>): Promise<ToolOutcome> {
+  const tasks = await scopedOpenTasks(ctx);
   const buckets = bucketMyTasks(tasks, ctx.today);
   const chosen = {
     overdue: buckets.overdue,
@@ -153,7 +174,7 @@ async function listMyTasks(ctx: ToolContext, input: z.infer<typeof inputs.list_m
 }
 
 async function findTasks(ctx: ToolContext, input: z.infer<typeof inputs.find_tasks>): Promise<ToolOutcome> {
-  const tasks = await getMyOpenTasks(ctx.access.workspaceId, ctx.access.userId);
+  const tasks = await scopedOpenTasks(ctx);
   const matched = tasksMatchingText(tasks, input.query, ctx.today, 8);
   if (matched.length === 0) {
     return {

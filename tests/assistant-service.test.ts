@@ -16,7 +16,8 @@ const mockPrisma = {
   assistantThread: { findFirst: vi.fn(), create: vi.fn() },
   assistantMessage: { findMany: vi.fn(), create: vi.fn() },
   assistantProposal: { findFirst: vi.fn(), findMany: vi.fn() },
-  project: { findMany: vi.fn() },
+  project: { findMany: vi.fn(), findFirst: vi.fn() },
+  document: { findMany: vi.fn() },
   emailDraft: { findMany: vi.fn() },
   $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
 };
@@ -459,5 +460,84 @@ describe("applyAssistantProposals", () => {
     const [result] = await service.applyAssistantProposals(access, "msg-1", [{ proposalId: "prop-1" }], NOW);
     expect(result).toMatchObject({ ok: false, status: 409 });
     expect(mockApplyChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("a question pinned to a project and documents", () => {
+  const answer = (proposals: unknown[] = []) =>
+    JSON.stringify({ action: "answer", answer: "Done.", citations: [], proposals });
+
+  it("checks the project and documents, keeps them on the person's message, and scopes the tools", async () => {
+    mockPrisma.project.findFirst.mockResolvedValue({ id: "project-client", name: "ABC Ltd" });
+    mockPrisma.document.findMany.mockResolvedValue([
+      { id: "doc-2", originalFilename: "b.pdf", title: null, status: "ready" },
+      { id: "doc-1", originalFilename: "quote.md", title: "ABC 報價", status: "ready" },
+    ]);
+    const chat = scriptedChat('{"action":"search_documents","input":{"query":"maintenance"}}', answer());
+
+    await service.runAssistantTurn(
+      access,
+      { question: "How long is the maintenance?", projectId: "project-client", documentIds: ["doc-1", "doc-2"] },
+      { chat, now: NOW },
+    );
+
+    expect(mockPrisma.project.findFirst.mock.calls[0][0].where).toEqual({
+      AND: [
+        { id: "project-client" },
+        { workspaceId: "ws-1", OR: [{ personalOwnerId: null }, { personalOwnerId: "u-1" }] },
+      ],
+    });
+    expect(mockPrisma.document.findMany.mock.calls[0][0].where).toEqual({
+      id: { in: ["doc-1", "doc-2"] },
+      workspaceId: "ws-1",
+    });
+    expect(mockPrisma.assistantMessage.create.mock.calls[0][0].data).toMatchObject({
+      role: "user",
+      sources: {
+        project: { id: "project-client", name: "ABC Ltd" },
+        documents: [
+          { id: "doc-1", name: "ABC 報價" },
+          { id: "doc-2", name: "b.pdf" },
+        ],
+      },
+    });
+    const opening = chat.seen[0][1].content;
+    expect(opening).toMatch(/ASKED ABOUT PROJECT: P\d+ \(ABC Ltd\)/);
+    expect(opening).toContain("ATTACHED DOCUMENTS (answer from these; search_documents searches only them): ABC 報價; b.pdf");
+    expect(opening).not.toContain("doc-1");
+    expect(mockRunTool.mock.calls[0][2].scope).toEqual({ projectId: "project-client", documentIds: ["doc-1", "doc-2"] });
+  });
+
+  it("files a new task in the chosen project when no project is named", async () => {
+    mockPrisma.project.findFirst.mockResolvedValue({ id: "project-client", name: "ABC Ltd" });
+    const chat = scriptedChat(
+      answer([
+        { kind: "create_task", title: "Send quote", description: null, project: null, priority: null, due: null, estimatedHours: null, citations: ["U1"] },
+      ]),
+    );
+
+    await service.runAssistantTurn(access, { question: "Add a task to send the quote", projectId: "project-client" }, { chat, now: NOW });
+
+    expect(tx.assistantProposal.createMany.mock.calls[0][0].data[0].payload.projectId).toBe("project-client");
+  });
+
+  it("refuses a project the person cannot see, or a document still being indexed, before starting a thread", async () => {
+    mockPrisma.project.findFirst.mockResolvedValue(null);
+    await expect(
+      service.runAssistantTurn(access, { question: "Hi", projectId: "project-hidden" }, { chat: scriptedChat(answer()), now: NOW }),
+    ).rejects.toMatchObject({ status: 404 });
+
+    mockPrisma.document.findMany.mockResolvedValue([{ id: "doc-1", originalFilename: "big.pdf", title: null, status: "processing" }]);
+    await expect(
+      service.runAssistantTurn(access, { question: "Hi", documentIds: ["doc-1"] }, { chat: scriptedChat(answer()), now: NOW }),
+    ).rejects.toMatchObject({ status: 409 });
+
+    expect(mockPrisma.assistantThread.create).not.toHaveBeenCalled();
+  });
+
+  it("stores nothing extra for an ordinary question", async () => {
+    await service.runAssistantTurn(access, { question: "What is due?" }, { chat: scriptedChat(answer()), now: NOW });
+    expect(mockPrisma.assistantMessage.create.mock.calls[0][0].data).not.toHaveProperty("sources");
+    expect(mockPrisma.project.findFirst).not.toHaveBeenCalled();
   });
 });

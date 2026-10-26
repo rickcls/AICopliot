@@ -33,8 +33,8 @@ const access = {
 };
 const today = new Date("2026-10-16T00:00:00Z");
 
-function context() {
-  return { access, registry: new SourceRegistry(), today, draftIds: [] as string[] };
+function context(scope: { projectId: string | null; documentIds: string[] } = { projectId: null, documentIds: [] }) {
+  return { access, registry: new SourceRegistry(), today, draftIds: [] as string[], scope };
 }
 
 function task(id: string, due: string | null, category: "open" | "blocked" = "open") {
@@ -171,5 +171,62 @@ describe("assistant tools", () => {
     });
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tavily-test");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("a question pinned in the composer", () => {
+  const embeddings = { modelName: "fake", dimensions: 3, embed: vi.fn(async () => [[0.1, 0.2, 0.3]]) };
+  const passage = (id: string, score: number) => ({
+    id,
+    documentId: "doc-attached",
+    filename: "報價.md",
+    content: "Quote with 3 years of maintenance",
+    chunkIndex: 0,
+    pageNumber: null,
+    sectionTitle: null,
+    score,
+    lexicalScore: 0,
+    matchType: "semantic",
+  });
+
+  it("searches only the attached documents, and keeps their passages even when the wording scores low", async () => {
+    const { retrieveChunks } = await import("@/lib/rag/retrieve");
+    vi.mocked(retrieveChunks).mockResolvedValue([passage("chunk-1", 0.05)] as never);
+    const ctx = { ...context({ projectId: "p1", documentIds: ["doc-attached"] }), embeddings };
+
+    const outcome = await runTool("search_documents", { query: "summarise this" }, ctx);
+
+    expect(vi.mocked(retrieveChunks).mock.calls[0].slice(4)).toEqual([null, ["doc-attached"]]);
+    expect(outcome.summary).toBe("1");
+    expect(outcome.text).toContain("[S1] (file: 報價.md)");
+  });
+
+  it("keeps searches in the chosen project, whatever project the model names", async () => {
+    const { retrieveChunks } = await import("@/lib/rag/retrieve");
+    vi.mocked(retrieveChunks).mockResolvedValue([passage("chunk-1", 0.05)] as never);
+    const ctx = { ...context({ projectId: "p-chosen", documentIds: [] }), embeddings };
+    ctx.registry.add("P", "project:p-other", (label) => ({ label, kind: "project" as const, projectId: "p-other", name: "Other" }));
+
+    const outcome = await runTool("search_documents", { query: "maintenance", project: "P1" }, ctx);
+
+    expect(vi.mocked(retrieveChunks).mock.calls[0].slice(4)).toEqual(["p-chosen", null]);
+    // Without attachments the evidence bar still applies.
+    expect(outcome.summary).toBe("0");
+  });
+
+  it("lists and finds only the chosen project's tasks", async () => {
+    mockMyTasks.mockResolvedValue([
+      task("a", "2026-10-20"),
+      { ...task("b", "2026-10-20"), project: { id: "p2", name: "Client" } },
+    ]);
+    const ctx = context({ projectId: "p2", documentIds: [] });
+
+    const listed = await runTool("list_my_tasks", { filter: "open" }, ctx);
+    expect(listed.summary).toBe("1");
+    expect(listed.text).toContain("Task b");
+    expect(listed.text).not.toContain("Task a");
+
+    const found = await runTool("find_tasks", { query: "Task" }, ctx);
+    expect(found.text).not.toContain("Task a");
   });
 });
