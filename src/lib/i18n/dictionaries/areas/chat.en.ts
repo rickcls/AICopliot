@@ -131,6 +131,7 @@ export const chatEn = {
       lexical: "exact text match",
       hybrid: "hybrid · {percent}% semantic",
       semantic: "{percent}% semantic match",
+      read: "read from the chosen file",
       jump: "Jump to source {label}",
     },
     turn: {

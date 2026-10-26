@@ -40,6 +40,8 @@ const mockRunTool = vi.fn();
 vi.mock("@/lib/assistant/tools", () => ({ runTool: mockRunTool }));
 const mockApplyChange = vi.fn();
 vi.mock("@/lib/capture/apply-change", () => ({ applyChange: mockApplyChange }));
+const mockReadDocuments = vi.fn(async () => [] as unknown[]);
+vi.mock("@/lib/rag/chosen-documents", () => ({ readChosenDocuments: mockReadDocuments }));
 
 const service = await import("@/lib/assistant/service");
 const { MAX_TOOL_STEPS } = await import("@/lib/assistant/protocol");
@@ -503,7 +505,8 @@ describe("a question pinned to a project and documents", () => {
     });
     const opening = chat.seen[0][1].content;
     expect(opening).toMatch(/ASKED ABOUT PROJECT: P\d+ \(ABC Ltd\)/);
-    expect(opening).toContain("ATTACHED DOCUMENTS (answer from these; search_documents searches only them): ABC 報價; b.pdf");
+    expect(opening).toContain("=== FILE: ABC 報價 ===");
+    expect(opening).toContain("=== FILE: b.pdf ===");
     expect(opening).not.toContain("doc-1");
     expect(mockRunTool.mock.calls[0][2].scope).toEqual({ projectId: "project-client", documentIds: ["doc-1", "doc-2"] });
   });
@@ -539,5 +542,40 @@ describe("a question pinned to a project and documents", () => {
     await service.runAssistantTurn(access, { question: "What is due?" }, { chat: scriptedChat(answer()), now: NOW });
     expect(mockPrisma.assistantMessage.create.mock.calls[0][0].data).not.toHaveProperty("sources");
     expect(mockPrisma.project.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("attached files are read, not searched", () => {
+  it("puts each file's passages in the prompt under its name, citable at once", async () => {
+    mockPrisma.document.findMany.mockResolvedValue([
+      { id: "doc-a", originalFilename: "a.md", title: "宏信報價", status: "ready" },
+      { id: "doc-b", originalFilename: "b.md", title: "明峯報價", status: "ready" },
+    ]);
+    const passage = (id: string, documentId: string, filename: string, content: string) => ({
+      id, documentId, filename, content, chunkIndex: 0, pageNumber: null, sectionTitle: null, score: 0, lexicalScore: 0, matchType: "read",
+    });
+    mockReadDocuments.mockResolvedValue([
+      passage("chunk-a", "doc-a", "宏信報價", "總額 HK$480,000"),
+      passage("chunk-b", "doc-b", "明峯報價", "總額 HK$455,000"),
+    ]);
+    // Answers straight away: everything it needs is already in the prompt.
+    const chat = scriptedChat(
+      '{"action":"answer","answer":"宏信 HK$480,000 [S1]，明峯 HK$455,000 [S2]。","citations":["S1","S2"],"proposals":[]}',
+    );
+
+    await service.runAssistantTurn(
+      access,
+      { question: "兩份報價有甚麼分別？", documentIds: ["doc-a", "doc-b"] },
+      { chat, now: NOW },
+    );
+
+    expect(mockReadDocuments.mock.calls[0].slice(0, 2)).toEqual(["ws-1", ["doc-a", "doc-b"]]);
+    const opening = chat.seen[0][1].content;
+    expect(opening).toMatch(/=== FILE: 宏信報價 ===\n\[S1\]\n總額 HK\$480,000\n=== FILE: 明峯報價 ===\n\[S2\]\n總額 HK\$455,000/);
+    expect(opening).not.toContain("chunk-a");
+    expect(mockRunTool).not.toHaveBeenCalled();
+    const saved = tx.assistantMessage.create.mock.calls[0][0].data;
+    expect(saved.content).toBe("宏信 HK$480,000 [S1]，明峯 HK$455,000 [S2]。");
+    expect(saved.sources.map((source: { filename: string }) => source.filename)).toEqual(["宏信報價", "明峯報價"]);
   });
 });

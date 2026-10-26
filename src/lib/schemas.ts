@@ -68,7 +68,7 @@ const documentCitationSchema = z.object({
   sectionTitle: z.string().nullable(),
   excerpt: z.string(),
   score: z.number(),
-  matchType: z.enum(["semantic", "lexical", "hybrid"]).optional(),
+  matchType: z.enum(["semantic", "lexical", "hybrid", "read"]).optional(),
 });
 
 const projectCitationKindSchema = z.enum([

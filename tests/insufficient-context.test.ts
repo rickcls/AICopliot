@@ -83,24 +83,47 @@ describe("retrieval gate — refusing before the model is called", () => {
     );
   });
 
-  it("narrows retrieval to the chosen documents in a document-focused thread", async () => {
-    retrieveChunks.mockResolvedValue([]);
-
-    await answerQuestion("ws-1", "what does the deck say", {
-      embeddings,
-      chat: chatReturning({}),
-      projectId: "project-1",
-      focus: { kind: "documents", documentIds: ["doc-1", "doc-2"] },
+  it("reads the chosen documents instead of searching them, with no score bar", async () => {
+    // A question across the files ("what is the difference?") needs all of
+    // each, not the nearest few passages; the person chose them, so they are
+    // the evidence whatever their similarity.
+    const readDocuments = vi.fn(async () => [
+      { ...chunk("a1", 0), matchType: "read" as const },
+      { ...chunk("b1", 0), documentId: "doc-2", matchType: "read" as const },
+    ]);
+    const chat = chatReturning({
+      answer: "They differ [S1][S2].",
+      confidence: "high",
+      citations: [
+        { sourceId: "S1", quote: "Content of a1." },
+        { sourceId: "S2", quote: "Content of b1." },
+      ],
     });
 
-    expect(retrieveChunks).toHaveBeenCalledWith(
-      "ws-1",
-      [0.1, 0.2, 0.3],
-      "what does the deck say",
-      8,
-      "project-1",
-      ["doc-1", "doc-2"],
-    );
+    const result = await answerQuestion("ws-1", "what is the difference", {
+      embeddings,
+      chat,
+      projectId: "project-1",
+      focus: { kind: "documents", documentIds: ["doc-1", "doc-2"] },
+      readDocuments,
+    });
+
+    expect(readDocuments).toHaveBeenCalledWith("ws-1", ["doc-1", "doc-2"], embeddings, "what is the difference");
+    expect(retrieveChunks).not.toHaveBeenCalled();
+    expect(chat.complete).toHaveBeenCalled();
+    expect(result.refused).toBe(false);
+  });
+
+  it("still refuses a document focus with nothing indexed, before the model is called", async () => {
+    const chat = chatReturning({});
+    const result = await answerQuestion("ws-1", "what is the difference", {
+      embeddings,
+      chat,
+      focus: { kind: "documents", documentIds: ["doc-1"] },
+      readDocuments: vi.fn(async () => []),
+    });
+    expect(result.refused).toBe(true);
+    expect(chat.complete).not.toHaveBeenCalled();
   });
 
   it("refuses without invoking the chat provider when all scores are below the threshold", async () => {

@@ -100,7 +100,11 @@ These are the load-bearing rules. Each is covered by a test in `tests/`.
    without invoking the chat provider. A capture is not a question: its
    evidence is the person's own note, which is always present, so there is no
    retrieval gate — but every proposal must still cite a `C` line or it is
-   dropped.
+   dropped. **Documents a person chose are read, not searched**
+   (`readChosenDocuments`, `src/lib/rag/chosen-documents.ts`): a document
+   focus in Ask documents, or files attached in the assistant, are the
+   evidence they picked, so no score bar applies — but a focus with nothing
+   indexed still refuses before the model is called.
 
 5. **Secrets stay server-side.** Everything touching the DB or a provider
    imports `server-only`. No `NEXT_PUBLIC_` variable exists, and none should.
@@ -1031,7 +1035,12 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
   workspace (a visible project, indexed documents) before a thread exists, and
   the person's message keeps them in its otherwise unused `sources` column
   (`AskContext`), so a reloaded thread still shows what each question was
-  about. The tools get `ToolContext.scope`: attached documents are the only
+  about. **Attached files are read before the loop** (`readChosenDocuments`)
+  and put in the opening message grouped under `=== FILE: name ===`, each
+  passage an `S` label, so a question across them is answered in the first
+  step. With only a search, the model saw six passages mixed from both files,
+  credited one file's scope to the other, or gave up into the fallback. The
+  tools get `ToolContext.scope`: attached documents are the only
   ones `search_documents` reads, and it keeps their best passages without the
   evidence bar, because the person chose them ("summarise this" scores low
   against any file); otherwise a chosen project bounds document searches,
@@ -1805,8 +1814,16 @@ its project or task, never re-point it.
   because a question in a task thread is usually about its progress. `taskId` is `SET NULL`: a
   deleted task's thread stays readable, `focus` stays `task`, and the route
   refuses to continue it with a 409.
-- **Document focus** is document-only, like global chat. `focusDocumentIds`
-  is a filter, not a relation, and lives **inside** both retrieval SQL paths
+- **Document focus** is document-only, like global chat, and it **reads the
+  chosen files rather than searching them**. The nearest eight passages cannot
+  answer "what is the difference between these two quotes" or "summarise
+  this", which span every file, so `readChosenDocuments` hands the model the
+  files whole when they fit `MAX_CHOSEN_CHUNKS` (24), and otherwise each
+  file's opening plus the passages nearest the question, in reading order —
+  `selectDocumentContext`, the plan generator's reader, so every file is
+  represented. Its passages carry `matchType: "read"`, shown as "read from the
+  chosen file" instead of a similarity. Elsewhere `focusDocumentIds` is a
+  filter, not a relation, and lives **inside** both retrieval SQL paths
   (`retrieveChunks(…, documentIds)`) — filtered afterwards, the rest of the
   project would fill the LIMIT and the focus would return nothing.
 - **Attaching files is a document focus.** The composer's paperclip (or a

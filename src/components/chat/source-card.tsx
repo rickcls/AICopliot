@@ -131,11 +131,13 @@ export function SourceCard({
           <span className="text-xs text-sand-500">{location}</span>
         ) : null}
         <span className="ml-auto text-xs text-sand-400">
-          {citation.matchType === "lexical"
-            ? t("chat.source.lexical")
-            : citation.matchType === "hybrid"
-              ? t("chat.source.hybrid", { percent: (citation.score * 100).toFixed(0) })
-              : t("chat.source.semantic", { percent: (citation.score * 100).toFixed(0) })}
+          {citation.matchType === "read"
+            ? t("chat.source.read")
+            : citation.matchType === "lexical"
+              ? t("chat.source.lexical")
+              : citation.matchType === "hybrid"
+                ? t("chat.source.hybrid", { percent: (citation.score * 100).toFixed(0) })
+                : t("chat.source.semantic", { percent: (citation.score * 100).toFixed(0) })}
         </span>
       </div>
       <blockquote className="mt-2 border-l-2 border-sand-300 pl-3 text-xs text-pretty text-sand-600 italic">

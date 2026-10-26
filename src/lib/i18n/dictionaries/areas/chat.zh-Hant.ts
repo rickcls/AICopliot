@@ -133,6 +133,7 @@ export const chatZhHant = {
       lexical: "文字完全相符",
       hybrid: "混合 · 語意相似度 {percent}%",
       semantic: "語意相似度 {percent}%",
+      read: "從所選文件讀取",
       jump: "跳到出處 {label}",
     },
     turn: {

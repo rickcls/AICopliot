@@ -1,4 +1,5 @@
-export type RetrievalMatchType = "semantic" | "lexical" | "hybrid";
+/** "read": a passage of a document the person chose, read rather than searched. */
+export type RetrievalMatchType = "semantic" | "lexical" | "hybrid" | "read";
 
 export interface RetrievalCandidate {
   id: string;
