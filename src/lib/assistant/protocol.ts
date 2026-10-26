@@ -374,6 +374,7 @@ export function buildOpeningMessage({
   tasks,
   history,
   question,
+  scope = { project: null, documents: [] },
 }: {
   today: string;
   weekday: string;
@@ -384,11 +385,25 @@ export function buildOpeningMessage({
   tasks: { label: string; line: string }[];
   history: { role: "user" | "assistant"; content: string }[];
   question: string;
+  /** What the person pinned the question to in the composer. */
+  scope?: { project: { label: string; name: string } | null; documents: string[] };
 }): string {
   return [
     `TODAY: ${today} (${weekday}), ${timeZone}`,
     `OUTPUT LANGUAGE: ${languageDirective(language)}`,
     "",
+    ...(scope.project
+      ? [
+          `ASKED ABOUT PROJECT: ${scope.project.label} (${scope.project.name}). Document searches and task lists stay in it, and a new task goes in it unless they name another.`,
+          "",
+        ]
+      : []),
+    ...(scope.documents.length
+      ? [
+          `ATTACHED DOCUMENTS (answer from these; search_documents searches only them): ${scope.documents.join("; ")}`,
+          "",
+        ]
+      : []),
     "PROJECTS:",
     projects.length
       ? projects.map((project) => `${project.label}: ${project.name}${project.personal ? " (personal)" : ""}`).join("\n")

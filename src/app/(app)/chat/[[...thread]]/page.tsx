@@ -28,12 +28,12 @@ export default async function ChatPage({
   searchParams,
 }: {
   params: Promise<{ thread?: string[] }>;
-  searchParams: Promise<{ project?: string; task?: string; docs?: string }>;
+  searchParams: Promise<{ project?: string; task?: string; docs?: string; ask?: string }>;
 }) {
   const { workspaceId, user } = await requireWorkspace();
   const [
     { thread },
-    { project: requestedProjectId, task: requestedTaskId, docs: requestedDocs },
+    { project: requestedProjectId, task: requestedTaskId, docs: requestedDocs, ask: carriedQuestion },
   ] = await Promise.all([params, searchParams]);
 
   if (thread && thread.length > 1) notFound();
@@ -47,6 +47,7 @@ export default async function ChatPage({
       select: {
         id: true,
         name: true,
+        personalOwnerId: true,
         _count: {
           select: {
             documents: { where: { status: "ready" } },
@@ -176,6 +177,10 @@ export default async function ChatPage({
       threads={threads}
       conversation={conversation}
       initialProjectId={initialProjectId}
+      // Attached files go into the chosen project, else the person's own.
+      personalProjectId={projects.find((project) => project.personalOwnerId === user.id)?.id ?? null}
+      // A question typed before attaching files survives the new thread.
+      initialQuestion={conversation ? "" : (carriedQuestion ?? "").slice(0, 2000)}
       focus={focus}
       focusOptions={focusOptions}
       // Relative timestamps in the rail must come from one instant, or server

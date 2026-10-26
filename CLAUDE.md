@@ -1024,6 +1024,23 @@ grounded, scope-pinned Q&A. Both are in the sidebar under those names.
   reply is returned, through `applyChange`. A possible duplicate, or a date
   the code disagrees with, stays pending for Apply. The tools themselves
   still do not write a task.
+- **A question can be pinned in the composer** to one project and to
+  documents — files attached (picker or drop) or chosen from the indexed
+  ones. Both live above the keyed conversation, like the web switch, so they
+  stay as set across turns. `resolveAskContext` checks them inside the
+  workspace (a visible project, indexed documents) before a thread exists, and
+  the person's message keeps them in its otherwise unused `sources` column
+  (`AskContext`), so a reloaded thread still shows what each question was
+  about. The tools get `ToolContext.scope`: attached documents are the only
+  ones `search_documents` reads, and it keeps their best passages without the
+  evidence bar, because the person chose them ("summarise this" scores low
+  against any file); otherwise a chosen project bounds document searches,
+  `list_my_tasks`, and `find_tasks`, overriding any project the model names,
+  and a new task with no project named goes into it. The opening message says
+  so by label and file name, never id. Attaching is an ordinary upload done by
+  the page before the question (`uploadAllAndIndex`,
+  `src/lib/documents/upload.ts`) into the chosen project, else the person's
+  own, so the assistant still writes nothing itself.
 - **Proposals render through `ProposalList`** (`components/capture/
   proposal-list.tsx`), shared with captures; only the apply and decide
   endpoints differ. Applying both kinds goes through
@@ -1792,6 +1809,12 @@ its project or task, never re-point it.
   is a filter, not a relation, and lives **inside** both retrieval SQL paths
   (`retrieveChunks(…, documentIds)`) — filtered afterwards, the rest of the
   project would fill the LIMIT and the focus would return nothing.
+- **Attaching files is a document focus.** The composer's paperclip (or a
+  drop) uploads and indexes the files into the thread's project, else the
+  person's own (`uploadAllAndIndex`), then opens a new thread focused on them
+  plus any already in the focus, carrying the half-typed question in `?ask=`.
+  A new thread because the evidence changed; the confirmation comes before
+  the upload, so a cancelled one uploads nothing.
 
 **Task threads may propose edits; they never make them.** `TASK_SYSTEM_PROMPT`
 lets the model return `proposals` (description, priority, estimate, dates),

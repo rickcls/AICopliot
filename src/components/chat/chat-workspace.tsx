@@ -10,6 +10,8 @@ import { useT } from "@/components/i18n-provider";
 import { useToast } from "@/components/toast";
 import { Modal, ModalBody } from "@/components/modal";
 import { Button, EmptyState, ErrorState, LinkButton } from "@/components/ui";
+import { uploadAllAndIndex, uploadFailureMessage } from "@/lib/documents/upload";
+import { MAX_FOCUS_DOCUMENTS } from "@/lib/schemas";
 import { assistantTurnFrom, streamAnswer } from "./ask-stream";
 import { Composer } from "./composer";
 import { DocumentChooser } from "./document-chooser";
@@ -41,6 +43,8 @@ export function ChatWorkspace({
   threads,
   conversation,
   initialProjectId,
+  personalProjectId,
+  initialQuestion = "",
   focus,
   focusOptions,
   nowIso,
@@ -50,6 +54,10 @@ export function ChatWorkspace({
   threads: ThreadSummary[];
   conversation: LoadedConversation | null;
   initialProjectId: string;
+  /** Where attached files go when no project is chosen. */
+  personalProjectId: string | null;
+  /** A question typed before files were attached, carried into the new thread. */
+  initialQuestion?: string;
   /** Like the project: changing it is a navigation to a new thread. */
   focus: ChatFocusState;
   focusOptions: FocusOptions;
@@ -71,7 +79,8 @@ export function ChatWorkspace({
   // Not state: changing scope starts a new thread, which is a navigation, and
   // the page remounts this component with the new value.
   const projectId = initialProjectId;
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(initialQuestion);
+  const [attaching, setAttaching] = useState<{ done: number; total: number; name: string } | null>(null);
   const [pending, setPending] = useState(false);
   const [phases, setPhases] = useState<AnswerProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -102,8 +111,12 @@ export function ChatWorkspace({
     projectId: string;
     taskId?: string;
     documentIds?: string[];
+    /** The question being typed, carried over. */
+    ask?: string;
+    /** Already confirmed by the caller. */
+    confirmed?: boolean;
   }) {
-    if (turns.length > 0) {
+    if (turns.length > 0 && !target.confirmed) {
       const confirmed = await confirm({
         title: t("chat.newThreadTitle"),
         body: t("chat.newThreadBody"),
@@ -116,8 +129,47 @@ export function ChatWorkspace({
     if (target.projectId) params.set("project", target.projectId);
     if (target.taskId) params.set("task", target.taskId);
     if (target.documentIds?.length) params.set("docs", target.documentIds.join(","));
+    if (target.ask?.trim()) params.set("ask", target.ask.trim());
     const query = params.toString();
     router.push(query ? `/chat?${query}` : "/chat");
+  }
+
+  /**
+   * Attached files become documents of the chosen project (else the person's
+   * own) and the thread is focused on them — answers come from those files
+   * only, and changing the evidence starts a new thread, as any focus does.
+   * Files already in the focus stay in it.
+   */
+  async function attachFiles(files: File[]) {
+    const target = projectId || personalProjectId;
+    if (files.length === 0 || attaching || !target) return;
+    if (turns.length > 0) {
+      const confirmed = await confirm({
+        title: t("chat.newThreadTitle"),
+        body: t("chat.newThreadBody"),
+        confirmLabel: t("chat.newThreadConfirm"),
+      });
+      if (!confirmed) return;
+    }
+    setError(null);
+    const results = await uploadAllAndIndex(files.slice(0, MAX_FOCUS_DOCUMENTS), target, (done, total, name) =>
+      setAttaching(name ? { done: done + 1, total, name } : null),
+    );
+    setAttaching(null);
+    const failures = results.flatMap((result) => (result.ok ? [] : [uploadFailureMessage(result, t)]));
+    const added = results.flatMap((result) => (result.ok ? [result.id] : []));
+    if (added.length === 0) {
+      setError(failures.join("\n") || t("tasks.documents.uploadFailed"));
+      return;
+    }
+    if (failures.length > 0) toast.error(failures.join("\n"));
+    const already = focus.kind === "documents" ? focus.documents.map((document) => document.id) : [];
+    await startThread({
+      projectId,
+      documentIds: [...new Set([...already, ...added])].slice(0, MAX_FOCUS_DOCUMENTS),
+      ask: question,
+      confirmed: true,
+    });
   }
 
   async function changeProject(nextProjectId: string) {
@@ -410,6 +462,8 @@ export function ChatWorkspace({
             onChange={setQuestion}
             onProjectChange={changeProject}
             onFocusChange={changeFocus}
+            onAttach={(files) => void attachFiles(files)}
+            attaching={attaching}
             onSubmit={() => ask(question)}
             // The negative margin lets the sticky bar cover content edge to
             // edge instead of letting text slide through the gutter beside it.

@@ -651,6 +651,10 @@ export const assistantQuestionSchema = z.object({
   threadId: z.string().trim().min(1).optional(),
   question: z.string().trim().min(1, "Ask something first").max(2000),
   webSearch: z.boolean().optional().default(false),
+  /** Asks about one project: documents, tasks, and new tasks stay in it. */
+  projectId: z.string().trim().min(1).optional(),
+  /** Answers from these documents only — files attached or chosen in the composer. */
+  documentIds: idList(MAX_FOCUS_DOCUMENTS, "documents").optional(),
 });
 
 export const loginSchema = z.object({

@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef } from "react";
-import { ArrowUp, Crosshair, FileText, Files, FolderKanban, Library, SquareCheck } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowUp, Crosshair, FileText, Files, FolderKanban, Library, Paperclip, SquareCheck } from "lucide-react";
 import { useT } from "@/components/i18n-provider";
 import { PillSelect, type PillOption } from "@/components/property-pill";
 import { projectOptions } from "@/components/task-field-options";
 import { Button, Spinner, Textarea } from "@/components/ui";
+import { UPLOAD_EXTENSIONS } from "@/lib/mail/document";
+import { cn } from "@/lib/utils";
 import type { ChatFocusState, FocusOptions, ProjectOption } from "./types";
 
 /**
@@ -34,6 +36,8 @@ export function Composer({
   onChange,
   onProjectChange,
   onFocusChange,
+  onAttach,
+  attaching,
   onSubmit,
   className,
 }: {
@@ -48,10 +52,16 @@ export function Composer({
   onProjectChange: (projectId: string) => void;
   /** "" | "task:<id>" | "doc:<id>" | "choose-documents" */
   onFocusChange: (value: string) => void;
+  /** Files chosen or dropped, to answer from. */
+  onAttach: (files: File[]) => void;
+  /** Progress while attached files upload and index. */
+  attaching: { done: number; total: number; name: string } | null;
   onSubmit: () => void;
   className?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
   const t = useT();
 
   const selectedProject = projects.find((project) => project.id === projectId);
@@ -132,7 +142,7 @@ export function Composer({
         ]
       : []),
   ];
-  const canSend =!pending && value.trim().length >= 3 && evidenceCount > 0;
+  const canSend = !pending && !attaching && value.trim().length >= 3 && evidenceCount > 0;
 
   function grow(element: HTMLTextAreaElement) {
     element.style.height = "auto";
@@ -156,8 +166,35 @@ export function Composer({
           event.preventDefault();
           submit();
         }}
-        className="rounded-2xl border border-sand-200/80 bg-white p-2 shadow-soft transition-shadow focus-within:border-brand-300 focus-within:ring-4 focus-within:ring-brand-100/70"
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          if (!event.dataTransfer.files.length) return;
+          event.preventDefault();
+          setDragging(false);
+          onAttach([...event.dataTransfer.files]);
+        }}
+        className={cn(
+          "rounded-2xl border border-sand-200/80 bg-white p-2 shadow-soft transition-shadow focus-within:border-brand-300 focus-within:ring-4 focus-within:ring-brand-100/70",
+          dragging && "border-brand-300 ring-4 ring-brand-100/70",
+        )}
       >
+        {attaching || dragging ? (
+          <p className="flex items-center gap-1.5 px-2 pt-1 text-xs text-sand-500" aria-live="polite">
+            {attaching ? (
+              <>
+                <Spinner className="size-3" />
+                {t("assistant.uploading", attaching)}
+              </>
+            ) : (
+              <span className="text-brand-700">{t("chat.composer.dropHere")}</span>
+            )}
+          </p>
+        ) : null}
         <label htmlFor="question" className="sr-only">
           {t("chat.composer.question")}
         </label>
@@ -221,6 +258,31 @@ export function Composer({
             disabled={pending}
             className="h-7 max-w-[14rem] shrink text-xs"
           />
+
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            className="sr-only"
+            tabIndex={-1}
+            accept={UPLOAD_EXTENSIONS.join(",")}
+            onChange={(event) => {
+              const files = [...(event.target.files ?? [])];
+              event.target.value = "";
+              onAttach(files);
+            }}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            disabled={pending || attaching !== null}
+            onClick={() => fileInput.current?.click()}
+          >
+            <Paperclip className="size-3.5" aria-hidden />
+            {t("chat.composer.attach")}
+          </Button>
 
           <span className="hidden min-w-0 truncate text-xs text-sand-500 sm:inline">
             {focus.kind !== "none"

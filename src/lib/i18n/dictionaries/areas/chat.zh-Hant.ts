@@ -47,6 +47,8 @@ export const chatZhHant = {
       delete: "刪除「{title}」",
     },
     composer: {
+      attach: "附上檔案",
+      dropHere: "放開即可根據這些檔案回答",
       question: "你的問題",
       placeholder: "就你的文件和專案記錄提問…",
       askAbout: "提問範圍",
