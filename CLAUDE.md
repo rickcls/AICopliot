@@ -1215,7 +1215,11 @@ ignored, never trusted. `PUT /api/me/workspace` checks membership before saving
 a choice, and accepting an invite sets it, so an existing user who joins a team
 lands in the team's workspace. The sidebar shows a switcher only with two or
 more memberships; switching lands on `/today`, because the open project belongs
-to the old workspace.
+to the old workspace. A second workspace is created only when an invite is set
+to "New workspace" and named (`createWorkspaceInvite`): the caller becomes its
+owner, the link joins that workspace, and `activeWorkspaceId` stays put so
+sending the invite does not open it. Inviting into the current workspace
+creates nothing else.
 
 Member rules live in the pure `canChangeMember()` (`src/lib/workspace/invites.ts`):
 only admins change other people, anyone may leave, the owner is never removed

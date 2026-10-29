@@ -14,6 +14,8 @@ import {
   Input,
   QUIET_CONTROL,
   SectionHeader,
+  Segment,
+  SegmentedControl,
   Select,
 } from "@/components/ui";
 import { intlLocale } from "@/lib/i18n/locales";
@@ -65,10 +67,16 @@ export function MembersPanel({
   const confirm = useConfirm();
   const router = useRouter();
   const roleSelectId = useId();
+  const nameId = useId();
+  const nameErrorId = useId();
   const [members, setMembers] = useState(initialMembers);
   const [invites, setInvites] = useState(initialInvites);
   const [inviteRole, setInviteRole] = useState<Role>("member");
+  const [destination, setDestination] = useState<"current" | "new">("current");
+  const [newName, setNewName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
   const [newLink, setNewLink] = useState<string | null>(null);
+  const [createdWorkspace, setCreatedWorkspace] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -135,24 +143,46 @@ export function MembersPanel({
   }
 
   async function createInvite() {
+    const namingNew = destination === "new";
+    if (namingNew && !newName.trim()) return;
     setBusy("invite");
     setCopied(false);
+    setNameError(null);
     try {
       const response = await fetch("/api/workspace/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: inviteRole }),
+        body: JSON.stringify({
+          role: inviteRole,
+          destination,
+          ...(namingNew ? { name: newName.trim() } : {}),
+        }),
       });
-      if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        code?: string;
+        invite?: { id: string; role: Role; expiresAt: string };
+        workspace?: { id: string; name: string };
+      };
+      if (!response.ok || !data.url || !data.invite) {
+        if (response.status === 409 || data.code === "name_taken") {
+          setNameError(t("members.workspaceNameTaken"));
+          return;
+        }
         toast.error(t("members.createFailed"));
         return;
       }
-      const data = (await response.json()) as {
-        url: string;
-        invite: { id: string; role: Role; expiresAt: string };
-      };
       setNewLink(data.url);
-      setInvites([data.invite, ...invites]);
+      // A link for a new workspace is pending there, not in this one. Adding
+      // it here would offer a withdraw that this workspace's list cannot do.
+      if (data.workspace) {
+        setCreatedWorkspace(data.workspace.name);
+        setNewName("");
+        router.refresh();
+      } else {
+        setCreatedWorkspace(null);
+        setInvites([data.invite, ...invites]);
+      }
     } catch {
       toast.error(t("common.couldNotReach"));
     } finally {
@@ -261,34 +291,93 @@ export function MembersPanel({
         />
         {isAdmin ? (
           <Card className="divide-y divide-sand-100">
-            <div className="flex flex-wrap items-end gap-3 p-4">
+            <div className="space-y-3 p-4">
               <div>
-                <label htmlFor={roleSelectId} className="mb-1 block text-xs font-medium text-sand-500">
-                  {t("members.inviteAs")}
-                </label>
-                <Select
-                  id={roleSelectId}
-                  value={inviteRole}
-                  onChange={(event) => setInviteRole(event.target.value as Role)}
-                  className="h-9"
-                >
-                  <option value="member">{t("members.roleMember")}</option>
-                  <option value="admin">{t("members.roleAdmin")}</option>
-                </Select>
+                <p className="mb-1 text-xs font-medium text-sand-500">{t("members.inviteTo")}</p>
+                <SegmentedControl label={t("members.inviteTo")}>
+                  <Segment
+                    pressed={destination === "current"}
+                    onClick={() => {
+                      setDestination("current");
+                      setNameError(null);
+                    }}
+                  >
+                    {t("members.thisWorkspace")}
+                  </Segment>
+                  <Segment
+                    pressed={destination === "new"}
+                    onClick={() => setDestination("new")}
+                  >
+                    {t("members.newWorkspace")}
+                  </Segment>
+                </SegmentedControl>
+                {destination === "current" ? (
+                  <p className="mt-1 text-xs text-sand-500">
+                    {t("members.thisWorkspaceHint", { workspace: workspaceName })}
+                  </p>
+                ) : null}
               </div>
-              <Button
-                type="button"
-                disabled={busy === "invite"}
-                onClick={() => void createInvite()}
-              >
-                <Link2 className="size-4" aria-hidden />
-                {t("members.createInvite")}
-              </Button>
+              {destination === "new" ? (
+                <div className="max-w-sm">
+                  <label htmlFor={nameId} className="mb-1 block text-xs font-medium text-sand-500">
+                    {t("members.newWorkspaceName")}
+                  </label>
+                  <Input
+                    id={nameId}
+                    value={newName}
+                    onChange={(event) => {
+                      setNewName(event.target.value);
+                      setNameError(null);
+                    }}
+                    placeholder={t("members.newWorkspaceNamePlaceholder")}
+                    maxLength={120}
+                    disabled={busy === "invite"}
+                    aria-invalid={nameError ? true : undefined}
+                    aria-describedby={nameError ? nameErrorId : undefined}
+                    className="h-9"
+                  />
+                  {nameError ? (
+                    <p id={nameErrorId} className="mt-1 text-xs text-red-700">
+                      {nameError}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-sand-500">{t("members.newWorkspaceHint")}</p>
+                  )}
+                </div>
+              ) : null}
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label htmlFor={roleSelectId} className="mb-1 block text-xs font-medium text-sand-500">
+                    {t("members.inviteAs")}
+                  </label>
+                  <Select
+                    id={roleSelectId}
+                    value={inviteRole}
+                    onChange={(event) => setInviteRole(event.target.value as Role)}
+                    className="h-9"
+                  >
+                    <option value="member">{t("members.roleMember")}</option>
+                    <option value="admin">{t("members.roleAdmin")}</option>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  disabled={busy === "invite" || (destination === "new" && !newName.trim())}
+                  onClick={() => void createInvite()}
+                >
+                  <Link2 className="size-4" aria-hidden />
+                  {t("members.createInvite")}
+                </Button>
+              </div>
             </div>
 
             {newLink ? (
               <div className="space-y-1.5 p-4">
-                <p className="text-xs font-medium text-sand-500">{t("members.newLinkLabel")}</p>
+                <p className="text-xs font-medium text-sand-500">
+                  {createdWorkspace
+                    ? t("members.newLinkFor", { workspace: createdWorkspace })
+                    : t("members.newLinkLabel")}
+                </p>
                 <div className="flex gap-2">
                   <Input
                     readOnly
@@ -306,7 +395,9 @@ export function MembersPanel({
                     {copied ? t("members.copied") : t("members.copy")}
                   </Button>
                 </div>
-                <p className="text-xs text-amber-700">{t("members.newLinkHint")}</p>
+                <p className="text-xs text-amber-700">
+                  {createdWorkspace ? t("members.newWorkspaceLinkHint") : t("members.newLinkHint")}
+                </p>
               </div>
             ) : null}
 

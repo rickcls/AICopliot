@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createInviteSchema } from "@/lib/schemas";
 import {
   canChangeMember,
   generateInviteToken,
@@ -131,10 +132,26 @@ describe("canChangeMember", () => {
   });
 });
 
+describe("createInviteSchema", () => {
+  it("invites into the current workspace without a name", () => {
+    expect(createInviteSchema.safeParse({}).success).toBe(true);
+    expect(createInviteSchema.safeParse({ role: "admin", destination: "current" }).success).toBe(true);
+  });
+
+  it("requires a name only when the invite creates a workspace", () => {
+    expect(createInviteSchema.safeParse({ destination: "new" }).success).toBe(false);
+    expect(createInviteSchema.safeParse({ destination: "new", name: "   " }).success).toBe(false);
+    const parsed = createInviteSchema.safeParse({ destination: "new", name: " Client " });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.name).toBe("Client");
+  });
+});
+
 // --- Service ----------------------------------------------------------------
 
 const tx = {
-  workspaceInvite: { updateMany: vi.fn() },
+  workspace: { create: vi.fn() },
+  workspaceInvite: { updateMany: vi.fn(), create: vi.fn() },
   workspaceMember: { create: vi.fn() },
   user: { update: vi.fn() },
 };
@@ -147,6 +164,7 @@ const mockPrisma = {
   },
   workspaceMember: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     count: vi.fn(),
     update: vi.fn(),
@@ -191,6 +209,46 @@ describe("createInvite", () => {
       status: 403,
     });
     expect(mockPrisma.workspaceInvite.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("createWorkspaceInvite", () => {
+  it("creates a workspace the caller owns and an invite into it, without switching", async () => {
+    mockPrisma.workspaceMember.findFirst.mockResolvedValue(null);
+    tx.workspace.create.mockResolvedValue({ id: "ws-new", name: "Client" });
+    tx.workspaceInvite.create.mockResolvedValue({ id: "inv-new", role: "member" });
+
+    const { token, workspace } = await service.createWorkspaceInvite("u-admin", "  Client  ", "member", NOW);
+
+    expect(workspace).toEqual({ id: "ws-new", name: "Client" });
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    expect(tx.user.update).not.toHaveBeenCalled();
+
+    const workspaceData = tx.workspace.create.mock.calls[0][0].data;
+    expect(workspaceData).toMatchObject({
+      name: "Client",
+      ownerId: "u-admin",
+      members: { create: { userId: "u-admin", role: "admin" } },
+    });
+
+    const inviteData = tx.workspaceInvite.create.mock.calls[0][0].data;
+    expect(inviteData.tokenHash).toBe(hashInviteToken(token));
+    expect(JSON.stringify(inviteData)).not.toContain(token);
+    expect(inviteData).toMatchObject({
+      workspaceId: "ws-new",
+      role: "member",
+      createdById: "u-admin",
+      expiresAt: inviteExpiry(NOW),
+    });
+  });
+
+  it("refuses a name the caller already has, and writes nothing", async () => {
+    mockPrisma.workspaceMember.findFirst.mockResolvedValue({ workspaceId: "ws-1" });
+
+    await expect(service.createWorkspaceInvite("u-admin", "Ops", "admin", NOW)).rejects.toBeInstanceOf(
+      service.WorkspaceNameTakenError,
+    );
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 });
 

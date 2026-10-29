@@ -43,6 +43,14 @@ function unusableInvite(state: "expired" | "accepted" | "revoked"): InviteError 
   }
 }
 
+/** The caller already belongs to a workspace with this name. */
+export class WorkspaceNameTakenError extends Error {
+  constructor() {
+    super("You already have a workspace with this name");
+    this.name = "WorkspaceNameTakenError";
+  }
+}
+
 /** Creates a link. The raw token is returned here once and never stored. */
 export async function createInvite(
   access: WorkspaceAccess,
@@ -62,6 +70,53 @@ export async function createInvite(
     select: { id: true, role: true, expiresAt: true, createdAt: true },
   });
   return { invite, token };
+}
+
+/**
+ * Creates a workspace the caller owns, and a single-use invite into it.
+ *
+ * This runs only when they chose "new workspace" on the invite. It does not
+ * change `activeWorkspaceId`: they stay in the workspace they were inviting
+ * from, and the new one appears in the switcher. The invitee's role is the
+ * one they picked; the caller is the owner and an admin either way.
+ */
+export async function createWorkspaceInvite(
+  userId: string,
+  name: string,
+  role: WorkspaceRole,
+  now: Date = new Date(),
+) {
+  const trimmed = name.trim();
+  const taken = await prisma.workspaceMember.findFirst({
+    where: { userId, workspace: { name: trimmed } },
+    select: { workspaceId: true },
+  });
+  if (taken) throw new WorkspaceNameTakenError();
+
+  const token = generateInviteToken();
+  const created = await prisma.$transaction(async (tx) => {
+    const workspace = await tx.workspace.create({
+      data: {
+        name: trimmed,
+        ownerId: userId,
+        members: { create: { userId, role: "admin" } },
+      },
+      select: { id: true, name: true },
+    });
+    const invite = await tx.workspaceInvite.create({
+      data: {
+        workspaceId: workspace.id,
+        tokenHash: hashInviteToken(token),
+        role,
+        createdById: userId,
+        expiresAt: inviteExpiry(now),
+      },
+      select: { id: true, role: true, expiresAt: true, createdAt: true },
+    });
+    return { workspace, invite };
+  });
+
+  return { ...created, token };
 }
 
 /** Links still waiting to be used. Never includes a token: none is stored. */

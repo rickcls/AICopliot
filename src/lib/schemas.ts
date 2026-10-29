@@ -589,9 +589,21 @@ export const switchWorkspaceSchema = z.object({
   workspaceId: z.string().trim().min(1),
 });
 
-export const createInviteSchema = z.object({
-  role: workspaceRoleSchema.optional(),
-});
+/**
+ * An invite joins the current workspace unless `destination` is `new`, in
+ * which case the caller names a workspace created for that link. The name is
+ * required only then: inviting into the current workspace never creates one.
+ */
+export const createInviteSchema = z
+  .object({
+    role: workspaceRoleSchema.optional(),
+    destination: z.enum(["current", "new"]).optional(),
+    name: z.string().trim().min(1).max(120).optional(),
+  })
+  .refine((value) => value.destination !== "new" || value.name !== undefined, {
+    path: ["name"],
+    message: "Name the new workspace",
+  });
 
 /** A base64url token of 32 bytes is 43 characters; anything far off is not one. */
 export const acceptInviteSchema = z.object({
